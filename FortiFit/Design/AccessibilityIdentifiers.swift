@@ -117,6 +117,12 @@ enum AccessibilityID {
 
     static let workoutDetailShowOnPlanMenuItem = "workoutDetailShowOnPlanMenuItem"
 
+    // MARK: - Match Prompt Sheet
+
+    static let matchPromptSheetLinkButton = "matchPromptSheet_linkButton"
+    static let matchPromptSheetKeepSeparateButton = "matchPromptSheet_keepSeparateButton"
+    static let matchPromptSheetDecideLaterButton = "matchPromptSheet_decideLaterButton"
+
     // MARK: - Trends
 
     static let trendsEllipsisMenu = "trendsEllipsisMenu"

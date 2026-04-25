@@ -14,9 +14,10 @@ struct FortiFitApp: App {
     @State private var showImportPrompt = false
     @State private var showImportError = false
     @State private var healthKitMatcher = WorkoutMatcher()
-    @State private var healthKitSyncService: HealthKitSyncService = {
-        HealthKitSyncService(client: DefaultHealthKitClient(), matcher: WorkoutMatcher())
-    }()
+    @State private var healthKitSyncService: HealthKitSyncService?
+    @State private var showMatchPrompt = false
+    @State private var currentPendingMatch: PendingMatch?
+    @Environment(\.scenePhase) private var scenePhase
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -72,15 +73,58 @@ struct FortiFitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(healthKitSyncService)
+                .environment(healthKitSyncService ?? HealthKitSyncService(client: DefaultHealthKitClient(), matcher: healthKitMatcher))
                 .task {
+                    let syncService = HealthKitSyncService(client: DefaultHealthKitClient(), matcher: healthKitMatcher)
+                    healthKitSyncService = syncService
                     let context = sharedModelContainer.mainContext
                     WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
-                    healthKitSyncService.setContext(context)
+                    syncService.setContext(context)
                     if UserSettings.shared.healthKitEnabled {
-                        await healthKitSyncService.importPendingWorkouts(context: context)
-                        healthKitSyncService.startObserving()
-                        healthKitSyncService.registerBackgroundTask()
+                        await syncService.importPendingWorkouts(context: context)
+                        syncService.startObserving()
+                        syncService.registerBackgroundTask()
+                    }
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        presentNextPendingMatch()
+                    }
+                }
+                .sheet(isPresented: $showMatchPrompt) {
+                    presentNextPendingMatch()
+                } content: {
+                    if let match = currentPendingMatch {
+                        let context = sharedModelContainer.mainContext
+                        let workout = fetchWorkout(id: match.workoutId, context: context)
+                        MatchPromptSheetView(
+                            pendingMatch: match,
+                            workout: workout,
+                            onLink: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .link,
+                                    context: context
+                                )
+                            },
+                            onKeepSeparate: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .keepSeparate,
+                                    context: context
+                                )
+                            },
+                            onDecideLater: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .decideLater,
+                                    context: context
+                                )
+                            }
+                        )
                     }
                 }
                 .onOpenURL { url in
@@ -107,5 +151,20 @@ struct FortiFitApp: App {
                 }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    private func presentNextPendingMatch() {
+        guard let match = healthKitMatcher.pendingMatches().first else {
+            currentPendingMatch = nil
+            return
+        }
+        currentPendingMatch = match
+        showMatchPrompt = true
+    }
+
+    private func fetchWorkout(id: UUID, context: ModelContext) -> Workout? {
+        let predicate = #Predicate<Workout> { w in w.id == id }
+        let descriptor = FetchDescriptor<Workout>(predicate: predicate)
+        return (try? context.fetch(descriptor))?.first
     }
 }
