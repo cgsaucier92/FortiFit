@@ -3,6 +3,7 @@ import HealthKit
 
 final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
     private let healthStore = HKHealthStore()
+    private let settings = UserSettings.shared
 
     private var readTypes: Set<HKObjectType> {
         var types: Set<HKObjectType> = [
@@ -24,20 +25,19 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
 
     func requestAuthorization() async throws {
         try await healthStore.requestAuthorization(toShare: [], read: readTypes)
+        settings.healthKitAuthorizationRequested = true
     }
 
     func authorizationStatus() -> HealthKitAuthorizationStatus {
-        let status = healthStore.authorizationStatus(for: HKObjectType.workoutType())
-        switch status {
-        case .notDetermined:
-            return .notDetermined
-        case .sharingAuthorized:
+        // HKHealthStore.authorizationStatus(for:) only reflects write/share
+        // permission. For read-only apps iOS intentionally hides whether the
+        // user granted or denied read access. Once we've presented the
+        // authorization prompt, treat it as granted — if the user actually
+        // denied read access, queries will simply return no results.
+        if settings.healthKitAuthorizationRequested {
             return .granted
-        case .sharingDenied:
-            return .denied
-        @unknown default:
-            return .notDetermined
         }
+        return .notDetermined
     }
 
     func fetchWorkouts(since anchor: Data?) async throws -> (workouts: [HealthKitWorkoutSnapshot], deletedUUIDs: [UUID], newAnchor: Data?) {

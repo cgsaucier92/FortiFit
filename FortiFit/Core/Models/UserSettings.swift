@@ -19,6 +19,7 @@ final class UserSettings {
         static let healthKitAnchor = "healthKitAnchor"
         static let healthKitLastSyncDate = "healthKitLastSyncDate"
         static let hasMigratedSprintsToCardio = "hasMigratedSprintsToCardio"
+        static let healthKitAuthorizationRequested = "healthKitAuthorizationRequested"
     }
 
     var useLbs: Bool {
@@ -69,6 +70,10 @@ final class UserSettings {
         didSet { defaults.set(hasMigratedSprintsToCardio, forKey: Keys.hasMigratedSprintsToCardio) }
     }
 
+    var healthKitAuthorizationRequested: Bool {
+        didSet { defaults.set(healthKitAuthorizationRequested, forKey: Keys.healthKitAuthorizationRequested) }
+    }
+
     private init() {
         // Register defaults for first launch
         defaults.register(defaults: [
@@ -81,7 +86,8 @@ final class UserSettings {
             Keys.longestStreak: 0,
             Keys.hasSeededDefaultTrendsCharts: false,
             Keys.healthKitEnabled: false,
-            Keys.hasMigratedSprintsToCardio: false
+            Keys.hasMigratedSprintsToCardio: false,
+            Keys.healthKitAuthorizationRequested: false
         ])
 
         self.useLbs = defaults.bool(forKey: Keys.useLbs)
@@ -96,5 +102,6 @@ final class UserSettings {
         self.healthKitAnchor = defaults.data(forKey: Keys.healthKitAnchor)
         self.healthKitLastSyncDate = defaults.object(forKey: Keys.healthKitLastSyncDate) as? Date
         self.hasMigratedSprintsToCardio = defaults.bool(forKey: Keys.hasMigratedSprintsToCardio)
+        self.healthKitAuthorizationRequested = defaults.bool(forKey: Keys.healthKitAuthorizationRequested)
     }
 }

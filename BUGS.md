@@ -275,3 +275,16 @@
 | Root Cause | The ellipsis button is placed inside the `ScrollView` in `FortiFitProgressView.swift`. When the native menu overlay dismisses mid-scroll, the button's position briefly follows scroll momentum before SwiftUI re-settles the layout. |
 | Resolution | Extracted the header (`HStack` with ellipsis and `FortiFitDivider`) out of the `ScrollView` into a fixed `VStack(spacing: 0)` above it, mirroring the pattern used by `WorkoutListView`, `HomeView`, and `PlanView`. |
 | Status | Resolved |
+
+---
+
+### BUG-021
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-04-24 |
+| Phase | Phase 8 — Settings (HealthKit authorization status always shows "Permission denied") |
+| Description | After enabling "Connect to Apple Health" in Settings, the status line reads "Permission denied in iOS Settings" and shows an "Open iOS Settings" button. The user never denied permissions, and Apple Health does not appear in the iOS Settings page for FitNavi. |
+| Root Cause | `DefaultHealthKitClient.authorizationStatus()` used `HKHealthStore.authorizationStatus(for:)`, which returns **sharing/write** authorization status (`.sharingAuthorized` / `.sharingDenied`). Since FortiFit is read-only (`toShare: []` in the authorization request), HealthKit always returns `.sharingDenied` for the workout type — the code then incorrectly mapped this to the app's `.denied` enum case. For read-only HealthKit apps, iOS intentionally hides whether read access was granted or denied; `authorizationStatus(for:)` is meaningless for read types. |
+| Resolution | Added a `healthKitAuthorizationRequested` boolean flag to `UserSettings`. `DefaultHealthKitClient.requestAuthorization()` sets this flag to `true` after the authorization prompt completes. `authorizationStatus()` now returns `.granted` when the flag is set, `.notDetermined` otherwise — bypassing the unusable `HKHealthStore.authorizationStatus(for:)` API entirely. |
+| Status | Resolved |
