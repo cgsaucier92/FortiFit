@@ -5,5 +5,6 @@ struct FortiFitHealthGlyph: View {
         Image(systemName: "heart.fill")
             .font(.system(size: 12))
             .foregroundStyle(Color(hex: "#FF2D55"))
+            .accessibilityIdentifier("healthGlyph")
     }
 }

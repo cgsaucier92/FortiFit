@@ -80,6 +80,13 @@ struct FortiFitApp: App {
                     let context = sharedModelContainer.mainContext
                     WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
                     syncService.setContext(context)
+                    if CommandLine.arguments.contains("--seed-hk-workout") {
+                        seedHealthKitLinkedWorkout(context: context)
+                    }
+                    if CommandLine.arguments.contains("--seed-hk-pending-match") {
+                        seedPendingMatch(context: context)
+                        presentNextPendingMatch()
+                    }
                     if UserSettings.shared.healthKitEnabled {
                         await syncService.importPendingWorkouts(context: context)
                         syncService.startObserving()
@@ -166,5 +173,53 @@ struct FortiFitApp: App {
         let predicate = #Predicate<Workout> { w in w.id == id }
         let descriptor = FetchDescriptor<Workout>(predicate: predicate)
         return (try? context.fetch(descriptor))?.first
+    }
+
+    private func seedHealthKitLinkedWorkout(context: ModelContext) {
+        let workout = Workout(
+            name: "HK Smoke Test Run",
+            date: Date(),
+            workoutType: "Cardio",
+            durationMinutes: 35,
+            distanceKm: 5.2,
+            healthKitUUID: UUID(),
+            healthKitSourceBundleID: "com.apple.health.workout-builder",
+            healthKitActivityType: "Running",
+            avgHeartRate: 155,
+            maxHeartRate: 178,
+            activeEnergyKcal: 420
+        )
+        context.insert(workout)
+        WorkoutTypeOrderService.ensureOrderExists(for: "Cardio", context: context)
+        try? context.save()
+    }
+
+    private func seedPendingMatch(context: ModelContext) {
+        let manualWorkout = Workout(
+            name: "Morning Strength",
+            date: Date(),
+            workoutType: "Strength Training",
+            durationMinutes: 45
+        )
+        context.insert(manualWorkout)
+        try? context.save()
+
+        let snapshot = HealthKitWorkoutSnapshot(
+            uuid: UUID(),
+            activityTypeRawValue: 50,
+            sourceBundleID: "com.apple.health.workout-builder",
+            startDate: Date().addingTimeInterval(-1800),
+            endDate: Date().addingTimeInterval(900),
+            durationMinutes: 45,
+            distanceKm: nil,
+            avgHeartRate: 142,
+            maxHeartRate: 168,
+            activeEnergyKcal: 350,
+            totalEnergyBurnedKcal: nil,
+            elevationAscendedMeters: nil,
+            exerciseMinutes: nil,
+            indoor: false
+        )
+        healthKitMatcher.queuePendingMatch(workoutId: manualWorkout.id, snapshot: snapshot)
     }
 }

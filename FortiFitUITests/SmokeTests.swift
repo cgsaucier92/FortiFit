@@ -532,4 +532,241 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(app.buttons["addGoalButton"].waitForExistence(timeout: 2), "Add Goal button should be visible after tab reset")
         XCTAssertFalse(app.buttons["Select Goal Type"].exists, "Add Goal screen should be dismissed after tab reset")
     }
+
+    // MARK: - Smoke 17: Settings — Apple Health Section
+
+    /// Settings screen shows Apple Health toggle and description text.
+    func test_settings_appleHealthSection_showsToggleAndDescription() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+        app.buttons["settingsGearIcon"].tap()
+
+        let toggle = app.switches["settings_appleHealthToggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 3), "Apple Health toggle should exist in Settings")
+
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Apple Health")).firstMatch.exists,
+            "Apple Health section header should be visible"
+        )
+
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Import workouts")).firstMatch.exists,
+            "Apple Health description text should be visible"
+        )
+    }
+}
+
+// MARK: - HealthKit Smoke Tests (Seeded Data)
+
+/// These tests use `--seed-hk-workout` to inject an HK-linked workout at launch,
+/// enabling verification of HealthKit UI surfaces without real HealthKit authorization.
+final class HealthKitSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state", "--seed-hk-workout"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    /// Waits for the seed to be visible on the Home screen, then navigates
+    /// to Workouts, expands the Cardio card, and taps into the workout detail.
+    private func navigateToSeededWorkoutDetail() {
+        // Home is the default tab. Wait for seeded workout in Recent Workouts
+        // to confirm the .task seed has completed.
+        let seedLabel = app.staticTexts["HK Smoke Test Run"]
+        XCTAssertTrue(seedLabel.waitForExistence(timeout: 5), "Seeded HK workout should appear on Home")
+
+        // Navigate to Workouts — .onAppear will now find the seeded data
+        app.tabBars.buttons["WORKOUTS"].tap()
+
+        let typeCard = app.buttons["workoutTypeCard_Cardio"]
+        XCTAssertTrue(typeCard.waitForExistence(timeout: 3), "Cardio type card should exist")
+        typeCard.tap()
+
+        let workoutRow = app.staticTexts["HK Smoke Test Run"]
+        XCTAssertTrue(workoutRow.waitForExistence(timeout: 3))
+        workoutRow.tap()
+    }
+
+    // MARK: - Smoke HK-1: Workout Detail Source Indicator
+
+    /// HK-linked workout shows the source indicator badge in Workout Detail.
+    func test_hkLinkedWorkout_showsSourceIndicatorInDetail() {
+        navigateToSeededWorkoutDetail()
+
+        let indicator = app.buttons["workoutDetail_healthSourceIndicator"]
+        XCTAssertTrue(indicator.waitForExistence(timeout: 3), "Source indicator should be visible for HK-linked workout")
+    }
+
+    // MARK: - Smoke HK-2: Health Source Info Sheet
+
+    /// Tapping the source indicator opens the Health Source Info Sheet.
+    func test_hkLinkedWorkout_tapIndicator_showsInfoSheet() {
+        navigateToSeededWorkoutDetail()
+
+        let indicator = app.buttons["workoutDetail_healthSourceIndicator"]
+        XCTAssertTrue(indicator.waitForExistence(timeout: 3))
+        indicator.tap()
+
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "imported from Apple Health")).firstMatch.waitForExistence(timeout: 3),
+            "Info sheet should describe the Apple Health import"
+        )
+
+        let unlinkButton = app.buttons["workoutDetail_healthUnlinkButton"]
+        XCTAssertTrue(unlinkButton.exists, "Unlink button should be visible in info sheet")
+    }
+
+    // MARK: - Smoke HK-3: Unlink via Ellipsis Menu
+
+    /// Ellipsis menu on HK-linked Workout Detail includes "Unlink from Apple Health".
+    func test_hkLinkedWorkout_ellipsisMenu_showsUnlinkOption() {
+        navigateToSeededWorkoutDetail()
+
+        let ellipsis = app.buttons["workoutDetailEllipsis"]
+        XCTAssertTrue(ellipsis.waitForExistence(timeout: 3))
+        ellipsis.tap()
+
+        let unlinkItem = app.buttons["workoutDetail_healthUnlinkButton"]
+        XCTAssertTrue(unlinkItem.waitForExistence(timeout: 3), "Unlink from Apple Health should appear in ellipsis menu")
+    }
+
+    // MARK: - Smoke HK-4: Unlink via Info Sheet Removes Indicator
+
+    /// Unlinking via the info sheet removes the source indicator.
+    func test_hkLinkedWorkout_unlinkViaInfoSheet_removesIndicator() {
+        navigateToSeededWorkoutDetail()
+
+        let indicator = app.buttons["workoutDetail_healthSourceIndicator"]
+        XCTAssertTrue(indicator.waitForExistence(timeout: 3))
+        indicator.tap()
+
+        let unlinkButton = app.buttons["workoutDetail_healthUnlinkButton"]
+        XCTAssertTrue(unlinkButton.waitForExistence(timeout: 3))
+        unlinkButton.tap()
+
+        XCTAssertFalse(
+            app.buttons["workoutDetail_healthSourceIndicator"].waitForExistence(timeout: 2),
+            "Source indicator should disappear after unlinking"
+        )
+    }
+
+    // MARK: - Smoke HK-5: Log Workout Read-Only Fields
+
+    /// Editing an HK-linked workout shows read-only helper text on date, duration, distance.
+    func test_hkLinkedWorkout_editMode_showsReadOnlyHelperText() {
+        navigateToSeededWorkoutDetail()
+
+        let editButton = app.buttons.matching(identifier: "pencil").firstMatch
+        XCTAssertTrue(editButton.waitForExistence(timeout: 3))
+        editButton.tap()
+
+        let durationHelper = app.buttons["logWorkout_durationReadOnlyHelper"]
+        XCTAssertTrue(durationHelper.waitForExistence(timeout: 3), "Duration read-only helper should be visible")
+
+        let distanceHelper = app.buttons["logWorkout_distanceReadOnlyHelper"]
+        XCTAssertTrue(distanceHelper.exists, "Distance read-only helper should be visible")
+    }
+
+    // MARK: - Smoke HK-6: Health Glyph on Home Screen
+
+    /// HK-linked workout shows the pink heart glyph next to its name on the Home screen.
+    func test_hkLinkedWorkout_showsHealthGlyphOnHome() {
+        // Wait for seed to complete on Home
+        let seedLabel = app.staticTexts["HK Smoke Test Run"]
+        XCTAssertTrue(seedLabel.waitForExistence(timeout: 5), "Seeded HK workout should appear on Home")
+
+        let glyphImage = app.images["healthGlyph"]
+        XCTAssertTrue(glyphImage.exists, "Heart glyph should be visible next to HK-linked workout name on Home")
+    }
+}
+
+// MARK: - Match Prompt Sheet Smoke Tests (Seeded Pending Match)
+
+/// These tests use `--seed-hk-pending-match` to inject a pending match at launch,
+/// enabling verification of the Match Prompt Sheet without real HealthKit data.
+final class MatchPromptSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state", "--seed-hk-pending-match"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    // MARK: - Smoke MP-1: Match Prompt Appears
+
+    /// When a pending match exists, the Match Prompt Sheet appears on foreground.
+    func test_pendingMatch_matchPromptSheetAppears() {
+        let linkButton = app.buttons["matchPromptSheet_linkButton"]
+        XCTAssertTrue(linkButton.waitForExistence(timeout: 5), "Match Prompt Sheet should appear with Link button")
+
+        let keepSeparateButton = app.buttons["matchPromptSheet_keepSeparateButton"]
+        XCTAssertTrue(keepSeparateButton.exists, "Keep Separate button should be visible")
+
+        let decideLaterButton = app.buttons["matchPromptSheet_decideLaterButton"]
+        XCTAssertTrue(decideLaterButton.exists, "Decide Later button should be visible")
+
+        XCTAssertTrue(
+            app.staticTexts["Possible Match"].exists,
+            "Sheet header 'Possible Match' should be visible"
+        )
+    }
+
+    // MARK: - Smoke MP-2: Match Prompt Decide Later
+
+    /// Tapping "Decide later" keeps the match pending (re-presents on next foreground).
+    /// This test verifies the button is tappable and doesn't crash.
+    func test_pendingMatch_decideLater_buttonIsTappable() {
+        let decideLaterButton = app.buttons["matchPromptSheet_decideLaterButton"]
+        XCTAssertTrue(decideLaterButton.waitForExistence(timeout: 5))
+        decideLaterButton.tap()
+
+        // "Decide later" keeps the match in the queue, so the sheet may
+        // re-present. Verify the app is still functional by checking tabs.
+        let homeTab = app.tabBars.buttons["HOME"]
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 3), "App should remain functional after Decide Later")
+    }
+
+    // MARK: - Smoke MP-3: Match Prompt Link Dismisses
+
+    /// Tapping "Link these workouts" dismisses the Match Prompt Sheet.
+    func test_pendingMatch_link_dismissesSheet() {
+        let linkButton = app.buttons["matchPromptSheet_linkButton"]
+        XCTAssertTrue(linkButton.waitForExistence(timeout: 5))
+        linkButton.tap()
+
+        XCTAssertFalse(
+            app.staticTexts["Possible Match"].waitForExistence(timeout: 2),
+            "Match Prompt Sheet should dismiss after Link"
+        )
+    }
+
+    // MARK: - Smoke MP-4: Match Prompt Keep Separate Dismisses
+
+    /// Tapping "Keep separate" dismisses the Match Prompt Sheet.
+    func test_pendingMatch_keepSeparate_dismissesSheet() {
+        let keepSeparateButton = app.buttons["matchPromptSheet_keepSeparateButton"]
+        XCTAssertTrue(keepSeparateButton.waitForExistence(timeout: 5))
+        keepSeparateButton.tap()
+
+        XCTAssertFalse(
+            app.staticTexts["Possible Match"].waitForExistence(timeout: 2),
+            "Match Prompt Sheet should dismiss after Keep Separate"
+        )
+    }
 }

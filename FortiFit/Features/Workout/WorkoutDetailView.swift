@@ -40,6 +40,7 @@ struct WorkoutDetailView: View {
                                 sourceName: nil
                             )
                         }
+                        .accessibilityIdentifier(AccessibilityID.workoutDetailHealthSourceIndicator)
                     }
 
                     FortiFitDivider()
@@ -101,6 +102,7 @@ struct WorkoutDetailView: View {
                                     } label: {
                                         Label("Unlink from Apple Health", systemImage: "heart.slash")
                                     }
+                                    .accessibilityIdentifier(AccessibilityID.workoutDetailHealthUnlinkButton)
                                 }
                                 if workout.hiddenFromPlan {
                                     Button {
