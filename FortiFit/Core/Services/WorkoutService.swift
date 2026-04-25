@@ -165,6 +165,16 @@ struct WorkoutService {
         return Array(Set(allExerciseNames))
     }
 
+    // MARK: - HealthKit Unlink
+
+    static func unlink(_ workout: Workout, context: ModelContext) {
+        workout.healthKitUUID = nil
+        workout.healthKitSourceBundleID = nil
+        workout.healthKitActivityType = nil
+        workout.lastModifiedDate = .now
+        try? context.save()
+    }
+
     // MARK: - Sprints → Cardio Migration
 
     static func migrateSprintsToCardioIfNeeded(context: ModelContext) {
