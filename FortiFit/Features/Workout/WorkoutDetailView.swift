@@ -14,6 +14,7 @@ struct WorkoutDetailView: View {
     @State private var saveAsTemplateName = ""
     @State private var showTemplateSavedToast = false
     @State private var showShowOnPlanToast = false
+    @State private var showHealthSourceInfoSheet = false
     @State private var headerHeight: CGFloat = 0
 
     private var settings: UserSettings { UserSettings.shared }
@@ -29,6 +30,17 @@ struct WorkoutDetailView: View {
                     Text("\(workout.date.shortFormatted)\(workout.time != nil ? " · \(workout.time!.timeFormatted)" : "") · \(workout.workoutType)")
                         .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
+
+                    if workout.isHealthKitLinked, let activityType = workout.healthKitActivityType {
+                        Button {
+                            showHealthSourceInfoSheet = true
+                        } label: {
+                            FortiFitHealthSourceIndicator(
+                                activityType: activityType,
+                                sourceName: nil
+                            )
+                        }
+                    }
 
                     FortiFitDivider()
 
@@ -72,7 +84,7 @@ struct WorkoutDetailView: View {
                                 showDeleteAlert = true
                             }
                         )
-                        if workout.workoutType == "Strength Training" || workout.workoutType == "HIIT" || workout.hiddenFromPlan {
+                        if workout.workoutType == "Strength Training" || workout.workoutType == "HIIT" || workout.hiddenFromPlan || workout.isHealthKitLinked {
                             Menu {
                                 if workout.workoutType == "Strength Training" || workout.workoutType == "HIIT" {
                                     Button {
@@ -82,6 +94,13 @@ struct WorkoutDetailView: View {
                                         Label("Save As Template", systemImage: "square.and.arrow.down")
                                     }
                                     .accessibilityIdentifier(AccessibilityID.saveAsTemplateMenuItem)
+                                }
+                                if workout.isHealthKitLinked {
+                                    Button(role: .destructive) {
+                                        WorkoutService.unlink(workout, context: modelContext)
+                                    } label: {
+                                        Label("Unlink from Apple Health", systemImage: "heart.slash")
+                                    }
                                 }
                                 if workout.hiddenFromPlan {
                                     Button {
@@ -247,6 +266,15 @@ struct WorkoutDetailView: View {
             }
         }
         #endif
+        .sheet(isPresented: $showHealthSourceInfoSheet) {
+            FortiFitHealthSourceInfoSheet(
+                workout: workout,
+                sourceName: nil,
+                onUnlink: {
+                    WorkoutService.unlink(workout, context: modelContext)
+                }
+            )
+        }
         .onChange(of: viewModel.showShareError) { _, newValue in
             if newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -262,16 +290,21 @@ struct WorkoutDetailView: View {
 
     private var strengthDetailSection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            if workout.rpe != nil || workout.durationMinutes != nil {
+            if workout.rpe != nil || workout.durationMinutes != nil || workout.isHealthKitLinked {
                 FortiFitWidgetHeader(title: "Summary")
 
                 FortiFitCard(borderColor: FortiFitColors.border) {
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        if let rpe = workout.rpe {
-                            summaryRow(field: "RPE", value: "\(rpe)")
+                    HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
+                        VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                            if let rpe = workout.rpe {
+                                summaryRow(field: "RPE", value: "\(rpe)")
+                            }
+                            if let duration = workout.durationMinutes {
+                                summaryRow(field: "Duration", value: "\(duration) min")
+                            }
                         }
-                        if let duration = workout.durationMinutes {
-                            summaryRow(field: "Duration", value: "\(duration) min")
+                        if workout.isHealthKitLinked {
+                            FortiFitHealthDataSubsection(workout: workout)
                         }
                     }
                 }
@@ -319,20 +352,25 @@ struct WorkoutDetailView: View {
             FortiFitWidgetHeader(title: "Summary")
 
             FortiFitCard(borderColor: FortiFitColors.border) {
-                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                    if let rpe = workout.rpe {
-                        summaryRow(field: "RPE", value: "\(rpe)")
+                HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
+                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                        if let rpe = workout.rpe {
+                            summaryRow(field: "RPE", value: "\(rpe)")
+                        }
+                        if let duration = workout.durationMinutes {
+                            summaryRow(field: "Duration", value: "\(duration) min")
+                        }
+                        if let distance = workout.distanceKm {
+                            summaryRow(field: "Distance", value: UnitConversion.displayDistance(distance, useMiles: settings.useMiles))
+                        }
+                        if workout.rpe == nil && workout.durationMinutes == nil && workout.distanceKm == nil && !workout.isHealthKitLinked {
+                            Text(workout.workoutType)
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.secondaryText)
+                        }
                     }
-                    if let duration = workout.durationMinutes {
-                        summaryRow(field: "Duration", value: "\(duration) min")
-                    }
-                    if let distance = workout.distanceKm {
-                        summaryRow(field: "Distance", value: UnitConversion.displayDistance(distance, useMiles: settings.useMiles))
-                    }
-                    if workout.rpe == nil && workout.durationMinutes == nil && workout.distanceKm == nil {
-                        Text(workout.workoutType)
-                            .font(FortiFitTypography.bodySmall)
-                            .foregroundStyle(FortiFitColors.secondaryText)
+                    if workout.isHealthKitLinked {
+                        FortiFitHealthDataSubsection(workout: workout)
                     }
                 }
             }
@@ -346,17 +384,22 @@ struct WorkoutDetailView: View {
             FortiFitWidgetHeader(title: "Summary")
 
             FortiFitCard(borderColor: FortiFitColors.border) {
-                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                    if let rpe = workout.rpe {
-                        summaryRow(field: "RPE", value: "\(rpe)")
+                HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
+                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                        if let rpe = workout.rpe {
+                            summaryRow(field: "RPE", value: "\(rpe)")
+                        }
+                        if let duration = workout.durationMinutes {
+                            summaryRow(field: "Duration", value: "\(duration) min")
+                        }
+                        if workout.rpe == nil && workout.durationMinutes == nil && !workout.isHealthKitLinked {
+                            Text(workout.workoutType)
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.secondaryText)
+                        }
                     }
-                    if let duration = workout.durationMinutes {
-                        summaryRow(field: "Duration", value: "\(duration) min")
-                    }
-                    if workout.rpe == nil && workout.durationMinutes == nil {
-                        Text(workout.workoutType)
-                            .font(FortiFitTypography.bodySmall)
-                            .foregroundStyle(FortiFitColors.secondaryText)
+                    if workout.isHealthKitLinked {
+                        FortiFitHealthDataSubsection(workout: workout)
                     }
                 }
             }

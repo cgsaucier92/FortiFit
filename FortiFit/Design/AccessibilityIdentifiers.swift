@@ -71,6 +71,8 @@ enum AccessibilityID {
     static let workoutDetailEllipsis = "workoutDetailEllipsis"
     static let saveAsTemplateMenuItem = "saveAsTemplateMenuItem"
     static let saveTemplateConfirmButton = "saveTemplateConfirmButton"
+    static let workoutDetailHealthSourceIndicator = "workoutDetail_healthSourceIndicator"
+    static let workoutDetailHealthUnlinkButton = "workoutDetail_healthUnlinkButton"
 
     // MARK: - Workout List
 
