@@ -36,6 +36,7 @@ enum TestFixtures {
                 ScheduledWorkout.self,
                 HomeWidget.self,
                 TrendsChart.self,
+                WorkoutMatchRejection.self,
             configurations: config
         )
     }
@@ -422,5 +423,95 @@ enum TestFixtures {
             priorDate: result.priorDate,
             context: context
         )
+    }
+
+    // MARK: - HealthKit Factories
+
+    static func makeHKWorkoutFixture(
+        uuid: UUID = UUID(),
+        activityTypeRawValue: UInt = 50,
+        startDate: Date = Date(),
+        durationMinutes: Int = 45,
+        distanceKm: Double? = nil,
+        avgHeartRate: Int? = 142,
+        maxHeartRate: Int? = 168,
+        activeEnergyKcal: Double? = 487,
+        indoor: Bool? = false
+    ) -> HealthKitWorkoutSnapshot {
+        HealthKitWorkoutSnapshot(
+            uuid: uuid,
+            activityTypeRawValue: activityTypeRawValue,
+            sourceBundleID: "com.apple.health.workout-builder",
+            startDate: startDate,
+            endDate: startDate.addingTimeInterval(TimeInterval(durationMinutes * 60)),
+            durationMinutes: durationMinutes,
+            distanceKm: distanceKm,
+            avgHeartRate: avgHeartRate,
+            maxHeartRate: maxHeartRate,
+            activeEnergyKcal: activeEnergyKcal,
+            totalEnergyBurnedKcal: nil,
+            elevationAscendedMeters: nil,
+            exerciseMinutes: nil,
+            indoor: indoor
+        )
+    }
+
+    @discardableResult
+    static func makeLinkedWorkout(
+        name: String = "HK Workout",
+        date: Date = .now,
+        workoutType: String = "Strength Training",
+        healthKitUUID: UUID = UUID(),
+        durationMinutes: Int? = 45,
+        avgHeartRate: Int? = 142,
+        in context: ModelContext
+    ) -> Workout {
+        let workout = Workout(
+            name: name,
+            date: date,
+            workoutType: workoutType,
+            durationMinutes: durationMinutes,
+            healthKitUUID: healthKitUUID,
+            healthKitSourceBundleID: "com.apple.health.workout-builder",
+            healthKitActivityType: "Traditional Strength Training",
+            avgHeartRate: avgHeartRate
+        )
+        context.insert(workout)
+        try? context.save()
+        return workout
+    }
+}
+
+// MARK: - StubHealthKitClient
+
+final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
+    var authStatus: HealthKitAuthorizationStatus = .granted
+    var workoutsToReturn: [HealthKitWorkoutSnapshot] = []
+    var deletedUUIDsToReturn: [UUID] = []
+    var anchorToReturn: Data? = nil
+    var effortScoreToReturn: Int? = nil
+    var sourceNameToReturn: String? = "Apple Watch"
+    var authorizationRequested = false
+
+    func requestAuthorization() async throws {
+        authorizationRequested = true
+    }
+
+    func authorizationStatus() -> HealthKitAuthorizationStatus {
+        authStatus
+    }
+
+    func fetchWorkouts(since anchor: Data?) async throws -> (workouts: [HealthKitWorkoutSnapshot], deletedUUIDs: [UUID], newAnchor: Data?) {
+        (workoutsToReturn, deletedUUIDsToReturn, anchorToReturn)
+    }
+
+    func observeWorkoutChanges(handler: @escaping @Sendable () -> Void) {}
+
+    func fetchEffortScore(for hkWorkoutUUID: UUID) async throws -> Int? {
+        effortScoreToReturn
+    }
+
+    func sourceName(for bundleID: String) -> String? {
+        sourceNameToReturn
     }
 }
