@@ -66,6 +66,12 @@ enum AccessibilityID {
     static let settingsAppleHealthSyncNowButton = "settings_appleHealthSyncNowButton"
     static let settingsAppleHealthOpenSettingsButton = "settings_appleHealthOpenSettingsButton"
 
+    // MARK: - Log Workout (HealthKit)
+
+    static let logWorkoutDateReadOnlyHelper = "logWorkout_dateReadOnlyHelper"
+    static let logWorkoutDurationReadOnlyHelper = "logWorkout_durationReadOnlyHelper"
+    static let logWorkoutDistanceReadOnlyHelper = "logWorkout_distanceReadOnlyHelper"
+
     // MARK: - Workout Detail
 
     static let workoutDetailEllipsis = "workoutDetailEllipsis"

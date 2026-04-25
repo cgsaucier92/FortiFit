@@ -207,6 +207,10 @@ final class WorkoutViewModel {
         workoutType == "Yoga" || workoutType == "Pilates"
     }
 
+    var isHealthKitLinked: Bool {
+        editingWorkout?.isHealthKitLinked == true
+    }
+
     // MARK: - Actions
 
     func loadWorkouts(context: ModelContext) {

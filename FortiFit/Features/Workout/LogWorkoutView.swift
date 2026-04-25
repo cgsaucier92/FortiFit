@@ -7,6 +7,7 @@ struct LogWorkoutView: View {
     @Bindable var viewModel: WorkoutViewModel
     @State private var showRPETooltip = false
     @State private var showDeleteAlert = false
+    @State private var showHealthSourceInfoSheet = false
     var onDeleteWorkout: (() -> Void)?
     @State private var headerHeight: CGFloat = 0
 
@@ -38,6 +39,12 @@ struct LogWorkoutView: View {
                     .labelsHidden()
                     .tint(FortiFitColors.primaryAccent)
                     .colorScheme(.dark)
+                    .disabled(viewModel.isHealthKitLinked)
+                    .opacity(viewModel.isHealthKitLinked ? 0.5 : 1)
+
+                    if viewModel.isHealthKitLinked {
+                        healthKitHelperText(identifier: AccessibilityID.logWorkoutDateReadOnlyHelper)
+                    }
 
                     // Workout Type
                     FortiFitLabel("Workout Type", color: FortiFitColors.primaryText)
@@ -74,6 +81,12 @@ struct LogWorkoutView: View {
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
+                        .disabled(viewModel.isHealthKitLinked)
+                        .opacity(viewModel.isHealthKitLinked ? 0.5 : 1)
+
+                    if viewModel.isHealthKitLinked {
+                        healthKitHelperText(identifier: AccessibilityID.logWorkoutDurationReadOnlyHelper)
+                    }
 
                     // Type-specific fields
                     if viewModel.isStrengthOrHIIT {
@@ -207,6 +220,16 @@ struct LogWorkoutView: View {
         } message: {
             Text("Enter a name for this template.")
         }
+        .sheet(isPresented: $showHealthSourceInfoSheet) {
+            if let workout = viewModel.editingWorkout {
+                FortiFitHealthSourceInfoSheet(
+                    workout: workout,
+                    sourceName: workout.healthKitSourceBundleID
+                ) {
+                    WorkoutService.unlink(workout, context: modelContext)
+                }
+            }
+        }
         .alert(
             "Delete \(viewModel.workoutName)?",
             isPresented: $showDeleteAlert
@@ -326,6 +349,20 @@ struct LogWorkoutView: View {
         }
     }
 
+    // MARK: - HealthKit Helper Text
+
+    private func healthKitHelperText(identifier: String) -> some View {
+        Button {
+            showHealthSourceInfoSheet = true
+        } label: {
+            Text("LINKED TO APPLE HEALTH · TAP TO UNLINK")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(2)
+                .foregroundStyle(FortiFitColors.mutedText)
+        }
+        .accessibilityIdentifier(identifier)
+    }
+
     // MARK: - Exercises Section (Strength/HIIT)
 
     private var exercisesSection: some View {
@@ -370,6 +407,12 @@ struct LogWorkoutView: View {
                 #if os(iOS)
                 .keyboardType(.decimalPad)
                 #endif
+                .disabled(viewModel.isHealthKitLinked)
+                .opacity(viewModel.isHealthKitLinked ? 0.5 : 1)
+
+            if viewModel.isHealthKitLinked {
+                healthKitHelperText(identifier: AccessibilityID.logWorkoutDistanceReadOnlyHelper)
+            }
         }
     }
 }
