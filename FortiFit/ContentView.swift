@@ -6,61 +6,62 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @State private var selectedTab = 0
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        TabView(selection: $selectedTab) {
+            HomeView(selectedTab: selectedTab)
+                .tabItem {
+                    Image(systemName: "square.grid.2x2")
+                    Text("HOME")
+                }
+                .tag(0)
+                .accessibilityIdentifier(AccessibilityID.tabBarHome)
+
+            WorkoutListView(selectedTab: selectedTab)
+                .tabItem {
+                    Image(systemName: "dumbbell")
+                    Text("WORKOUTS")
+                }
+                .tag(1)
+                .accessibilityIdentifier(AccessibilityID.tabBarWorkouts)
+
+            PlanView(selectedTab: selectedTab)
+                .tabItem {
+                    Image(systemName: "calendar")
+                    Text("PLAN")
+                }
+                .tag(2)
+                .accessibilityIdentifier(AccessibilityID.tabBarPlan)
+
+            FortiFitProgressView(selectedTab: selectedTab)
+                .tabItem {
+                    Image(systemName: "chart.bar.fill")
+                    Text("TRENDS")
+                }
+                .tag(3)
+                .accessibilityIdentifier(AccessibilityID.tabBarTrends)
+
+            GoalsView(selectedTab: selectedTab)
+                .tabItem {
+                    Label {
+                        Text("GOALS")
+                    } icon: {
+                        Image(systemName: "target")
                     }
                 }
-                .onDelete(perform: deleteItems)
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
+                .tag(4)
+                .accessibilityIdentifier(AccessibilityID.tabBarGoals)
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
+        .tint(FortiFitColors.primaryAccent)
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPlanTab)) { _ in
+            selectedTab = 2
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }

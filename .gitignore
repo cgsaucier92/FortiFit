@@ -1,0 +1,38 @@
+# Xcode user-specific files
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+
+# Build artifacts
+DerivedData/
+build/
+*.o
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods (not used, but future-proofing)
+Pods/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Fastlane (not used, but future-proofing)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Miscellaneous IDE / editor files
+*.swp
+*~
+.vscode/
+.idea/

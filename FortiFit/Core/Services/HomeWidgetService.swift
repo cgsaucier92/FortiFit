@@ -1,0 +1,124 @@
+import Foundation
+import SwiftData
+
+struct HomeWidgetService {
+
+    // MARK: - Read
+
+    /// Fetches all HomeWidget records sorted by sortOrder ascending.
+    static func fetchAll(context: ModelContext) -> [HomeWidget] {
+        let descriptor = FetchDescriptor<HomeWidget>(
+            sortBy: [SortDescriptor(\.sortOrder, order: .forward)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Fetches the HomeWidget for a specific widget type, if it exists.
+    static func fetch(for widgetType: String, context: ModelContext) -> HomeWidget? {
+        let descriptor = FetchDescriptor<HomeWidget>(
+            predicate: #Predicate<HomeWidget> { widget in
+                widget.widgetType == widgetType
+            }
+        )
+        return (try? context.fetch(descriptor))?.first
+    }
+
+    // MARK: - Seed Defaults
+
+    /// Seeds the default Home screen widgets on first launch.
+    /// Idempotent — skips any widget type that already exists in the store.
+    /// Also migrates legacy lastWorkout/totalWorkouts widgets to the combined workoutInfo widget.
+    static func seedDefaultWidgets(context: ModelContext) {
+        // Migrate legacy widgets if present
+        migrateLegacyWidgets(context: context)
+
+        let existing = fetchAll(context: context)
+        let existingTypes = Set(existing.map(\.widgetType))
+        let maxSort = existing.map(\.sortOrder).max() ?? -1
+        var nextSort = maxSort + 1
+
+        for widgetType in AppConstants.defaultHomeWidgets {
+            guard !existingTypes.contains(widgetType) else { continue }
+            let widget = HomeWidget(widgetType: widgetType, sortOrder: nextSort)
+            context.insert(widget)
+            nextSort += 1
+        }
+        try? context.save()
+    }
+
+    /// Replaces legacy "lastWorkout" and "totalWorkouts" widgets with a single "workoutInfo" widget.
+    /// The new widget takes the lower sortOrder of the two replaced widgets.
+    private static func migrateLegacyWidgets(context: ModelContext) {
+        let lastWorkout = fetch(for: "lastWorkout", context: context)
+        let totalWorkouts = fetch(for: "totalWorkouts", context: context)
+
+        guard lastWorkout != nil || totalWorkouts != nil else { return }
+        // Already migrated if workoutInfo exists
+        guard fetch(for: "workoutInfo", context: context) == nil else {
+            // Clean up any leftover legacy widgets
+            if let lw = lastWorkout { context.delete(lw) }
+            if let tw = totalWorkouts { context.delete(tw) }
+            try? context.save()
+            reindexSortOrder(context: context)
+            return
+        }
+
+        let sortOrder = min(lastWorkout?.sortOrder ?? Int.max, totalWorkouts?.sortOrder ?? Int.max)
+        if let lw = lastWorkout { context.delete(lw) }
+        if let tw = totalWorkouts { context.delete(tw) }
+
+        let workoutInfo = HomeWidget(widgetType: "workoutInfo", sortOrder: sortOrder)
+        context.insert(workoutInfo)
+        try? context.save()
+        reindexSortOrder(context: context)
+    }
+
+    // MARK: - Add
+
+    /// Adds a widget to the Home screen at the end of the list.
+    /// Does nothing if a widget of this type already exists.
+    static func addWidget(widgetType: String, context: ModelContext) {
+        guard fetch(for: widgetType, context: context) == nil else { return }
+
+        let allWidgets = fetchAll(context: context)
+        let maxSort = allWidgets.map(\.sortOrder).max() ?? -1
+
+        let widget = HomeWidget(widgetType: widgetType, sortOrder: maxSort + 1)
+        context.insert(widget)
+        try? context.save()
+    }
+
+    // MARK: - Delete
+
+    /// Deletes a widget and re-indexes remaining sortOrder values.
+    static func deleteWidget(_ widget: HomeWidget, context: ModelContext) {
+        context.delete(widget)
+        try? context.save()
+        reindexSortOrder(context: context)
+    }
+
+    // MARK: - Reorder
+
+    /// Reorders widgets. Accepts an array of widgetType strings
+    /// in the desired order and re-indexes sortOrder values starting from 0.
+    static func reorder(orderedTypes: [String], context: ModelContext) {
+        let allWidgets = fetchAll(context: context)
+        let widgetMap = Dictionary(uniqueKeysWithValues: allWidgets.map { ($0.widgetType, $0) })
+
+        for (index, type) in orderedTypes.enumerated() {
+            widgetMap[type]?.sortOrder = index
+        }
+        try? context.save()
+    }
+
+    // MARK: - Private
+
+    /// Re-indexes sortOrder values to close gaps after a deletion.
+    private static func reindexSortOrder(context: ModelContext) {
+        let allWidgets = fetchAll(context: context)
+        for (index, widget) in allWidgets.enumerated() {
+            widget.sortOrder = index
+        }
+        try? context.save()
+    }
+}

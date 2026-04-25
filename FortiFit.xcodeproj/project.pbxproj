@@ -6,7 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		02BC25BD2F6F46550078681A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 02BC25BC2F6F46550078681A /* PrivacyInfo.xcprivacy */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		028786F52F97BEF30073DD60 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 029E29282F6C1E79000EAE13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 029E292F2F6C1E79000EAE13;
+			remoteInfo = FortiFit;
+		};
 		029E29402F6C1E7A000EAE13 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 029E29282F6C1E79000EAE13 /* Project object */;
@@ -24,14 +35,34 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		028786F12F97BEF30073DD60 /* FortiFitIntegrationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FortiFitIntegrationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		029E29302F6C1E79000EAE13 /* FortiFit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FortiFit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		029E293F2F6C1E7A000EAE13 /* FortiFitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FortiFitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		029E29492F6C1E7A000EAE13 /* FortiFitUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FortiFitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		02BC25BC2F6F46550078681A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		02A6188A2F86EB2D00CB6D48 /* Exceptions for "FortiFit" folder in "FortiFit" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 029E292F2F6C1E79000EAE13 /* FortiFit */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		028786F22F97BEF30073DD60 /* FortiFitIntegrationTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FortiFitIntegrationTests;
+			sourceTree = "<group>";
+		};
 		029E29322F6C1E79000EAE13 /* FortiFit */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				02A6188A2F86EB2D00CB6D48 /* Exceptions for "FortiFit" folder in "FortiFit" target */,
+			);
 			path = FortiFit;
 			sourceTree = "<group>";
 		};
@@ -48,6 +79,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		028786EE2F97BEF30073DD60 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		029E292D2F6C1E79000EAE13 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -75,9 +113,11 @@
 		029E29272F6C1E79000EAE13 = {
 			isa = PBXGroup;
 			children = (
+				02BC25BC2F6F46550078681A /* PrivacyInfo.xcprivacy */,
 				029E29322F6C1E79000EAE13 /* FortiFit */,
 				029E29422F6C1E7A000EAE13 /* FortiFitTests */,
 				029E294C2F6C1E7A000EAE13 /* FortiFitUITests */,
+				028786F22F97BEF30073DD60 /* FortiFitIntegrationTests */,
 				029E29312F6C1E79000EAE13 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +128,7 @@
 				029E29302F6C1E79000EAE13 /* FortiFit.app */,
 				029E293F2F6C1E7A000EAE13 /* FortiFitTests.xctest */,
 				029E29492F6C1E7A000EAE13 /* FortiFitUITests.xctest */,
+				028786F12F97BEF30073DD60 /* FortiFitIntegrationTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,6 +136,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		028786F02F97BEF30073DD60 /* FortiFitIntegrationTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 028786F72F97BEF30073DD60 /* Build configuration list for PBXNativeTarget "FortiFitIntegrationTests" */;
+			buildPhases = (
+				028786ED2F97BEF30073DD60 /* Sources */,
+				028786EE2F97BEF30073DD60 /* Frameworks */,
+				028786EF2F97BEF30073DD60 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				028786F62F97BEF30073DD60 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				028786F22F97BEF30073DD60 /* FortiFitIntegrationTests */,
+			);
+			name = FortiFitIntegrationTests;
+			packageProductDependencies = (
+			);
+			productName = FortiFitIntegrationTests;
+			productReference = 028786F12F97BEF30073DD60 /* FortiFitIntegrationTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		029E292F2F6C1E79000EAE13 /* FortiFit */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 029E29532F6C1E7A000EAE13 /* Build configuration list for PBXNativeTarget "FortiFit" */;
@@ -170,9 +234,13 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					028786F02F97BEF30073DD60 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 029E292F2F6C1E79000EAE13;
+					};
 					029E292F2F6C1E79000EAE13 = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -203,15 +271,24 @@
 				029E292F2F6C1E79000EAE13 /* FortiFit */,
 				029E293E2F6C1E7A000EAE13 /* FortiFitTests */,
 				029E29482F6C1E7A000EAE13 /* FortiFitUITests */,
+				028786F02F97BEF30073DD60 /* FortiFitIntegrationTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		028786EF2F97BEF30073DD60 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		029E292E2F6C1E79000EAE13 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				02BC25BD2F6F46550078681A /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,6 +309,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		028786ED2F97BEF30073DD60 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		029E292C2F6C1E79000EAE13 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -256,6 +340,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		028786F62F97BEF30073DD60 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 029E292F2F6C1E79000EAE13 /* FortiFit */;
+			targetProxy = 028786F52F97BEF30073DD60 /* PBXContainerItemProxy */;
+		};
 		029E29412F6C1E7A000EAE13 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 029E292F2F6C1E79000EAE13 /* FortiFit */;
@@ -269,6 +358,53 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		028786F82F97BEF30073DD60 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = App.FortiFitIntegrationTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FortiFit.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FortiFit";
+			};
+			name = Debug;
+		};
+		028786F92F97BEF30073DD60 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = App.FortiFitIntegrationTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FortiFit.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FortiFit";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		029E29512F6C1E7A000EAE13 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -388,12 +524,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FortiFit/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FitNavi;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -409,7 +551,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = App.FortiFit;
+				PRODUCT_BUNDLE_IDENTIFIER = App.FitNavi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -430,12 +572,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FortiFit/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FitNavi;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -451,7 +599,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = App.FortiFit;
+				PRODUCT_BUNDLE_IDENTIFIER = App.FitNavi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -473,6 +621,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
@@ -498,6 +647,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
@@ -522,6 +672,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
@@ -546,6 +697,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HCH8243GG3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
@@ -568,6 +720,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		028786F72F97BEF30073DD60 /* Build configuration list for PBXNativeTarget "FortiFitIntegrationTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				028786F82F97BEF30073DD60 /* Debug */,
+				028786F92F97BEF30073DD60 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		029E292B2F6C1E79000EAE13 /* Build configuration list for PBXProject "FortiFit" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

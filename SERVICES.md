@@ -1,0 +1,682 @@
+# SERVICES.md: FitNavi Service Specifications
+
+> Implement each algorithm exactly as specified. Do not invent alternative formulas or add variables beyond what is defined here.
+> For data models, see `PRD.md` Section 5. For constants, see `CONSTANTS.md`.
+
+---
+
+## Training Load Algorithm (ExerciseLoadService.swift)
+
+**Purpose:** Daily training load score (0–100) reflecting accumulated training stress. Answers: "Should I train today, and how hard?" Drives the Training Load widget (Home) and Training Load Trend chart (Progress). Updates daily — including rest days — because stress decays over time.
+
+`targetWorkoutsPerWeek` is NOT an input to this algorithm. It is used exclusively by Streak.
+
+### Lookback Window
+All workouts within the **last 10 days**. Anything older is ignored.
+
+### Inputs — Per Workout (within 10-day window)
+
+| Input | Source | Nil Handling |
+|---|---|---|
+| RPE | `workout.rpe` | Nil → assume **5** |
+| Duration | `workout.durationMinutes` | Nil → use `targetMinutesPerWorkout` from UserSettings |
+| Workout Type | `workout.workoutType` | Required (never nil) |
+| Exercise Sets | `workout.exerciseSets` | Empty → volume modifier defaults to 1.0 |
+| Date | `workout.date` | Required (never nil) |
+
+### Inputs — Global
+
+| Input | Source |
+|---|---|
+| Experience Level | `UserSettings.experienceLevel` |
+| Target Minutes/Workout | `UserSettings.targetMinutesPerWorkout` (nil-duration fallback only) |
+
+### Pre-Filter — Empty Workout Exclusion
+Before processing, discard any workout in the 10-day window where **all three** conditions are true:
+1. `exerciseSets` is empty (zero exercises)
+2. `rpe` is nil
+3. `durationMinutes` is nil
+
+These workouts contain no meaningful training data (placeholder/shell entries) and must be excluded from the entire algorithm: they do not contribute to `session_stress` (Steps 1–5), do not count toward `consecutive_days` (Step 6), and do not factor into `today_stress` (Step 9).
+
+A workout that has zero exercises but provides RPE and/or duration (e.g., a Yoga session with RPE 7, 45 min) passes the filter and is processed normally — the nil-handling defaults in the Inputs table above still apply.
+
+**Scope:** This exclusion applies only to Training Load. Streak, Power Level, Weekly Workouts goal, and all other algorithms count these workouts normally.
+
+### Step 1 — Workout Type Modifier
+See `CONSTANTS.md` for modifier values per type. These are defined in AppConstants.
+
+### Step 2 — Volume Modifier
+For **Strength Training and HIIT** with ExerciseSets:
+```
+total_sets = sum of `sets` across all ExerciseSets
+volume_modifier = clamp(0.5 + (total_sets / 20), min: 0.5, max: 1.5)
+```
+0 sets → 0.5, 10 sets → 1.0, 20+ sets → 1.5. Uses set count (not tonnage) because bodyweight exercises have nil weight.
+
+For **all other types** (no ExerciseSets): `volume_modifier = 1.0`.
+
+### Step 3 — Per-Session Stress
+```
+session_stress = RPE × (duration_minutes / 60) × type_modifier × volume_modifier
+```
+Duration divided by 60 normalizes to hours. Typical session (RPE 7, 60 min, Strength, 10 sets) = 7.0.
+
+### Step 4 — Experience-Based Decay Constant (τ)
+
+| Experience Level | τ (days) | Effect |
+|---|---|---|
+| Beginner (0) | 3.0 | Stress lingers longest. ~37% remains after 3 days. |
+| Intermediate (1) | 2.0 | ~37% remains after 2 days. |
+| Advanced (2) | 1.5 | Fastest recovery. ~37% remains after 1.5 days. |
+
+### Step 5 — Time-Decayed Contribution
+```
+days_ago = (now - workout.date) in fractional days
+decayed_stress = session_stress × e^(-days_ago / τ)
+```
+Uses fractional days — a workout 8 hours ago contributes more than one 20 hours ago.
+
+### Step 6 — Consecutive Training Days Multiplier
+Count consecutive calendar days (each with ≥1 qualifying workout — see Pre-Filter above), ending on today or yesterday. If most recent workout was 2+ days ago, `consecutive_days = 0`.
+```
+consecutive_multiplier = 1.0 + max(consecutive_days - 1, 0) × 0.08
+```
+Capped at 5+ days:
+
+| Consecutive Days | Multiplier |
+|---|---|
+| 0 or 1 | 1.00 |
+| 2 | 1.08 |
+| 3 | 1.16 |
+| 4 | 1.24 |
+| 5+ | 1.32 (cap) |
+
+### Step 7 — Stress Capacity (Normalization)
+
+| Experience Level | Stress Capacity |
+|---|---|
+| Beginner (0) | 15 |
+| Intermediate (1) | 20 |
+| Advanced (2) | 25 |
+
+### Step 8 — Final Score
+```
+raw_stress = sum of decayed_stress for all workouts in the 10-day window
+adjusted_stress = raw_stress × consecutive_multiplier
+load_score = clamp((adjusted_stress / stress_capacity) × 100, min: 0, max: 100)
+```
+
+### Step 9 — Same-Day Training Floor
+Prevents the score from advising "train hard" on a day the user already trained. Only qualifying workouts count (see Pre-Filter above).
+```
+today_stress = sum of session_stress for all workouts on today's calendar date
+               (raw values — no decay, since they are from today)
+floor = clamp((today_stress / stress_capacity) × 150, min: 0, max: 80)
+load_score = max(load_score, floor)
+```
+The `× 150` multiplier makes today's sessions count 1.5× for floor purposes. Cap at 80 prevents floor alone from reaching Peak. Floor lifts automatically next day (today_stress = 0 → floor = 0).
+
+### Step 10 — Zone Classification
+See `CONSTANTS.md` for zone ranges, colors, and advisory text tables.
+
+### Settings Change Behavior
+Always uses current `experienceLevel` at calculation time. Changing experience recalculates immediately using new τ and stress capacity for all workouts in the 10-day window. No per-workout versioning.
+
+---
+
+## Streak Algorithm (StreakService.swift)
+
+**Purpose:** Consecutive-week workout streak driving the streak widget on Home.
+
+**Completed week:** Monday 00:00:00 through Sunday 23:59:59. Completed when workout count in that range ≥ `targetWorkoutsPerWeek`.
+
+**Calculation** (on app launch, after each workout save/edit/delete, and after Settings changes):
+
+1. Start from the most recently completed week (last full Mon–Sun that ended). Walk backward.
+2. For each week, count workouts where `workout.date` falls within Mon–Sun.
+3. If count ≥ target → counts toward streak; continue to prior week.
+4. If count < target → stop. Streak = number of consecutive completed weeks.
+5. If current in-progress week already has count ≥ target → add 1 (provisional extension).
+6. If `targetWorkoutsPerWeek` is 0 → streak always 0 (dormant state).
+7. Update `currentStreak`. If > `longestStreak`, update `longestStreak`.
+
+**Settings change:** Changing target recalculates retroactively for all historical weeks.
+
+**Flame tiers and motivational messages:** See `CONSTANTS.md`.
+
+---
+
+## Power Level Algorithm (PowerLevelService.swift)
+
+**Purpose:** Status (Deloading/Steady/Rising) reflecting average strength volume trend over 30 days vs. prior 30-day baseline. Answers: "Is my training volume trending up, down, or steady?"
+
+**Scope:** Only **Strength Training** and **HIIT** workouts. All others excluded.
+
+### Volume Formula — Per Workout
+```
+workout_volume = sum of (sets × reps × effective_weight) across all ExerciseSets
+```
+If `weightKg` is nil (bodyweight): `effective_weight = 1.0`.
+
+### Time Windows
+
+| Window | Range |
+|---|---|
+| Current period | Today − 30 days through today |
+| Baseline period | Today − 60 days through today − 31 days |
+
+Both windows use calendar days, inclusive.
+
+### Step 1 — Current Average
+```
+current_avg = sum of workout_volume / count of qualifying workouts in current period
+```
+Empty → `current_avg = 0`.
+
+### Step 2 — Baseline Average
+```
+baseline_avg = sum of workout_volume / count of qualifying workouts in baseline period
+```
+Empty → `baseline_avg = 0`.
+
+### Step 3 — Percentage Change
+```
+If baseline_avg = 0: status = Steady
+Else: pct_change = ((current_avg - baseline_avg) / baseline_avg) × 100
+```
+
+### Step 4 — Status Classification
+
+| Condition | Status |
+|---|---|
+| No baseline data (baseline_avg = 0) | Steady |
+| No current data (current_avg = 0, baseline > 0) | Deloading |
+| pct_change < −10% | Deloading |
+| −10% ≤ pct_change ≤ +10% | Steady |
+| pct_change > +10% | Rising |
+
+**Contextual messages and indicators:** See `CONSTANTS.md`.
+
+**Edge cases:** < 31 days history → baseline empty → Steady. Zero qualifying workouts in both → "No data" message. Recalculates on workout log/edit/delete.
+
+**No dependency on UserSettings.** Purely data-driven.
+
+---
+
+## Goal Auto-Update (GoalService.swift)
+
+### Reset Scoping (applies to all auto-updated goal types)
+All auto-update scans (Strength PR, Repetitions PR, Speed and Distance) filter workouts against each goal's `resetDate`. A workout is **in-scope** for a goal if any of the following is true:
+- `goal.resetDate` is nil (goal has never been reset, or was cleared by editing the goal definition), OR
+- `workout.date > goal.resetDate`, OR
+- `workout.lastModifiedDate > goal.resetDate` (workout was created or edited after the reset, regardless of its `date` — includes cosmetic edits).
+
+Workouts that are out-of-scope are invisible to the goal's auto-update and to GoalSnapshotService until either the goal is edited (clearing `resetDate`) or the workout is modified (refreshing `lastModifiedDate`). The `lastModifiedDate` bump applies uniformly to ALL workout edits, including cosmetic changes (name, notes, time) — there is no allowlist of "meaningful" fields.
+
+This scoping applies to Weekly Workouts as well in principle, but in practice Weekly Workouts has no "Reset Goal Progress" action (its current value is runtime-derived) so `resetDate` is always nil for that type.
+
+### Strength PR Goals
+After each workout save: scan **in-scope** workouts (per § Reset Scoping). For all Strength PR goals, compare title (case-insensitive) against exerciseNames in the in-scope workouts' ExerciseSets. `currentValueKg` is set to the **highest matching weightKg across all in-scope workouts** (best-ever within scope) — not incrementally compared against the prior value. This ensures the ring correctly reflects the current best after edits, deletions, and resets.
+
+On workout deletion: recalculate currentValueKg by scanning all remaining in-scope workouts for highest matching weightKg. No in-scope matches → reset to 0.
+
+Custom-titled goals not matching any exerciseName are never auto-updated.
+
+### Repetitions PR Goals
+Same matching logic as Strength PR, but compares `reps` instead of weightKg. `currentReps` is set to the **highest matching reps across all in-scope workouts**. On deletion, recalculates from remaining in-scope data; resets to 0 if no matches.
+
+### Speed and Distance Goals
+Auto-updated by matching on **workout type** (e.g., all "Cardio" workouts update linked Speed and Distance goals), scoped to in-scope workouts only (per § Reset Scoping).
+
+Auto-update rule by sub-type (best-ever within scope):
+- **Distance-only:** `currentDistanceKm` = highest `distanceKm` across all in-scope matching workouts. No in-scope matches → 0.
+- **Duration-only (endurance):** `currentDurationMinutes` = highest `durationMinutes` across all in-scope matching workouts (higher is better per § Goal Progress Calculation). No in-scope matches → 0.
+- **Speed-target (both distance and duration set):** Compute each in-scope matching workout's `overallProgress %` using the existing speed target logic (§ Goal Progress Calculation). Select the workout with the highest `overallProgress %` and copy its `distanceKm` → `currentDistanceKm` and `durationMinutes` → `currentDurationMinutes` (take the full workout, never a composite across separate runs). Ties broken by most recent `date`. No in-scope matches → both current values = 0.
+
+On workout deletion or edit affecting matching workouts: recalculate per the rule above across remaining in-scope matching workouts.
+
+### Number of Weekly Workouts Goals
+This goal type is a visual tracker that reads its target from `UserSettings.targetWorkoutsPerWeek` and computes its current value at runtime. It does not store target or current values on the Goal model — both are derived:
+- **Target:** Read from `UserSettings.targetWorkoutsPerWeek` at display time. If the user changes the target in Settings, the goal card reflects the new target immediately.
+- **Current value:** Count of all workouts where `workout.date` falls within the current Monday 00:00:00 – Sunday 23:59:59 week. Uses the same week definition as the Streak algorithm.
+- **Progress:** current / target × 100. If target is 0, progress is 0%.
+- **Victory:** Achieved when current ≥ target (and target > 0). Resets each Monday when the new week begins.
+- **Auto-update:** Recalculates after each workout save, edit, or delete (same triggers as Streak).
+- **Singleton:** Only one weeklyWorkouts goal can exist at a time. GoalService enforces this on creation.
+- **Deletion:** Deletable like any other goal via the long-press context menu. Deleting it does not affect `targetWorkoutsPerWeek` in Settings or the Streak algorithm.
+
+### Goal Progress Calculation
+- **exercisePR:** currentValueKg / targetValueKg × 100
+- **repsPR:** currentReps / targetReps × 100
+- **speedDistance (distance only):** currentDistanceKm / targetDistanceKm × 100
+- **speedDistance (duration only, endurance):** currentDurationMinutes / targetDurationMinutes × 100 (higher = better — "higher is better" endurance semantics)
+- **speedDistance (both — speed target):** A speed target means "complete the distance in at or below the duration." Logic:
+  - `distanceProgress = clamp((currentDistanceKm / targetDistanceKm) × 100, 0, 100)`
+  - `durationProgress`:
+    - If `currentDurationMinutes <= targetDurationMinutes` (at or under target time): `durationProgress = 100` (user met or beat the time goal)
+    - If `currentDurationMinutes > targetDurationMinutes` (over target time — running too slow): `durationProgress = clamp((targetDurationMinutes / currentDurationMinutes) × 100, 0, 100)`
+  - `overallProgress = min(distanceProgress, durationProgress)` — overall progress percentage (used for ring display, sparkline value, and completion check).
+  - **Completion:** `currentDistanceKm >= targetDistanceKm` AND `currentDurationMinutes <= targetDurationMinutes`. Beating the target time (running faster than required) still counts as completion.
+  - **Example:** Goal is 5 miles in 30 minutes. User runs 5 miles in 20 minutes → distance = 100%, duration = 100% (clamped — user beat the time), overall = 100%, goal completes. User runs 5 miles in 45 minutes → distance = 100%, duration ≈ 67% (30/45), overall = 67%, goal does not complete.
+
+**Note:** The speed target logic (above) applies ONLY when both distance and duration targets are set. Duration-only (endurance) goals continue to use the original "higher is better" logic unchanged.
+
+### Goal Completion Date Tracking
+After every goal auto-update, GoalService checks if any goal has crossed 100%. If so:
+1. Check `goal.lastCelebratedDate`. If `lastCelebratedDate` is nil or the current date is strictly after `lastCelebratedDate`, proceed; otherwise skip.
+2. Set `goal.lastCelebratedDate` to the current date.
+
+This drives the "COMPLETED [date]" micro-label and the Completion Pulse Animation on the Goals screen (see `SCREENS.md` § Goals).
+
+**Re-completion edge case:** If a workout edit causes a goal to drop below 100% and it later crosses 100% again, `lastCelebratedDate` only updates if the new completion date is strictly after the existing value (per step 1 above).
+
+**Trigger paths:** The setter fires from all workout-save cascades — direct workout logging, Plan tab completion (PlanService), and Today's Plan HomeWidget completion. All paths call the same GoalService auto-update logic.
+
+### Reset Goal Progress
+Called from the long-press context menu "Reset Goal Progress" option on individual goal cards.
+- **exercisePR:** Set `currentValueKg` to 0.
+- **repsPR:** Set `currentReps` to 0.
+- **speedDistance:** Set `currentDistanceKm` to 0 and `currentDurationMinutes` to 0.
+- **weeklyWorkouts:** Not applicable — this goal type derives its current value at runtime. The "Reset Goal Progress" option is hidden for this goal type.
+- Set `resetDate` to `.now`. All existing workouts are now out-of-scope for this goal (per § Reset Scoping) until they are edited (refreshing `lastModifiedDate`) or new workouts are logged.
+- Clear `lastCelebratedDate` to nil (removes the "COMPLETED [date]" label and allows the Completion Pulse to re-fire if the goal is achieved again).
+- **Wipe GoalSnapshot history:** Delete all GoalSnapshot records for this goal via `GoalSnapshotService.deleteSnapshots(goalId:)`. The sparkline restarts from scratch — it will show the brand-new skeleton state until new in-scope workouts generate snapshots. Do NOT append a zero-valued snapshot.
+
+**Clearing `resetDate`:** `resetDate` is cleared to nil when the user edits the goal definition via the Add/Edit Goal flow (e.g., changing target weight, target distance, exercise name). Editing the goal is treated as a deliberate re-baselining action — pre-reset workouts come back into scope. `resetDate` is not cleared by any other path; workout edits alone do not clear it (they just bump `lastModifiedDate` on the workout, which re-scopes that specific workout).
+
+---
+
+## Deletion Cascading Behavior
+
+### Workout Cascade (shared definition)
+
+Any time a workout is logged, edited, deleted, or batch-deleted via workout type deletion, the following cascade runs against the resulting workout set. Individual cascade sections below reference this block rather than restating it.
+
+**Recalculations:**
+- **PR timeline** — remove PRs without supporting data; recompute from remaining workout data.
+- **Training Load score** — remove affected workouts from the 10-day window; `consecutive_days` may change.
+- **Home screen** — Workout Info widget, Recent Workouts list, Training Load widget refresh.
+- **Strength Tracker chart** — data points reflect current state.
+- **Training Frequency chart** — affected week(s) re-count.
+- **Strength PR goals** — recalculate `currentValueKg` for matching goals across remaining in-scope workouts (per § Reset Scoping). No in-scope matches → 0.
+- **Repetitions PR goals** — recalculate `currentReps` for matching goals across remaining in-scope workouts. No in-scope matches → 0.
+- **Speed and Distance goals** — recalculate `currentDistanceKm` and `currentDurationMinutes` per § Speed and Distance Goals (best-ever within scope) across remaining in-scope matching-type workouts. No in-scope matches → both current values = 0.
+- **GoalSnapshot records** — for each affected goal, recompute snapshots on the affected date(s) per § GoalSnapshotService § Per-Workout Value Computation. If no remaining in-scope matching workouts exist on a given date, delete that goal's snapshot for that date.
+- **Weekly streak** — recalculate across affected weeks.
+- **Power Level** — recalculate if Strength Training or HIIT was involved.
+- **Workout Type card** — update count. If the last workout of a type is gone, remove the card and delete the WorkoutTypeOrder record (see § Workout Type Deletion for the batch case).
+- **Scheduled workout linkage** — if a deleted workout's ID matches any `ScheduledWorkout.completedWorkoutId`, set that field to nil and revert status to "planned".
+
+### Workout Deletion
+Apply the Workout Cascade to remaining data.
+
+### Workout Edit
+Apply the Workout Cascade to updated data. Additionally, **every workout edit sets `workout.lastModifiedDate = .now`** regardless of which fields changed (including cosmetic edits to name, notes, or time). This refreshes the workout's scope against any goal `resetDate` per § Reset Scoping.
+
+Edit-specific notes:
+- **Date changed** — the cascade runs against both the old and new `workout.date` (Training Frequency hits both weeks; GoalSnapshot recomputes both the old-date and new-date snapshots).
+- **Cosmetic-only change** (name/notes/time with no value-affecting fields) — `lastModifiedDate` still bumps, which re-scopes the workout against any goal `resetDate` and triggers full goal auto-update and snapshot recalc. No Training Load / chart recalc beyond this.
+
+### Workout Type Deletion
+When a workout type is deleted via the context menu, ALL workouts of that type are deleted in a single batch operation. Apply the Workout Cascade as a batch across every deleted workout, plus:
+- All ExerciseSets across all deleted workouts are cascade-deleted from SwiftData.
+- The WorkoutTypeOrder record for the deleted type is removed; the Workout Type card disappears from the Workouts screen.
+- Remaining WorkoutTypeOrder records do NOT re-index `sortOrder` — the gap is acceptable; relative order preserved.
+- Any linked ScheduledWorkout slots revert to "planned" (via the Workout Cascade's Scheduled workout linkage rule).
+
+### Goal Deletion
+Remove goal from SwiftData. Cascade-delete all associated GoalSnapshot records (matching goalId). Re-index remaining goals' sortOrder.
+
+### Template Deletion
+Remove WorkoutTemplate + all TemplateExerciseSets (cascade). No effect on any other data.
+
+### Widget Deletion
+Remove HomeWidget record only. No underlying data affected. Widget re-addable via Add Widget menu. Remaining widgets re-index sortOrder.
+
+### Chart Deletion
+Remove TrendsChart record only. No underlying data affected. Chart re-addable via Add Charts menu. Remaining charts re-index sortOrder. Identical behavior to Widget Deletion.
+
+### Scheduled Workout Deletion
+Remove `ScheduledWorkout` record. No effect on any other data (no Workout is created until completion). For recurring workouts, "Remove from Plan → This and future" removes this instance and all future instances sharing the same `recurrenceGroupId` — past completed/skipped instances are preserved.
+
+**Completed scheduled workout removed via Plan ("Remove from Plan" dual-action):** The `ScheduledWorkout` record is deleted AND the linked `Workout` has `hiddenFromPlan` set to `true`. See SERVICES.md § PlanService → Remove from Plan for full semantics. The underlying `Workout` is otherwise unaffected — all cascades (PR, Training Load, streaks, goals, charts) continue to include it.
+
+### Workout Hide from Plan (hiddenFromPlan flag)
+`hiddenFromPlan` is a pure display flag on the `Workout` model. Setting or clearing it **does not trigger any cascade** — PR timelines, Training Load, streaks, Power Level, goals, GoalSnapshot records, and all charts are unaffected. The flag exclusively controls whether the `Workout` surfaces on the Plan screen (see SERVICES.md § PlanService → Retrieval → Fetch Plan surface). No cascade recalculations are needed when the flag changes.
+
+---
+
+## WorkoutService (WorkoutService.swift)
+
+CRUD wrapper for workouts via SwiftData:
+- **Log:** Create workout + ExerciseSets. Set `workout.lastModifiedDate = .now`. Trigger PR recalculation and goal auto-update.
+- **Retrieve:** Sorted by date (newest first).
+- **Update:** Full workout (name, date, time, RPE, duration, distance, add/modify/delete ExerciseSets). Set `workout.lastModifiedDate = .now` on every update regardless of which fields changed (including cosmetic edits — see § Workout Edit cascade). Trigger PR recalc and goal auto-update.
+- **Update notes:** Inline note edit. Sets `workout.lastModifiedDate = .now` (cosmetic edit per § Reset Scoping).
+- **Delete:** Cascade-delete all ExerciseSets. Trigger all cascading recalculations (see Deletion Behavior above). If the deleted workout is linked to a `ScheduledWorkout` (via `completedWorkoutId`), notify PlanService to revert that slot to "planned".
+- **Delete all for type:** Accept a workoutType string, fetch all workouts matching that type, cascade-delete each with ExerciseSets, then trigger all cascading recalculations once (see Workout Type Deletion above). Remove the corresponding WorkoutTypeOrder record. Revert any linked ScheduledWorkout slots to "planned".
+
+---
+
+## WorkoutTypeOrderService (WorkoutTypeOrderService.swift)
+
+- **Create:** When a workout is saved and no WorkoutTypeOrder exists for that type → create with sortOrder = max + 1, isExpanded = false, activeSortOption = "newestFirst", activeFiltersJSON = nil.
+- **Delete:** When last workout of a type is deleted → remove the WorkoutTypeOrder record.
+- **Reorder:** Accept array of workoutType strings, re-index sortOrder starting from 0.
+- **Toggle expand/collapse:** Flip isExpanded for a given type.
+- **Update sort/filter:** Persist activeSortOption and activeFiltersJSON per type.
+
+---
+
+## WorkoutTemplateService (WorkoutTemplateService.swift)
+
+- **Create:** Template + TemplateExerciseSets. workoutType restricted to Strength Training / HIIT.
+- **Retrieve:** All templates sorted by dateCreated (newest first).
+- **Update:** Name, duration, add/modify/delete TemplateExerciseSets.
+- **Delete:** Cascade-delete all TemplateExerciseSets. No effect on other data.
+- **Apply:** Return data snapshot (not a reference) for pre-populating Log Workout form.
+
+---
+
+## PlanService (PlanService.swift)
+
+**Purpose:** CRUD for scheduled workouts, recurrence generation, date resolution, template snapshot encoding/decoding, and completion flow.
+
+### Template Snapshot
+
+When a user schedules a template, the exercise data (names, sets, reps, weights, sort order) is serialized into `ScheduledWorkout.templateSnapshot` as a JSON blob at scheduling time. This ensures:
+- Editing a template after scheduling does not silently alter planned workouts.
+- Deleting a template does not orphan scheduled workouts.
+- The "Complete Planned Workout" flow always has exercise data to populate.
+
+**encodeSnapshot(template: WorkoutTemplate) → Data:** Serializes the template's TemplateExerciseSets into a JSON array of `{ exerciseName, sets, reps, weightKg, sortOrder }` objects.
+
+**decodeSnapshot(data: Data) → [SnapshotExercise]:** Deserializes the JSON blob back into an array of exercise structs for populating Log Workout or creating a Workout directly.
+
+### Scheduling
+
+- **Schedule:** Create a `ScheduledWorkout` record. Copy name, workoutType, durationMinutes from the selected template. Encode template exercises into `templateSnapshot`. Set status = "planned". `scheduledDate` must be today or in the future — past dates are rejected.
+- **Schedule recurring:** Accept a recurrence rule ("weekly" / "biweekly") and generate individual `ScheduledWorkout` records for the next 12 weeks, each sharing the same `recurrenceGroupId` (a new UUID). Each instance gets its own `templateSnapshot` copied at creation time.
+- **Regenerate recurrence:** When the user opens the Plan tab and fewer than 4 future instances remain for a `recurrenceGroupId`, auto-generate additional instances to maintain a 12-week lookahead. Silent background operation.
+
+### Retrieval
+
+- **Fetch for date range:** Return all `ScheduledWorkout` records within a given date range, sorted by `scheduledDate` then `scheduledTime`.
+- **Fetch for date:** Return all records for a specific calendar day.
+- **Fetch today's planned:** Return the first `ScheduledWorkout` for today with status "planned" (used by Today's Plan widget left column).
+- **Fetch Plan surface for date range:** Unified fetch used by the Plan screen calendar dots and Day Detail Area. Returns a merged, date-sorted collection of:
+  1. All `ScheduledWorkout` records in the range (all statuses).
+  2. All `Workout` records in the range **where** no `ScheduledWorkout` has `completedWorkoutId == workout.id` AND `workout.hiddenFromPlan == false`.
+  
+  The filter on condition (1) prevents duplicate representation of completed scheduled workouts (once as their `ScheduledWorkout`, once as the linked `Workout`). Callers distinguish the two record types and render logged-only cards vs. scheduled cards accordingly (see SCREENS.md § Plan → Day Detail Area).
+- **Fetch Plan surface for date:** Same logic scoped to a single calendar day. Used by Day Detail Area and by the Today's Plan widget calendar square (for green dot presence on today).
+
+### Completion
+
+- **Complete:** Accept a `ScheduledWorkout`, RPE (optional), and duration (optional). Decode `templateSnapshot`, create a `Workout` + `ExerciseSet` records from the snapshot data plus RPE and duration. Set `ScheduledWorkout.status` = "completed" and `completedWorkoutId` = new Workout's ID. Trigger all standard workout-save cascades (PR recalc, goal auto-update, Training Load, streak, Power Level).
+- **Complete via Log Workout:** When the user taps "Modify Exercises," pass the `ScheduledWorkout.id` through to Log Workout. On workout save, call back to PlanService to mark the slot completed and link the workout ID.
+
+### Date Resolution
+
+Determine the appropriate workout date when completing a planned workout:
+
+- **Scheduled date is today:** Return today. No prompt needed.
+- **Scheduled date is in the past:** Return both the scheduled date and today as options. Caller presents prompt to user.
+- **Scheduled date is in the future:** Return today as the only valid date. Caller presents prompt. Post-dating is prohibited.
+
+### Skip / Restore
+
+- **Skip:** Set status = "skipped". No `Workout` record created. Reversible.
+- **Restore:** Set status back to "planned" (from "skipped" only).
+
+### Remove from Plan
+
+The unified "Remove from Plan" action supports all non-planned card types on the Plan screen (planned and skipped `ScheduledWorkout`s, completed `ScheduledWorkout`s, and logged-only `Workout`s). Behavior varies by underlying record type:
+
+- **Planned or skipped `ScheduledWorkout` (single):** Delete the `ScheduledWorkout` record. Standard delete confirmation required by caller.
+- **Planned or skipped `ScheduledWorkout` (recurring):** Caller presents "This workout only / This and future workouts" prompt first. "This workout only" deletes this instance. "This and future" deletes this instance and all future instances sharing the same `recurrenceGroupId` with `scheduledDate` ≥ this instance's date. Past completed/skipped instances are never deleted.
+- **Completed `ScheduledWorkout` (single) — dual-action:** Execute atomically:
+  1. Delete the `ScheduledWorkout` record.
+  2. Set `workout.hiddenFromPlan = true` on the linked `Workout` (resolved via `completedWorkoutId`).
+  
+  Without step 2, the dedup rule in § Retrieval → Fetch Plan surface would immediately re-surface the `Workout` as a logged-only card. The underlying `Workout` record is fully preserved in the Workouts screen and in all cascades — only its visibility on Plan is removed.
+- **Completed `ScheduledWorkout` (recurring):** Caller presents "This workout only / This and future workouts" prompt. "This workout only" executes the dual-action on this instance. "This and future" executes the dual-action on this instance, plus deletes all future **planned** instances in the same `recurrenceGroupId` (existing recurring delete rule — past completed/skipped untouched).
+- **Logged-only `Workout`:** Set `workout.hiddenFromPlan = true`. No `ScheduledWorkout` involved.
+
+**Undo:** All variants emit a "Removed from Plan. [Undo]" toast (~4s auto-dismiss). Undo reverses the action:
+- For logged-only and completed-scheduled variants, undo sets `workout.hiddenFromPlan = false`. The card reappears as a **logged-only card** (the deleted `ScheduledWorkout` record is not restored — this is acceptable behavior consistent with the dual-action's lineage-destroying semantics).
+- For planned/skipped variants, undo restores the deleted `ScheduledWorkout` record from the pre-delete snapshot held in memory for the toast's lifetime. If the toast auto-dismisses before the user taps Undo, the deletion is permanent.
+
+### Delete (legacy — now subsumed by Remove from Plan)
+
+Historical note: the action previously named "Delete from Schedule" has been renamed to "Remove from Plan" and unified across all card types. Callers that previously invoked a plain `delete(scheduledWorkout:)` now invoke `removeFromPlan(card:)` with the card's underlying record. The SwiftData operations are unchanged for planned/skipped cases — only naming and the addition of the completed-card dual-action branch.
+
+### Workout Deletion Linkage
+
+When a `Workout` that is linked to a `ScheduledWorkout` (via `completedWorkoutId`) is deleted, PlanService sets `completedWorkoutId` to nil and reverts status to "planned". This allows the user to re-complete the scheduled slot.
+
+---
+
+## HomeWidgetService (HomeWidgetService.swift)
+
+- **Seed defaults:** On first launch (hasSeededDefaultWidgets = false), create HomeWidget records for Training Load, Workout Info, Week Streak in that order. Set hasSeededDefaultWidgets = true.
+- **Add:** Create HomeWidget at max sortOrder + 1. No duplicate widgetType allowed.
+- **Delete:** Remove HomeWidget record. Re-index remaining sortOrder.
+- **Reorder:** Accept array of widgetType strings, re-index sortOrder starting from 0.
+
+---
+
+## TrendsChartService (TrendsChartService.swift)
+
+Mirrors `HomeWidgetService` for the Trends screen.
+
+- **Seed defaults:** On first launch (hasSeededDefaultTrendsCharts = false), create TrendsChart records for Strength Tracker, Training Frequency, Personal Records, Training Load Trend in that order. Set hasSeededDefaultTrendsCharts = true.
+- **Add:** Create TrendsChart at max sortOrder + 1. No duplicate chartType allowed.
+- **Delete:** Remove TrendsChart record. Re-index remaining sortOrder. No underlying workout data affected.
+- **Reorder:** Accept array of chartType strings, re-index sortOrder starting from 0.
+
+---
+
+## ExerciseSuggestionService (ExerciseSuggestionService.swift)
+
+**Purpose:** Hybrid autocomplete for exercise name inputs across Log Workout, Create Template, and Add Goal (Custom exercise).
+
+### Data Sources
+1. **User history:** Exercise names from all previously logged workouts. Refreshed after workout save/delete.
+2. **Static dictionary:** Curated list in AppConstants (see `CONSTANTS.md`).
+3. **Alias map:** Abbreviations → canonical names (see `CONSTANTS.md`).
+
+### Suggestion Ranking (highest to lowest priority)
+1. **Prefix match** from user history (e.g., "Ben" → "Bench Press" from history)
+2. **Prefix match** from dictionary (e.g., "Ben" → "Bench Press" from dictionary)
+3. **Word-boundary match** from user history (e.g., "Press" → "Bench Press")
+4. **Word-boundary match** from dictionary
+5. **Contains match** from user history (e.g., "bell" → "Barbell Rows")
+6. **Contains match** from dictionary
+7. **Alias resolution:** If input matches an alias key (case-insensitive), include the canonical name as a suggestion.
+
+### Closest-Match Nudge
+If no candidates match via prefix/word-boundary/contains, check Levenshtein edit distance. Surface the closest match within edit distance ≤ 2 as the top suggestion (e.g., "Bech Press" → "Bench Press"). No special visual distinction. Edit distance 3+ → no nudge.
+
+### Rules
+- Maximum 5 suggestions returned
+- Empty or whitespace-only query → empty list
+- Deduplication: case-insensitive. If same exercise exists in history + dictionary, history version wins.
+- All matching is case-insensitive
+- `refreshHistory()` updates the history source after workout save/delete
+
+### FortiFitExerciseAutocomplete Component
+Dropdown overlay below input. Elevated surface (#2d2d2d), border (#404040). Each row: 44pt min height, 13px 600-weight #e5e5e5 text. First row highlighted (#3b82f6 at 10% opacity). Appears when ≥1 character typed and suggestions exist. Tap suggestion → populates input, dismisses immediately. Tap outside / press return / lose focus → dismisses, accepts typed text. Renders above sibling cards via zIndex. 0.15s opacity fade-in. Identical behavior across Log Workout, Create Template, and Add Goal.
+
+---
+
+## GoalSnapshotService (GoalSnapshotService.swift)
+
+**Purpose:** Manages `GoalSnapshot` records that power the 30-day sparkline on goal cards. Captures **per-workout session values** anchored to each matching workout's `date`, so the sparkline reflects what the user actually did on each training day — including regressions, light sessions, and time between PRs — not just PR events.
+
+### Snapshot Model
+The sparkline and the ring are two different lenses on the same goal:
+- **Ring** reflects the all-time best within scope (`currentValueKg`, `currentReps`, or `currentDistanceKm` / `currentDurationMinutes`) — unchanged from existing behavior.
+- **Sparkline** reflects per-workout performance: each matching workout produces a snapshot anchored to its `workout.date`, using that workout's best-of-day session value. Multiple matching workouts on the same date collapse to a single snapshot with the best-of-day value.
+
+### Snapshot Triggers
+Snapshots are computed/recomputed whenever matching workout data changes:
+- After workout log → snapshot appended/updated on `workout.date` for each affected goal.
+- After workout edit → snapshot recomputed on the workout's `date`. If the edit changed `date`, both old-date and new-date snapshots recompute.
+- After workout deletion → snapshot on the deleted workout's `date` recomputes from remaining matching in-scope workouts on that date. If no remaining in-scope workouts on that date, the snapshot is deleted.
+- After workout type deletion → bulk recompute across all affected dates per the per-workout rules above.
+- After goal definition edit (Add/Edit Goal) → if `resetDate` was cleared, previously out-of-scope workouts may now qualify; rebuild snapshots for affected dates from in-scope workouts. GoalSnapshotService exposes a `rebuildSnapshots(goal:)` operation for this path.
+- **Not on `lastCelebratedDate` change or ring display changes alone** — only on actual underlying workout or scope changes.
+
+Weekly Workouts is a special case: its value is a runtime count, so a snapshot is written on any day a matching workout is logged (today), with `value` = current week's workout count at end-of-day. Its existing behavior is unchanged.
+
+### Per-Workout Value Computation (best-of-day)
+For a given goal and calendar date, the snapshot `value` is computed from all **in-scope, matching** workouts on that date (per § Reset Scoping). "Best-of-day" applies the same per-goal-type arithmetic as the ring's "best-ever within scope" logic (see § Goal Auto-Update), but scoped to a single date rather than the full goal history:
+
+| Goal Type | Best-of-day input | Snapshot `value` |
+|---|---|---|
+| exercisePR (Strength PR) | Top `weightKg` across matching ExerciseSets on that date (name match, case-insensitive) | That weight in kg. No matching sets → no snapshot written (or existing one deleted on recompute). |
+| repsPR (Repetitions PR) | Highest `reps` across matching ExerciseSets on that date | That rep count as `Double`. Same no-match behavior as exercisePR. |
+| speedDistance — distance-only | Highest `distanceKm` across matching-type workouts on that date | Distance progress % (`distanceKm / targetDistanceKm × 100`, clamped 0–100). |
+| speedDistance — duration-only (endurance) | Highest `durationMinutes` across matching-type workouts on that date | Duration progress % (`durationMinutes / targetDurationMinutes × 100`, clamped 0–100). |
+| speedDistance — speed target (both set) | Per-workout `overallProgress %` per § Goal Progress Calculation; take the highest. Ties broken by most recent workout. | That `overallProgress %`. |
+| weeklyWorkouts | Runtime count (special case — see below) | `Double(current workout count this week)` at end of day. |
+
+### Rules
+- **One snapshot per goal per day:** Deduplicates by `goalId` + calendar date (time component zeroed). Best-of-day computation applies when multiple matching workouts exist on the same date.
+- **No backfilling for brand-new goals:** Snapshots are only computed for dates on which a matching in-scope workout exists. There is no historical scan at goal creation. The sparkline carries forward the last known value for days with no snapshot.
+- **No automatic pruning:** Snapshots persist for the lifetime of the goal. Snapshots are deleted only by: (a) goal deletion cascade, (b) Reset Goal Progress (wipes all), or (c) workout-change cascade that removes the last supporting in-scope workout on a given date.
+- **Out-of-scope filtering:** All per-workout computations ignore workouts where `workout.date <= goal.resetDate` AND `workout.lastModifiedDate <= goal.resetDate` (per § Reset Scoping). A snapshot is not written for dates that have no in-scope matching workout.
+- **Migration:** Existing GoalSnapshot records written under the prior PR-event model are left alone. They will be gradually superseded as new snapshots are written and as edit/delete cascades recompute dates; there is no one-time historical rebuild at update. Old and new snapshots coexist on the sparkline during the transition.
+
+### Responsibilities
+- **recomputeSnapshot(goal, date, context):** Computes and writes (or deletes) the snapshot for a given goal and date based on currently stored in-scope matching workouts. Called from goal auto-update, workout delete/edit cascades. Idempotent.
+- **recomputeSnapshotsForWorkout(workout, affectedGoals, context):** For each affected goal, recomputes the snapshot on `workout.date`. If the caller also supplies a prior date (on edit with date change), recomputes that too.
+- **rebuildSnapshots(goal, context):** Drops all existing snapshots for this goal and rebuilds from all in-scope matching workouts. Called on goal definition edit when `resetDate` clears.
+- **fetchSnapshots(goalId, days: 30, context) → [GoalSnapshot]:** Returns snapshots for the given goal within the last N days, sorted by date ascending.
+- **deleteSnapshots(goalId, context):** Removes all snapshots for a given goal. Called on goal deletion cascade and on Reset Goal Progress.
+
+### File Dependencies
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `GoalSnapshotService.swift` | `Core/Services/` | Snapshot CRUD and retrieval |
+| `GoalSnapshot.swift` | `Core/Models/` | SwiftData model |
+
+---
+
+## WorkoutShareService (WorkoutShareService.swift)
+
+**Purpose:** Renders a single workout as a styled PNG image card and presents the iOS share sheet from the Workout Detail screen. See `SCREENS.md` § Workout Detail (Share Image Card) for full card layout, styling, and edge cases.
+
+### Responsibilities
+
+- **renderShareImage(workout: Workout, userSettings: UserSettings) → UIImage:** Builds a `WorkoutShareCardView` (a pure SwiftUI view not displayed on screen), renders it via `ImageRenderer` at @3x scale. Respects `useLbs` and `useMiles` from UserSettings for unit display. Returns the rendered `UIImage`.
+- **presentShareSheet(image: UIImage):** Presents `UIActivityViewController` via a `UIViewControllerRepresentable` wrapper. Activity items: `[UIImage]`. No excluded activity types (allow all system share targets).
+
+### Rendering Rules
+
+- Uses the same color tokens and typography from `Theme/` — no hardcoded values.
+- Weight display: `weightKg` converted via `UnitConversion` if `useLbs == true`.
+- Distance display: `distanceKm` converted via `UnitConversion` if `useMiles == true`.
+- Exercise list capped at 10. If workout has more than 10, show first 10 followed by muted "+X more exercises" line.
+- Date/time format follows device locale (matches Workout Detail screen behavior). When `workout.time` is nil, omit time component.
+- Summary pills with nil values omitted entirely.
+- Session notes excluded from the image.
+
+### Error Handling
+
+If `ImageRenderer` returns nil (render failure), show a brief toast: "Couldn't generate image. Try again." (auto-dismiss ~2s, matching existing toast pattern). Do not present the share sheet.
+
+### File Dependencies
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `WorkoutShareService.swift` | `Core/Services/` | Orchestrates render + share sheet presentation |
+| `WorkoutShareCardView.swift` | `Design/Components/` | Pure SwiftUI view used as `ImageRenderer` input |
+| `ShareSheet.swift` | `Core/Utilities/` | `UIActivityViewController` wrapper (UIViewControllerRepresentable) |
+
+---
+
+## TemplateShareService (TemplateShareService.swift)
+
+**Purpose:** Encodes workout templates into QR code URLs, generates QR code images, decodes incoming QR URLs, and handles template import with duplicate name resolution. See `SCREENS.md` § Saved Templates List (Share Template QR Modal) and `SCREENS.md` § Template Import Prompt for UI specs.
+
+### URL Scheme
+
+```
+fitnavi://template?v=1&data=<base64-encoded-JSON>
+```
+
+- **Scheme:** `fitnavi` — registered in Info.plist as a custom URL type.
+- **Host:** `template` — identifies the payload type for future extensibility.
+- **v:** Payload version (integer). Current version: `1`. Used for forward compatibility — if the payload format changes, the decoder can handle or reject older/newer versions.
+- **data:** Base64url-encoded JSON string containing the full template data.
+
+### Payload Format (v1)
+
+```json
+{
+  "v": 1,
+  "name": "Push Day",
+  "workoutType": "Strength Training",
+  "durationMinutes": 60,
+  "exercises": [
+    {
+      "exerciseName": "Bench Press",
+      "sets": 4,
+      "reps": 8,
+      "weightKg": 84.0,
+      "sortOrder": 0
+    },
+    {
+      "exerciseName": "Push-Ups",
+      "sets": 3,
+      "reps": 15,
+      "weightKg": null,
+      "sortOrder": 1
+    }
+  ]
+}
+```
+
+- `durationMinutes`: null when not set.
+- `weightKg`: null for bodyweight exercises.
+- `workoutType`: Must be "Strength Training" or "HIIT". Any other value is treated as malformed.
+- Exercises ordered by `sortOrder`.
+
+### Responsibilities
+
+- **encodeTemplate(template: WorkoutTemplate) → URL:** Serializes the template and its TemplateExerciseSets into the v1 JSON payload, base64url-encodes it, and constructs the `fitnavi://` URL.
+- **generateQRCode(from url: URL) → UIImage?:** Uses Core Image `CIQRCodeGenerator` to produce a QR code image from the URL string. Returns nil on failure. Native framework — no third-party dependency.
+- **decodeTemplateURL(url: URL) → TemplatePayload?:** Parses the incoming URL, extracts the `data` parameter, base64url-decodes it, deserializes the JSON into a `TemplatePayload` struct. Returns nil if any step fails (malformed URL, invalid base64, JSON parse error, missing required fields, invalid workoutType).
+- **importTemplate(payload: TemplatePayload, context: ModelContext) → WorkoutTemplate:** Creates a new WorkoutTemplate + TemplateExerciseSets in SwiftData from the decoded payload. Calls `resolveTemplateName` to handle duplicates before saving.
+- **resolveTemplateName(name: String, context: ModelContext) → String:** Checks if a template with the given name exists. If not, returns the name as-is. If so, appends " (1)", " (2)", etc., incrementing until a unique name is found.
+
+### QR Code Generation Rules
+
+- Uses `CIQRCodeGenerator` from Core Image (native, no third-party).
+- Error correction level: `M` (medium — 15% recovery, good balance of data density and damage tolerance).
+- Output scaled to ~250pt for comfortable scanning from a phone screen.
+- QR image rendered as white modules on transparent background, displayed on Card Surface (#1a1a1a) in the modal.
+
+### QR Code Size Limits
+
+QR codes (version 40, error correction M) can hold ~2,331 bytes in binary mode. A template with 10 exercises and typical field lengths encodes to approximately 500–800 bytes after base64, well within limits. Templates with 20+ exercises or very long names may approach the limit. If the encoded URL exceeds 2,331 bytes, show a toast: "Template is too large to share via QR code." (~2s auto-dismiss). Do not generate the QR code.
+
+### Deep Link Handling
+
+The app must register `fitnavi` as a custom URL scheme in Info.plist. In `FortiFitApp.swift`, handle incoming URLs via `.onOpenURL { url in ... }`. When a `fitnavi://template` URL is received:
+
+1. Call `decodeTemplateURL(url:)`.
+2. If decoding succeeds → present the Template Import Prompt (see `SCREENS.md` § Template Import Prompt).
+3. If decoding fails → present the error modal with "This QR code couldn't be read." message.
+
+### File Dependencies
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `TemplateShareService.swift` | `Core/Services/` | Encode/decode/QR generation/import logic |
+| `TemplateQRModalView.swift` | `Design/Components/` | QR code modal (used by Saved Templates List and Edit Template) |
+| `TemplateImportView.swift` | `Features/Workout/` | Import confirmation prompt (triggered by deep link) |

@@ -7,10 +7,9 @@
 
 import Testing
 
-struct FortiFitTests {
+// Individual test suites are in:
+// - ModelTests.swift (Workout, ExerciseSet, Goal model CRUD)
+// - ServiceTests.swift (WorkoutService, GoalService)
+// - ExerciseLoadServiceTests.swift (RPE-weighted load algorithm)
+// - UnitConversionTests.swift (kg↔lbs conversion)
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-    }
-
-}
