@@ -68,6 +68,10 @@ struct FortiFitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    let context = sharedModelContainer.mainContext
+                    WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
+                }
                 .onOpenURL { url in
                     guard url.scheme == "fitnavi", url.host == "template" else { return }
                     if let payload = TemplateShareService.decodeTemplateURL(url: url) {

@@ -58,7 +58,8 @@ A holistic health app that helps users track and understand the interaction betw
 - **Persistence:** SwiftData for structured data. UserDefaults ONLY for lightweight preferences.
 - **Charts:** Swift Charts (Apple native)
 - **Dependencies:** Zero third-party. Native frameworks only. Swift Package Manager.
-- **Not in MVP:** CloudKit, HealthKit, authentication, user accounts.
+- **HealthKit:** Read-only integration in Phase 8 (see HEALTHKIT.md). Imports workouts from Apple Watch and other Health-connected sources. No write-back in MVP.
+- **Not in MVP:** CloudKit, authentication, user accounts, HealthKit write-back, biometrics (Phase 10), sleep data (Phase 11).
 
 ### Project Structure
 
@@ -82,6 +83,7 @@ FortiFit/
 │   │   ├── ScheduledWorkout.swift
 │   │   ├── HomeWidget.swift
 │   │   ├── TrendsChart.swift             # Chart visibility + order on Trends
+│   │   ├── WorkoutMatchRejection.swift   # HealthKit dedup rejection record (see HEALTHKIT.md § 5)
 │   │   └── UserSettings.swift         # UserDefaults-backed preferences
 │   ├── Services/
 │   │   ├── WorkoutService.swift       # CRUD for workouts (see SERVICES.md)
@@ -97,7 +99,10 @@ FortiFit/
 │   │   ├── PowerLevelService.swift    # Power Level algorithm (see SERVICES.md)
 │   │   ├── WorkoutShareService.swift  # Workout image export (see SERVICES.md)
 │   │   ├── TemplateShareService.swift # Template QR sharing (see SERVICES.md)
-│   │   └── ExerciseSuggestionService.swift  # Autocomplete (see SERVICES.md)
+│   │   ├── ExerciseSuggestionService.swift  # Autocomplete (see SERVICES.md)
+│   │   ├── HealthKitClient.swift         # HealthKit protocol + DefaultHealthKitClient (see HEALTHKIT.md § 4, SERVICES.md § HealthKitClient)
+│   │   ├── HealthKitSyncService.swift    # HK import, anchor persistence, cascade triggering (see HEALTHKIT.md § 9, SERVICES.md § HealthKitSyncService)
+│   │   └── WorkoutMatcher.swift          # Bidirectional HK dedup (see HEALTHKIT.md § 12, SERVICES.md § WorkoutMatcher)
 │   └── Utilities/
 │       ├── Extensions/                # Date+, Double+, Color+
 │       ├── ShareSheet.swift           # UIActivityViewController wrapper
@@ -154,7 +159,12 @@ FortiFit/
 │   │   ├── FortiFitMonthGrid.swift    # Reusable month grid calendar component
 │   │   ├── FortiFitScheduledWorkoutCard.swift # Card for a scheduled workout in Plan
 │   │   ├── WorkoutShareCardView.swift # Share image card (see SERVICES.md § WorkoutShareService)
-│   │   └── TemplateQRModalView.swift  # QR code modal for template sharing
+│   │   ├── TemplateQRModalView.swift  # QR code modal for template sharing
+│   │   ├── FortiFitHealthSourceIndicator.swift  # HK-pink heart + activity type + source name on Workout Detail (see HEALTHKIT.md § 15)
+│   │   ├── FortiFitHealthSourceInfoSheet.swift  # Tap sheet with explainer + Unlink button (see HEALTHKIT.md § 15)
+│   │   ├── FortiFitHealthDataSubsection.swift   # Workout Detail Health Data rows (HR, calories, elevation, etc.) with conditional rendering (see HEALTHKIT.md § 15)
+│   │   ├── FortiFitHealthGlyph.swift             # Small HK-pink heart glyph for peripheral surfaces (Home Recent, Workouts preview, Plan cards) (see HEALTHKIT.md § 15)
+│   │   └── MatchPromptSheetView.swift           # Sheet-on-foreground dedup prompt (see HEALTHKIT.md § 13, SCREENS.md § Match Prompt Sheet)
 │   ├── Theme/
 │   │   ├── Colors.swift
 │   │   ├── Typography.swift
@@ -247,11 +257,21 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | workoutType | String | Yes | One of the 6 types in AppConstants |
 | rpe | Int? | No | 1–10. Nil if not rated. |
 | note | String | No | Free-text session notes |
-| durationMinutes | Int? | No | Available for all types. Nil if not entered. |
-| distanceKm | Double? | No | Cardio/Sprints only. Always nil for other types. |
+| durationMinutes | Int? | No | Available for all types. Nil if not entered. Read-only in Log Workout edit view when `healthKitUUID != nil` (HK-owned field — see HEALTHKIT.md § 7). |
+| distanceKm | Double? | No | Cardio only. Always nil for other types. Read-only in Log Workout edit view when `healthKitUUID != nil` (HK-owned field). |
 | time | Date? | No | Time of day. Purely informational — not used by any algorithm. |
 | lastModifiedDate | Date? | No | Set to `.now` on create AND on every update. Used by goal reset scoping (see SERVICES.md § Goal Auto-Update → Reset Scoping). Nil on records created before this field was introduced — treated as in-scope for all goals. |
 | hiddenFromPlan | Bool | Yes | Default: `false`. Pure display flag controlling whether the workout surfaces as a logged-only card on the Plan calendar (see SCREENS.md § Plan and SERVICES.md § PlanService → Retrieval). Set to `true` via "Remove from Plan" long-press action; reverted to `false` via the conditional "Show on Plan" item in Workout Detail's ellipsis menu. Does not affect any algorithm, cascade, or other screen — purely controls Plan surfacing. |
+| healthKitUUID | UUID? | No | Pointer to source HealthKit workout record. Nil = manual FortiFit workout. Non-nil = imported or linked to an HK record. See HEALTHKIT.md § 5. |
+| healthKitSourceBundleID | String? | No | Bundle ID of the app that wrote the workout to HealthKit (e.g., `com.apple.health.WatchApp`, `com.onepeloton.peloton`). Used for the source indicator label via `HKSource.name`. Nil when `healthKitUUID` is nil. |
+| healthKitActivityType | String? | No | Friendly display string for the HK activity type (e.g., "Traditional Strength Training", "Outdoor Run"). Used on Workout Detail's source indicator. Never consumed by any algorithm. Nil when `healthKitUUID` is nil. |
+| avgHeartRate | Int? | No | Average heart rate in bpm. Imported from HK; nil if not available. HK-owned (see HEALTHKIT.md § 7). |
+| maxHeartRate | Int? | No | Maximum heart rate in bpm. Imported from HK; nil if not available. HK-owned. |
+| activeEnergyKcal | Double? | No | Active calories burned (Move ring metric). Imported from HK; nil if not available. HK-owned. |
+| totalEnergyBurnedKcal | Double? | No | Active + basal calories combined. Imported from HK; nil if not available. HK-owned. |
+| elevationAscendedMeters | Double? | No | Elevation gain. Outdoor workouts only. Imported from HK; nil if not available. HK-owned. Display respects `useMiles` (meters vs feet). |
+| exerciseMinutes | Int? | No | Apple Exercise ring credit. Differs from `durationMinutes` (strength sessions with low HR may log less Exercise time than total duration). Imported from HK; nil if not available. HK-owned. |
+| indoor | Bool? | No | Metadata flag distinguishing indoor vs outdoor workout variants. Imported from HK; nil for manual workouts. HK-owned. |
 
 #### ExerciseSet
 | Property | Type | Required | Notes |
@@ -365,6 +385,20 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | longestStreak | Int | 0 | Highest streak ever reached |
 | hasSeededDefaultWidgets | Bool | false | Prevents re-seeding after user removes all widgets |
 | hasSeededDefaultTrendsCharts | Bool | false | Prevents re-seeding after user removes all charts |
+| hasMigratedSprintsToCardio | Bool | false | Gates the one-time Sprints → Cardio migration (see HEALTHKIT.md § 18). Set to `true` after migration runs. |
+| healthKitEnabled | Bool | false | User-facing toggle for "Apple Health" section in Settings (see HEALTHKIT.md § 16). When `false`, all HK sync activity is suspended; existing linked workouts retain their `healthKitUUID`. |
+| healthKitAnchor | Data? | nil | Serialized `HKQueryAnchor` for catch-up sync (see HEALTHKIT.md § 9). Updated after every successful anchored query. |
+| healthKitLastSyncDate | Date? | nil | Timestamp of last successful sync. Drives the "Last sync X min ago" status line in Settings. |
+
+#### WorkoutMatchRejection
+| Property | Type | Required | Notes |
+|----------|------|----------|-------|
+| id | UUID | Yes | Auto-generated |
+| healthKitUUID | UUID | Yes | The HealthKit workout the user declined to link |
+| workoutId | UUID | Yes | The FortiFit Workout ID it was rejected against |
+| rejectedDate | Date | Yes | Set to `.now` on creation |
+
+Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md § WorkoutMatcher). Before proposing any pairing, the matcher checks for an existing rejection with matching `(healthKitUUID, workoutId)`. No `@Relationship` to `Workout` — lookups are by UUID pair. Orphan rejections (when a linked `Workout` is deleted) are harmless and retained.
 
 ### Relationships
 - Workout → many ExerciseSets (cascade delete, ordered by sortOrder)
@@ -376,6 +410,7 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 - ScheduledWorkout: standalone. Links to WorkoutTemplate and Workout by UUID reference, not @Relationship. Deleting a template does not delete associated scheduled workouts (templateSnapshot preserves exercise data). Deleting a Workout sets completedWorkoutId to nil and reverts status to "planned".
 - HomeWidget: one per active widget. No relationship to other entities.
 - TrendsChart: one per active chart. No relationship to other entities. Mirrors HomeWidget pattern.
+- WorkoutMatchRejection: standalone. Links to Workout and HK records by UUID reference, not @Relationship. See HEALTHKIT.md § 12 for matcher lookup semantics. Orphan rejections after Workout deletion are harmless and retained; no cascade.
 - UserSettings: singleton (UserDefaults)
 
 ---
@@ -386,18 +421,19 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 
 | Screen | Purpose | Key Elements |
 |--------|---------|-------------|
-| Home | Central hub with customizable widgets | Training Load widget (gear icon → settings modal), Workout Info widget, Week Streak widget (gear icon → settings modal), Power Level widget (optional), "+ Log Workout" CTA, Recent Workouts list (5 most recent), ellipsis menu for Add Widget, long-press edit mode for widget management |
-| Workouts | Training log organized by type | Expandable Workout Type cards, preview rows (newest-first), swipe-to-delete on preview rows, bulk delete workout type via context menu, pagination (30 per page), search (>20 workouts), sort/filter via context menu, template management via ellipsis |
-| Plan | Schedule workouts in advance using templates | Day-by-day scrollable week strip with month indicator, month grid toggle, blue filled circle selected day, scheduled workout cards per day, "Complete Planned Workout" flow with compact confirmation sheet, recurrence (weekly/biweekly), skip/restore, date resolution logic, Today's Plan HomeWidget, ellipsis → Saved Templates |
-| Log Workout | Form for new/edit workout | Name, DatePicker (.dateAndTime), type dropdown, RPE, duration. Adapts by type: Strength/HIIT → exercise cards with autocomplete; Cardio/Sprints → distance; Yoga/Pilates → duration only. Edit mode: pre-populated, type locked, trash icon for delete. Ellipsis for templates (new mode only). |
-| Workout Detail | Exercise breakdown for a session | Name, date, time, type, RPE, duration, exercises/distance, session notes. Share icon (renders workout as PNG image card → iOS share sheet), edit icon, trash icon, ellipsis (Strength/HIIT: save as template). |
+| Home | Central hub with customizable widgets | Training Load widget (gear icon → settings modal), Workout Info widget, Week Streak widget (gear icon → settings modal), Power Level widget (optional), "+ Log Workout" CTA, Recent Workouts list (5 most recent, HK glyph on imported rows), ellipsis menu for Add Widget, long-press edit mode for widget management |
+| Workouts | Training log organized by type | Expandable Workout Type cards, preview rows (newest-first, HK glyph on imported rows), swipe-to-delete on preview rows, bulk delete workout type via context menu, pagination (30 per page), search (>20 workouts), sort/filter via context menu, template management via ellipsis |
+| Plan | Schedule workouts in advance using templates | Day-by-day scrollable week strip with month indicator, month grid toggle, blue filled circle selected day, scheduled workout cards per day (HK glyph on cards linked to imported workouts), "Complete Planned Workout" flow with compact confirmation sheet, recurrence (weekly/biweekly), skip/restore, date resolution logic, Today's Plan HomeWidget, ellipsis → Saved Templates |
+| Log Workout | Form for new/edit workout | Name, DatePicker (.dateAndTime), type dropdown, RPE, duration. Adapts by type: Strength/HIIT → exercise cards with autocomplete; Cardio → distance; Yoga/Pilates → duration only. Edit mode: pre-populated, type locked, trash icon for delete. Ellipsis for templates (new mode only). When `healthKitUUID != nil`: `durationMinutes`, `distanceKm`, and `date` are disabled with "Linked to Apple Health · tap to unlink" helper text (see HEALTHKIT.md § 15). |
+| Workout Detail | Exercise breakdown for a session | Name, date, time, type, RPE, duration, exercises/distance, session notes. Share icon (renders workout as PNG image card → iOS share sheet), edit icon, trash icon, ellipsis (Strength/HIIT: save as template; when linked: "Unlink from Apple Health"). When `healthKitUUID != nil`: source indicator (HK-pink heart + `healthKitActivityType` + "from {HKSource.name}") below Workout Type row, tappable to open info sheet; "Health Data" subsection below summary rows with conditional HR/calorie/elevation/exercise-minutes/indoor rows (see HEALTHKIT.md § 15). |
 | Create Template | Build reusable workout structure | Name, type (Strength/HIIT only), duration, exercise cards. No date/RPE/distance. Edit mode: trash icon + ellipsis (Share Template via QR). |
 | Saved Templates | Manage and share templates | "+" button for new template, list (newest-first), tap to edit, long-press context menu (Share Template via QR, Schedule This Template, Delete Template). |
 | Template Import | Save a template from QR code | Deep link import prompt with template preview, duplicate auto-rename, Cancel/Save. |
 | Trends | Training trend charts with customizable layout | Customizable chart cards (TrendsChart-backed), long-press context menu to delete or reorder, ellipsis menu for Add Charts overlay. Strength Tracker (line chart, exercise selector, 30/60/90D), Training Frequency (bar chart, 8 weeks), Personal Records (exercise dropdown, bar chart comparing current vs. previous PR), Training Load Trend (daily dots, zone-colored, 7-day avg). Additional charts available via Add Charts: Workout Volume, RPE Trend, Workout Type Breakdown, Session Duration. Each chart has independent data thresholds. |
 | Goals | Track targets | Three-section left column (Goal / Target / Progress with sentence-case Primary Accent labels), large right-justified circular progress rings with goal-type SF Symbol silhouettes and centered overall % readout, dual-arc rings for Speed and Distance with tap-to-toggle legend overlay, expandable sparkline cards (30-day history, always visible on expand), long-press context menu (delete, reset progress, reorder), ellipsis menu (Filter Goals, Expand/Collapse All), completion pulse animation on screen visit. Completed state uses blue border + 3% blue wash + "COMPLETED [date]" micro-label. |
 | Add Goal | Create a goal | Type selector (Strength PR / Repetitions PR / Speed and Distance / Number of Weekly Workouts), conditional fields per type, validation. Weekly Workouts target read from UserSettings (read-only, configured via Weekly Streak widget gear icon). |
-| Settings | Configure preferences | General: weight unit, distance unit. Training Load and Streak settings accessed via gear icons on their respective Home screen widgets. |
+| Settings | Configure preferences | General: weight unit, distance unit. Training Load and Streak settings accessed via gear icons on their respective Home screen widgets. Apple Health section: "Connect to Apple Health" toggle, status line, "Sync Now" button (when connected), "Open iOS Settings" button (when permission denied) — see HEALTHKIT.md § 16. |
+| Match Prompt Sheet | Resolve ambiguous HK-to-FortiFit workout matches | Modal sheet on app foreground when `WorkoutMatcher` has queued a lower-confidence match. Side-by-side summary of the two workouts, three actions: "Link these workouts," "Keep separate," "Decide later." See HEALTHKIT.md § 13. |
 
 ---
 
@@ -406,13 +442,14 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 Do NOT build, scaffold UI for, or write service logic for:
 - Social features, multi-user (single-workout image export and template QR sharing are in scope — see SCREENS.md § Workout Detail, SCREENS.md § Saved Templates List)
 - Subscriptions or IAP
-- Apple Watch app
-- Third-party device integration (Garmin, Whoop, Fitbit)
+- Apple Watch app (a native watchOS companion app). HealthKit read integration (Phase 8) covers consuming workouts recorded in Apple's Fitness app on Apple Watch — see HEALTHKIT.md.
+- Third-party device direct integration (Garmin, Whoop, Fitbit native SDKs). Workouts from these sources reach FortiFit indirectly via HealthKit when those apps write to Apple Health.
 - Cloud sync or user accounts
-- HealthKit integration
+- HealthKit write-back (FortiFit → HealthKit). Read integration is in scope as of Phase 8 — see HEALTHKIT.md § 2 and § 20.
 - Nutrition tracking
 - Mental health or mindfulness
-- Sleep tracking
+- Sleep tracking (deferred to future Phase 11 — see HEALTHKIT.md § 20)
+- Biometrics: resting HR, HRV, body weight, VO₂ max, etc. (deferred to future Phase 10 — see HEALTHKIT.md § 20)
 - Onboarding flow
 
 ---
@@ -424,6 +461,7 @@ Do NOT build, scaffold UI for, or write service logic for:
 | `SCREENS.md` | Full screen layouts, state tables, interaction details | Building or modifying any View |
 | `SERVICES.md` | All algorithms (Training Load, Streak, Power Level), service specs, deletion/edit cascading, goal auto-update | Building or modifying any Service or ViewModel |
 | `CONSTANTS.md` | AppConstants values, color hex codes, exercise dictionary, motivational messages, advisory text | Defining constants, theming, or referencing specific values |
+| `HEALTHKIT.md` | HealthKit integration spec: architecture, phases, data model additions, field ownership, sync lifecycle, matcher, UI surfaces, Settings | Any Phase 8 work — building or modifying HealthKit-related models, services, UI surfaces, or tests |
 | `CLAUDE.md` | Coding conventions, constraints, bug logging, development phases | Every coding session |
 | `TESTS.md` | Acceptance test checklist | Verifying features |
 | `BUGS.md` | All bugs, build failures, and unexpected behavior | Logging any bugs, build failures, or unexpected behavior |

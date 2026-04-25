@@ -116,13 +116,12 @@ struct WorkoutShareServiceTests {
         #expect(image != nil)
     }
 
-    @Test @MainActor func renderShareImageReturnsImageForSprints() {
+    @Test @MainActor func renderShareImageReturnsImageForOther() {
         let workout = Workout(
-            name: "Track Sprints",
-            workoutType: "Sprints",
+            name: "Kickboxing",
+            workoutType: "Other",
             rpe: 9,
-            durationMinutes: 25,
-            distanceKm: 3.2
+            durationMinutes: 25
         )
 
         let image = WorkoutShareService.renderShareImage(workout: workout, userSettings: UserSettings.shared)
@@ -323,25 +322,25 @@ struct WorkoutShareCardViewLogicTests {
     @Test func noDistancePillForStrength() {
         // Even if distanceKm is somehow set, strength should not show distance pill
         let workout = Workout(name: "Test", workoutType: "Strength Training", distanceKm: 5.0)
-        let isCardioOrSprints = workout.workoutType == "Cardio" || workout.workoutType == "Sprints"
+        let isCardioOrSprints = workout.workoutType == "Cardio"
         #expect(!isCardioOrSprints)
     }
 
     @Test func noDistancePillForYoga() {
         let workout = Workout(name: "Test", workoutType: "Yoga", distanceKm: 5.0)
-        let isCardioOrSprints = workout.workoutType == "Cardio" || workout.workoutType == "Sprints"
+        let isCardioOrSprints = workout.workoutType == "Cardio"
         #expect(!isCardioOrSprints)
     }
 
     @Test func noDistancePillForPilates() {
         let workout = Workout(name: "Test", workoutType: "Pilates", distanceKm: 5.0)
-        let isCardioOrSprints = workout.workoutType == "Cardio" || workout.workoutType == "Sprints"
+        let isCardioOrSprints = workout.workoutType == "Cardio"
         #expect(!isCardioOrSprints)
     }
 
     @Test func noDistancePillForHIIT() {
         let workout = Workout(name: "Test", workoutType: "HIIT", distanceKm: 5.0)
-        let isCardioOrSprints = workout.workoutType == "Cardio" || workout.workoutType == "Sprints"
+        let isCardioOrSprints = workout.workoutType == "Cardio"
         #expect(!isCardioOrSprints)
     }
 
@@ -359,8 +358,8 @@ struct WorkoutShareCardViewLogicTests {
         #expect(!checkIsStrengthOrHIIT("Cardio"))
     }
 
-    @Test func sprintsDoesNotShowExercises() {
-        #expect(!checkIsStrengthOrHIIT("Sprints"))
+    @Test func otherDoesNotShowExercises() {
+        #expect(!checkIsStrengthOrHIIT("Other"))
     }
 
     @Test func yogaDoesNotShowExercises() {
@@ -409,7 +408,7 @@ struct WorkoutShareCardViewLogicTests {
     }
 
     private func checkHasSummaryPills(_ workout: Workout) -> Bool {
-        let isCardioOrSprints = workout.workoutType == "Cardio" || workout.workoutType == "Sprints"
+        let isCardioOrSprints = workout.workoutType == "Cardio"
         return workout.rpe != nil || workout.durationMinutes != nil || (isCardioOrSprints && workout.distanceKm != nil)
     }
 

@@ -692,7 +692,7 @@ struct WorkoutListView: View {
 
     @ViewBuilder
     private func durationSummary(for workout: Workout) -> some View {
-        if workout.workoutType == "Cardio" || workout.workoutType == "Sprints" {
+        if workout.workoutType == "Cardio" {
             let settings = UserSettings.shared
             let parts: [String] = [
                 workout.durationMinutes.map { "\($0) min" },

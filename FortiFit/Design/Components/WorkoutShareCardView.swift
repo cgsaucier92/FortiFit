@@ -9,7 +9,7 @@ struct WorkoutShareCardView: View {
     }
 
     private var isCardioOrSprints: Bool {
-        workout.workoutType == "Cardio" || workout.workoutType == "Sprints"
+        workout.workoutType == "Cardio"
     }
 
     private var sortedExerciseSets: [ExerciseSet] {

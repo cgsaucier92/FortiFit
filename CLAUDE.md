@@ -75,7 +75,7 @@ At the end of each development session, before closing or pausing work:
 - Apple Watch app
 - Third-party device integration (Garmin, Whoop, Fitbit)
 - Cloud sync or user accounts
-- HealthKit integration
+- HealthKit write-back (FortiFit → HealthKit). HealthKit **read** integration is in scope as of Phase 8 — see HEALTHKIT.md. Write-back remains deferred indefinitely; see HEALTHKIT.md § 2 Scope and § 20 Future Phases.
 - Nutrition tracking
 - Mental health or mindfulness features
 - Sleep tracking
@@ -204,7 +204,37 @@ At the end of each development session, before closing or pausing work:
 | "Show on Plan" conditional ellipsis item in Workout Detail | SCREENS.md § Workout Detail (Ellipsis Menu); CONSTANTS.md § SF Symbols |
 | Today's Plan widget green dot for logged-only workouts | SCREENS.md § Home Screen (Today's Plan widget, Right column) |
 
-### Phase 8: Launch Prep
+### Phase 8: HealthKit Integration
+**Goal:** Workouts recorded on Apple Watch (or any Health-connected source) auto-import into FortiFit. Bidirectional matching, linking, and unlinking. UI surfaces the HealthKit relationship. Read-only — no write-back.
+
+Phases 1 and 2 in HEALTHKIT.md ship together as a single implementation pass. Catch-up-on-launch (anchored queries) is Phase 1; live background delivery (observer queries + `BGAppRefreshTask`) is Phase 2.
+
+| Feature | Where to find spec |
+|---------|-------------------|
+| `HealthKitClient` protocol + `DefaultHealthKitClient` concrete | HEALTHKIT.md § 4 Architecture Decisions; SERVICES.md § HealthKitClient |
+| New `Workout` fields (`healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`, `avgHeartRate`, `maxHeartRate`, `activeEnergyKcal`, `totalEnergyBurnedKcal`, `elevationAscendedMeters`, `exerciseMinutes`, `indoor`) | HEALTHKIT.md § 5 Data Model; PRD.md § Data Model |
+| `WorkoutMatchRejection` entity | HEALTHKIT.md § 5 Data Model; PRD.md § Data Model |
+| HK-to-FortiFit workout type mapping table (static) | HEALTHKIT.md § 6 Workout Type Taxonomy; CONSTANTS.md § HealthKit Mapping |
+| Sprints → Cardio one-time migration | HEALTHKIT.md § 18 Platform and Migration |
+| Field ownership rules (HK-owned vs user-owned) | HEALTHKIT.md § 7 Field Ownership |
+| `HealthKitSyncService` (catch-up on launch, observer queries, background refresh, deleted-object handler) | HEALTHKIT.md § 9 Sync Lifecycle; SERVICES.md § HealthKitSyncService |
+| Auto-create flow + 2-minute minimum-duration floor | HEALTHKIT.md § 10 Auto-Create Flow |
+| Upstream delete handling (null out pointer, bump `lastModifiedDate`, no cascade) | HEALTHKIT.md § 11 Upstream Updates and Deletes; SERVICES.md § HealthKitSyncService |
+| Upstream update handling (HK wins on HK-owned fields) | HEALTHKIT.md § 11 Upstream Updates and Deletes |
+| `WorkoutMatcher` service (bidirectional, tiered confidence, rejection-aware) | HEALTHKIT.md § 12 Deduplication; SERVICES.md § WorkoutMatcher |
+| Workout Cascade fires on HK import (reuses existing cascade) | SERVICES.md § Deletion Cascading Behavior → Workout Cascade |
+| `workoutEffortScore` import into `rpe` (nil-fill only, iOS 18+ gated) | HEALTHKIT.md § 8 Effort Score |
+| Match Prompt Sheet (sheet-on-foreground, side-by-side summary, 3 actions) | HEALTHKIT.md § 13 Prompt UX; SCREENS.md § Match Prompt Sheet |
+| Unlink action (three entry points: ellipsis, info sheet, Log Workout helper) | HEALTHKIT.md § 14 Unlink; SCREENS.md § Workout Detail (Ellipsis Menu) |
+| Workout Detail source indicator + info sheet + Summary two-column grid (HK-linked) | HEALTHKIT.md § 15 UI Surfaces; SCREENS.md § Workout Detail |
+| Log Workout read-only fields (`durationMinutes`, `distanceKm`, `date`) + helper text | HEALTHKIT.md § 15 UI Surfaces; SCREENS.md § Log Workout |
+| Peripheral HK glyph on Home, Workouts, Plan | HEALTHKIT.md § 15 UI Surfaces; SCREENS.md § Home, § Workouts, § Plan |
+| Settings "Apple Health" section (toggle, status line, Sync Now, iOS deep link) | HEALTHKIT.md § 16 Settings; SCREENS.md § Settings (Apple Health Section) |
+| Authorization flow + Info.plist `NSHealthShareUsageDescription` | HEALTHKIT.md § 17 Authorization |
+| New accessibility identifiers (see HEALTHKIT.md § 19 for list) | HEALTHKIT.md § 19 Testing Strategy; TESTING.md |
+| Unit / integration / UI tests for the above | HEALTHKIT.md § 19 Testing Strategy |
+
+### Phase 9: Launch Prep
 **Goal:** Ready for TestFlight or App Store.
 
 | Feature | Notes |
@@ -226,5 +256,6 @@ At the end of each development session, before closing or pausing work:
 | `SCREENS.md` | Full screen layouts, state tables, interaction details | Building or modifying any View |
 | `SERVICES.md` | Algorithms, service specs, deletion/edit cascading, goal auto-update | Building or modifying any Service or ViewModel |
 | `CONSTANTS.md` | AppConstants values, colors, exercise dictionary, messages, reference tables | Defining constants, theming, referencing values |
+| `HEALTHKIT.md` | HealthKit integration spec: architecture, phases, data model additions, field ownership, sync lifecycle, matcher, UI surfaces, Settings | Building or modifying any HealthKit-related service, UI surface, or test; reference alongside SERVICES.md and SCREENS.md for Phase 8 work |
 | `TESTING.md` | Test target structure, framework-per-target rules, naming conventions, accessibility identifier conventions, shared fixture usage, regression test workflow | Always — reference whenever writing or modifying tests |
 | `BUGS.md` | All bugs, build failures, and unexpected behavior | Logging any bugs, build failures, or unexpected behavior |

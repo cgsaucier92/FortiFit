@@ -291,7 +291,7 @@ Called from the long-press context menu "Reset Goal Progress" option on individu
 
 ### Workout Cascade (shared definition)
 
-Any time a workout is logged, edited, deleted, or batch-deleted via workout type deletion, the following cascade runs against the resulting workout set. Individual cascade sections below reference this block rather than restating it.
+Any time a workout is logged, edited, deleted, or batch-deleted via workout type deletion, the following cascade runs against the resulting workout set. HealthKit import (auto-create or link — see HEALTHKIT.md § 10, § 12) and HealthKit upstream update (see § HealthKit Upstream Update below) route through the same cascade entry points (`WorkoutService.log()` and `WorkoutService.update()` respectively) — there is no separate HealthKit cascade. Individual cascade sections below reference this block rather than restating it.
 
 **Recalculations:**
 - **PR timeline** — remove PRs without supporting data; recompute from remaining workout data.
@@ -345,17 +345,237 @@ Remove `ScheduledWorkout` record. No effect on any other data (no Workout is cre
 ### Workout Hide from Plan (hiddenFromPlan flag)
 `hiddenFromPlan` is a pure display flag on the `Workout` model. Setting or clearing it **does not trigger any cascade** — PR timelines, Training Load, streaks, Power Level, goals, GoalSnapshot records, and all charts are unaffected. The flag exclusively controls whether the `Workout` surfaces on the Plan screen (see SERVICES.md § PlanService → Retrieval → Fetch Plan surface). No cascade recalculations are needed when the flag changes.
 
+### HealthKit Auto-Create / Link
+When `WorkoutMatcher` returns a high-confidence match (auto-link) or when no match exists and `HealthKitSyncService` creates a new `Workout` from an HK import (auto-create), the Workout Cascade fires via `WorkoutService.log()`. See HEALTHKIT.md § 10, § 12. No HK-specific cascade rules beyond the shared definition — all algorithms recalculate exactly as they would for any manually logged workout.
+
+### HealthKit Upstream Update
+When `HealthKitSyncService` detects that an HK-linked workout's HK-owned fields have changed upstream (e.g., user edited duration in Apple's Health app), apply the changes via `WorkoutService.update()`. HK wins on HK-owned fields (see HEALTHKIT.md § 7 for ownership rules): `date`, `durationMinutes`, `distanceKm`, `avgHeartRate`, `maxHeartRate`, `activeEnergyKcal`, `totalEnergyBurnedKcal`, `elevationAscendedMeters`, `exerciseMinutes`, `indoor`, `healthKitActivityType`. User-owned fields (`name`, `note`, `time`, `ExerciseSets`, `rpe`) are not touched.
+
+`lastModifiedDate` bumps to `.now`. Full Workout Cascade fires against the updated record. Edit-specific rules from § Workout Edit apply — in particular, if `date` changed, the cascade runs against both the old and new `workout.date`.
+
+### HealthKit Upstream Delete
+When `HealthKitSyncService` receives a `deletedObjectHandler` callback for an HK workout matching an existing FortiFit `Workout.healthKitUUID`:
+
+1. Clear `healthKitUUID`, `healthKitSourceBundleID`, and `healthKitActivityType` to nil.
+2. Retain all HK-sourced numeric values (duration, distance, HR, calories, elevation, exercise minutes, indoor flag) as-is — they become regular editable fields on a now-manual workout.
+3. Bump `workout.lastModifiedDate = .now`. This re-scopes the workout against any goal `resetDate` (see § Reset Scoping).
+4. **Do NOT fire the deletion cascade.** This is not a deletion — the workout is being promoted to manual.
+
+See HEALTHKIT.md § 11 for rationale. This is a non-destructive operation: the user retains their training history even if they clean up HealthKit data upstream.
+
+### HealthKit Unlink (user-initiated)
+Identical to HealthKit Upstream Delete in data behavior (clear the three pointer fields, retain numeric values, bump `lastModifiedDate`, no cascade), but triggered by the user via Workout Detail's ellipsis menu, the source indicator info sheet, or the Log Workout disabled-field helper text. See HEALTHKIT.md § 14. Re-adds the HK workout UUID to `WorkoutMatcher`'s candidate pool for future sync events.
+
 ---
 
 ## WorkoutService (WorkoutService.swift)
 
 CRUD wrapper for workouts via SwiftData:
-- **Log:** Create workout + ExerciseSets. Set `workout.lastModifiedDate = .now`. Trigger PR recalculation and goal auto-update.
+- **Log:** Create workout + ExerciseSets. Set `workout.lastModifiedDate = .now`. Trigger PR recalculation and goal auto-update. **Dual entry point:** also called by `HealthKitSyncService` on HK import (auto-create path, after `WorkoutMatcher` returns no match) and by `WorkoutMatcher` on auto-link (applies HK-owned field values from the HK record to an existing manual workout). On the manual-log path, call `WorkoutMatcher.findMatch(forNewManualWorkout:)` immediately after save — if a high-confidence match exists, auto-link; if a lower-confidence match exists, queue for prompt; otherwise proceed normally. See HEALTHKIT.md § 11, § 12.
 - **Retrieve:** Sorted by date (newest first).
-- **Update:** Full workout (name, date, time, RPE, duration, distance, add/modify/delete ExerciseSets). Set `workout.lastModifiedDate = .now` on every update regardless of which fields changed (including cosmetic edits — see § Workout Edit cascade). Trigger PR recalc and goal auto-update.
+- **Update:** Full workout (name, date, time, RPE, duration, distance, add/modify/delete ExerciseSets). Set `workout.lastModifiedDate = .now` on every update regardless of which fields changed (including cosmetic edits — see § Workout Edit cascade). Trigger PR recalc and goal auto-update. **HK-linked workouts:** when `workout.healthKitUUID != nil`, `durationMinutes`, `distanceKm`, and `date` are read-only at the UI layer (see SCREENS.md § Log Workout). Update must still tolerate these values being non-nil (they are populated by HK sync, not the user). HK upstream updates flow through this same method — see § HealthKit Upstream Update.
 - **Update notes:** Inline note edit. Sets `workout.lastModifiedDate = .now` (cosmetic edit per § Reset Scoping).
-- **Delete:** Cascade-delete all ExerciseSets. Trigger all cascading recalculations (see Deletion Behavior above). If the deleted workout is linked to a `ScheduledWorkout` (via `completedWorkoutId`), notify PlanService to revert that slot to "planned".
+- **Delete:** Cascade-delete all ExerciseSets. Trigger all cascading recalculations (see Deletion Behavior above). If the deleted workout is linked to a `ScheduledWorkout` (via `completedWorkoutId`), notify PlanService to revert that slot to "planned". **HK-linked workouts delete normally** — deletion removes the FortiFit record but does not propagate to HealthKit (no write-back in MVP). Orphan `WorkoutMatchRejection` records pointing at the deleted workout are retained; harmless.
 - **Delete all for type:** Accept a workoutType string, fetch all workouts matching that type, cascade-delete each with ExerciseSets, then trigger all cascading recalculations once (see Workout Type Deletion above). Remove the corresponding WorkoutTypeOrder record. Revert any linked ScheduledWorkout slots to "planned".
+- **Unlink (HK-linked workouts):** Invoked via Workout Detail's ellipsis menu, the source indicator info sheet, or the Log Workout disabled-field helper text. See § HealthKit Unlink for data behavior.
+
+---
+
+## HealthKitClient (HealthKitClient.swift)
+
+**Purpose:** Protocol abstraction over Apple's HealthKit framework. All HealthKit access in FortiFit goes through this protocol. The concrete implementation (`DefaultHealthKitClient`) is the only file in the codebase that imports `HealthKit`. Integration tests inject `StubHealthKitClient` from `TestFixtures.swift` instead (see TESTING.md § HealthKit Test Strategy).
+
+See HEALTHKIT.md § 4 for the architectural rationale.
+
+### Protocol Surface
+
+The protocol defines the following operations (exact Swift signatures to be finalized by Claude Code; shape documented here):
+
+| Operation | Purpose |
+|---|---|
+| `requestAuthorization() async throws` | Invoke Apple's authorization prompt with the read permission list. See HEALTHKIT.md § 17. |
+| `authorizationStatus() → HealthKitAuthorizationStatus` | Returns one of: `.notDetermined`, `.granted`, `.denied`. Used by Settings to render the status line. |
+| `fetchWorkouts(since anchor: HKQueryAnchor?) async throws → (workouts: [HKWorkoutSnapshot], deletedUUIDs: [UUID], newAnchor: HKQueryAnchor)` | Anchored query returning workouts added or modified since the anchor, plus a list of UUIDs for workouts deleted upstream. Drives catch-up-on-launch and live sync. |
+| `observeWorkoutChanges(handler: @escaping () → Void)` | Register an `HKObserverQuery` with `enableBackgroundDelivery`. Handler fires (on a background thread) when HK has new or changed workout data. `HealthKitSyncService` hops to `@MainActor` before acting. |
+| `fetchEffortScore(for hkWorkoutUUID: UUID) async throws → Int?` | Query the user-entered `workoutEffortScore` sample related to an HK workout. Returns nil if no user-entered score exists. Ignores `estimatedWorkoutEffortScore`. iOS 18+ only — gated `if #available(iOS 18, *)`. See HEALTHKIT.md § 8. |
+| `sourceName(for bundleID: String) → String?` | Resolves an `HKSource` bundle ID to a display name (e.g., `com.apple.health.WatchApp` → "Apple Watch"). Used for the Workout Detail source indicator label. Returns nil if resolution fails — caller falls back to "Apple Health." |
+
+### HealthKitWorkoutSnapshot
+
+A plain Swift struct (not an `HKWorkout`) containing exactly the fields FortiFit cares about. Returned by `fetchWorkouts`. Keeps the protocol boundary free of Apple framework types so the stub and tests don't need to construct real `HKWorkout` instances.
+
+Fields: `uuid`, `activityTypeRawValue`, `activityTypeDisplayString`, `sourceBundleID`, `startDate`, `endDate`, `durationMinutes`, `distanceKm?`, `avgHeartRate?`, `maxHeartRate?`, `activeEnergyKcal?`, `totalEnergyBurnedKcal?`, `elevationAscendedMeters?`, `exerciseMinutes?`, `indoor?`, `isDeleted` (flag indicating this entry represents an upstream delete rather than an addition/update).
+
+### Rules
+
+- **No other service imports `HealthKit`.** Only `DefaultHealthKitClient` does. Enforced by convention in code review and by TESTING.md § HealthKit Test Strategy.
+- **Threading is the client's contract.** The protocol methods may be called from any actor. The concrete implementation marshals internal HK framework calls appropriately. Callers assume results are returned on the calling actor.
+- **Authorization is fire-and-forget.** `requestAuthorization()` completes when the user responds to the iOS prompt. The client does not cache the result — callers re-query `authorizationStatus()` as needed.
+
+### File Dependencies
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `HealthKitClient.swift` | `Core/Services/` | Protocol definition + `HealthKitWorkoutSnapshot` struct |
+| `DefaultHealthKitClient.swift` | `Core/Services/` | Concrete implementation using Apple's `HealthKit` framework |
+| `StubHealthKitClient.swift` | `FortiFitIntegrationTests/` | Test stub (see TESTING.md § Shared Test Fixtures) |
+
+---
+
+## HealthKitSyncService (HealthKitSyncService.swift)
+
+**Purpose:** Orchestrate the full HealthKit sync lifecycle — authorization, catch-up queries on launch, live observer queries, background refresh, upstream updates, upstream deletes, and manual "Sync Now" from Settings. Routes imports through `WorkoutMatcher` and ultimately through `WorkoutService.log()` / `update()` so the full Workout Cascade fires on every imported change.
+
+See HEALTHKIT.md § 9 for the sync lifecycle overview.
+
+### Responsibilities
+
+- Own the `HKQueryAnchor` persisted in UserDefaults (`UserSettings.healthKitAnchor`).
+- Register the `HKObserverQuery` with `enableBackgroundDelivery` on launch (Phase 2 only — see HEALTHKIT.md § 3 Phases).
+- Register the `BGAppRefreshTask` handler on launch (Phase 2).
+- Run a catch-up anchored query on every cold launch and foreground transition (Phase 1 — mandatory).
+- On each sync event: fetch workouts since anchor, process each via `importPendingWorkouts()`, update anchor on success.
+- Update `UserSettings.healthKitLastSyncDate` to `.now` after each successful sync.
+
+### Triggers
+
+| Source | Phase | Behavior |
+|---|---|---|
+| App launch (cold) | 1 | Run catch-up anchored query. |
+| App foreground transition | 1 | Run catch-up anchored query. |
+| Manual "Sync Now" button in Settings | 1 | Run catch-up anchored query immediately. |
+| `HKObserverQuery` fires | 2 | Run anchored query on background thread, marshal to `@MainActor` for SwiftData writes. |
+| `BGAppRefreshTask` executes | 2 | Run anchored query; update anchor; complete task. |
+| `UserSettings.healthKitEnabled` flipped off | 1 | Cancel any in-flight queries. Retain anchor (for re-enable). Existing linked workouts unchanged — see HEALTHKIT.md § 16. |
+| `UserSettings.healthKitEnabled` flipped on (first time) | 1 | Call `client.requestAuthorization()`. On grant, run catch-up. On deny, update Settings status line. |
+
+### Import Pipeline (`importPendingWorkouts()`)
+
+For each `HealthKitWorkoutSnapshot` returned by the anchored query:
+
+1. **If `snapshot.isDeleted == true` → Upstream Delete handler.** Find the FortiFit `Workout` with matching `healthKitUUID`. If found, apply § HealthKit Upstream Delete rules (null out pointer fields, bump `lastModifiedDate`, no cascade). If not found, no-op.
+2. **Else if a FortiFit `Workout` exists with `healthKitUUID == snapshot.uuid` → Upstream Update handler.** Apply § HealthKit Upstream Update rules via `WorkoutService.update()`. HK wins on HK-owned fields; user-owned fields untouched. Full cascade fires.
+3. **Else (new HK workout) → Matcher path.** Call `WorkoutMatcher.findMatch(forIncomingHKWorkout: snapshot)`. Three possible outcomes:
+   - **High-confidence match:** matcher auto-links the snapshot to the existing FortiFit `Workout` (see WorkoutMatcher § Link Application below). No new `Workout` created.
+   - **Lower-confidence match:** matcher queues the pairing for the Match Prompt Sheet. No new `Workout` created yet. Pairing waits for user decision.
+   - **No match:** proceed to step 4.
+4. **Auto-create.** If `snapshot.durationMinutes < 2`, skip entirely (minimum-duration floor — see HEALTHKIT.md § 9). Otherwise, build a new `Workout` with the default field values from HEALTHKIT.md § 10 and route through `WorkoutService.log()`. Full cascade fires.
+
+After processing all snapshots, persist the new anchor to `UserSettings.healthKitAnchor` and update `healthKitLastSyncDate`.
+
+### Effort Score Handling (iOS 18+)
+
+After auto-create or link, if `rpe` is nil and the device is iOS 18+, call `client.fetchEffortScore(for: healthKitUUID)`. If a non-nil result is returned, set `workout.rpe = result`. Never overwrites a user-entered RPE (see HEALTHKIT.md § 8). Runs as part of the same cascade — subsequent Training Load, goal auto-update, and snapshot recalculations see the populated RPE.
+
+### Threading
+
+All `WorkoutService` and `ModelContext` calls execute on `@MainActor`. Observer query callbacks (background thread) marshal via `await MainActor.run { ... }` before any SwiftData write. Anchored query fetches may run on a background thread; only the import pipeline's write step is main-bound.
+
+### Error Handling
+
+- **Authorization denial:** no workouts imported. Settings status line shows "Permission denied in iOS Settings" with deep-link button.
+- **Anchored query failure:** log to `BUGS.md` if recurring. Retry on next trigger. Anchor not updated on failure (next sync re-attempts from the last good anchor).
+- **Individual snapshot processing failure:** log, skip that snapshot, continue processing remaining snapshots. Do not abort the full sync for a single bad record.
+
+### File Dependencies
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `HealthKitSyncService.swift` | `Core/Services/` | Orchestration logic |
+| `HealthKitClient.swift` | `Core/Services/` | Protocol dependency (injected) |
+| `WorkoutService.swift` | `Core/Services/` | Entry point for log/update/unlink |
+| `WorkoutMatcher.swift` | `Core/Services/` | Dedup lookup |
+| `UserSettings.swift` | `Core/Models/` | Anchor, enabled flag, last sync timestamp |
+
+---
+
+## WorkoutMatcher (WorkoutMatcher.swift)
+
+**Purpose:** Bidirectional deduplication between HealthKit-imported workouts and manually logged FortiFit workouts. Determines whether an incoming workout should be auto-linked to an existing record, prompt the user for resolution, or proceed as a separate record.
+
+See HEALTHKIT.md § 12 for the architectural overview.
+
+### Entry Points
+
+Single service, called from two places:
+
+| Caller | Method | When |
+|---|---|---|
+| `HealthKitSyncService.importPendingWorkouts()` | `findMatch(forIncomingHKWorkout: HealthKitWorkoutSnapshot) → MatchResult` | Before auto-creating a new `Workout` from an HK import. |
+| `WorkoutService.log()` | `findMatch(forNewManualWorkout: Workout) → MatchResult` | Immediately after saving a manual workout. |
+
+Both methods apply the same matching rules. Differences:
+- HK-side match returns candidate `Workout` IDs to link the incoming snapshot to.
+- Manual-side match returns candidate `HealthKitWorkoutSnapshot`s (from the current HK candidate pool) to link the just-saved Workout to.
+
+### MatchResult
+
+Enum with three cases:
+
+| Case | Meaning | Next Step |
+|---|---|---|
+| `.highConfidence(matchedWorkoutId)` / `.highConfidence(matchedSnapshot)` | Overlapping time windows, same FortiFit type. | Caller auto-links immediately. |
+| `.lowerConfidence(candidateId)` / `.lowerConfidence(candidateSnapshot)` | Same FortiFit type, same calendar day, non-overlapping, start times within 4 hours. | Caller queues a pending match for the Match Prompt Sheet. |
+| `.noMatch` | Outside both windows, or different FortiFit type, or different calendar day. | Caller proceeds with auto-create or keeps the manual log as-is. |
+
+### Matching Rules
+
+**High-confidence (auto-link):**
+- Same FortiFit `workoutType` (after HK-to-category mapping for the HK side — see CONSTANTS.md § HealthKit Mapping).
+- `|startA − startB| ≤ 5 minutes` AND `|endA − endB| ≤ 5 minutes`.
+
+**Lower-confidence (prompt):**
+- Same FortiFit `workoutType`.
+- Same calendar day.
+- Time windows do NOT overlap (per the high-confidence rule above — if they overlap, it's high-confidence, not lower).
+- `|startA − startB| ≤ 4 hours`.
+
+**No match:**
+- Any of the above conditions fail.
+- Note: same-day same-type workouts MORE than 4 hours apart (typical AM+PM splits) are expected to be separate records. No prompt. See HEALTHKIT.md § 12.
+
+### Rejection Check
+
+Before returning `.highConfidence` or `.lowerConfidence`, query for an existing `WorkoutMatchRejection` with matching `(healthKitUUID, workoutId)`. If found, return `.noMatch` instead.
+
+Rejection lookup is by UUID pair, not by `@Relationship`. Orphan rejections (created when a linked `Workout` is deleted) are harmless and retained — see PRD.md § Data Model (WorkoutMatchRejection).
+
+### Link Application
+
+When a caller receives `.highConfidence` and performs auto-link (or when the user taps "Link these workouts" in the Match Prompt Sheet), `WorkoutMatcher.applyLink(workout:snapshot:)` performs:
+
+1. Set `workout.healthKitUUID = snapshot.uuid`.
+2. Set `workout.healthKitSourceBundleID = snapshot.sourceBundleID`.
+3. Set `workout.healthKitActivityType = snapshot.activityTypeDisplayString`.
+4. Apply HK-owned field values from `snapshot`:
+   - `workout.date = snapshot.startDate`
+   - `workout.durationMinutes = snapshot.durationMinutes`
+   - `workout.distanceKm = snapshot.distanceKm` (if snapshot has it)
+   - `workout.avgHeartRate`, `workout.maxHeartRate`, `workout.activeEnergyKcal`, `workout.totalEnergyBurnedKcal`, `workout.elevationAscendedMeters`, `workout.exerciseMinutes`, `workout.indoor` — all copied from snapshot.
+5. User-owned fields (`name`, `note`, `time`, `ExerciseSets`, `rpe`) are NOT touched.
+6. Bump `workout.lastModifiedDate = .now`.
+7. Fire Workout Cascade via `WorkoutService.update()` (measured-field changes may affect Training Load, goals, snapshots).
+
+On iOS 18+, after link, run the effort-score nil-fill step (see HealthKitSyncService § Effort Score Handling).
+
+### Prompt Queue
+
+Lower-confidence matches are queued via `WorkoutMatcher.queuePendingMatch(workoutId:snapshot:)`. The queue is a simple in-memory list (non-persistent — acceptable because pending matches re-surface on next sync if unresolved). Match Prompt Sheet UI drains the queue on foreground (see HEALTHKIT.md § 13).
+
+Queue API: `pendingMatches()`, `resolvePending(workoutId: UUID, snapshot: HealthKitWorkoutSnapshot, decision: MatchDecision)` where `MatchDecision` is `.link` / `.keepSeparate` / `.decideLater`.
+
+- `.link` → apply link via `applyLink(workout:snapshot:)`; remove from queue.
+- `.keepSeparate` → create a `WorkoutMatchRejection(healthKitUUID: snapshot.uuid, workoutId: workoutId, rejectedDate: .now)`; remove from queue.
+- `.decideLater` → leave in queue; re-surface on next foreground.
+
+### File Dependencies
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `WorkoutMatcher.swift` | `Core/Services/` | Matching logic, link application, prompt queue |
+| `WorkoutMatchRejection.swift` | `Core/Models/` | Persisted rejection records |
+| `WorkoutService.swift` | `Core/Services/` | Entry point for save/update after link |
+| `MatchPromptSheetView.swift` | `Design/Components/` | UI surface (see SCREENS.md § Match Prompt Sheet) |
 
 ---
 

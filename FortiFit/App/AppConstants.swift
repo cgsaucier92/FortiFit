@@ -5,10 +5,10 @@ enum AppConstants {
     static let workoutTypes = [
         "Strength Training",
         "HIIT",
-        "Sprints",
         "Cardio",
         "Yoga",
-        "Pilates"
+        "Pilates",
+        "Other"
     ]
 
     static let exerciseOptions = [
@@ -24,10 +24,10 @@ enum AppConstants {
     static let workoutTypeModifiers: [String: Double] = [
         "Strength Training": 1.0,
         "HIIT": 1.1,
-        "Sprints": 0.9,
         "Cardio": 0.7,
         "Pilates": 0.5,
-        "Yoga": 0.3
+        "Yoga": 0.3,
+        "Other": 0.7
     ]
 
     static let experienceLevels = ["Beginner", "Intermediate", "Advanced"]
@@ -46,10 +46,10 @@ enum AppConstants {
     static let workoutTypeSymbols: [String: String] = [
         "Strength Training": "figure.strengthtraining.traditional",
         "HIIT": "figure.highintensity.intervaltraining",
-        "Sprints": "figure.run",
         "Cardio": "figure.mixed.cardio",
         "Yoga": "figure.yoga",
-        "Pilates": "figure.pilates"
+        "Pilates": "figure.pilates",
+        "Other": "figure"
     ]
 
     // MARK: - Workout Detail Summary Icons
@@ -170,10 +170,10 @@ enum AppConstants {
     static let workoutTypeChartColors: [String: Color] = [
         "Strength Training": Color(hex: "3b82f6"),   // Primary Accent Blue
         "HIIT": Color(hex: "60a5fa"),                 // Secondary Blue
-        "Sprints": Color(hex: "4B2893"),              // Purple
         "Cardio": Color(hex: "10b981"),               // Positive Green
         "Yoga": Color(hex: "FFBF51"),                 // Orange
-        "Pilates": Color(hex: "ef4444")               // Alert Red
+        "Pilates": Color(hex: "ef4444"),              // Alert Red
+        "Other": Color(hex: "C4F648")                 // Caution Yellow
     ]
 
     // MARK: - Chart Data Thresholds

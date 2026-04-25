@@ -35,7 +35,7 @@ struct WorkoutDetailView: View {
                     // Content based on workout type
                     if workout.workoutType == "Strength Training" || workout.workoutType == "HIIT" {
                         strengthDetailSection
-                    } else if workout.workoutType == "Cardio" || workout.workoutType == "Sprints" {
+                    } else if workout.workoutType == "Cardio" {
                         cardioDetailSection
                     } else {
                         yogaDetailSection

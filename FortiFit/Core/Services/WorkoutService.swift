@@ -165,6 +165,38 @@ struct WorkoutService {
         return Array(Set(allExerciseNames))
     }
 
+    // MARK: - Sprints → Cardio Migration
+
+    static func migrateSprintsToCardioIfNeeded(context: ModelContext) {
+        let settings = UserSettings.shared
+        guard !settings.hasMigratedSprintsToCardio else { return }
+
+        let predicate = #Predicate<Workout> { workout in
+            workout.workoutType == "Sprints"
+        }
+        let descriptor = FetchDescriptor<Workout>(predicate: predicate)
+        let sprintsWorkouts = (try? context.fetch(descriptor)) ?? []
+
+        for workout in sprintsWorkouts {
+            workout.workoutType = "Cardio"
+            workout.lastModifiedDate = .now
+        }
+
+        let sprintsOrder = WorkoutTypeOrderService.fetch(for: "Sprints", context: context)
+        let cardioOrder = WorkoutTypeOrderService.fetch(for: "Cardio", context: context)
+
+        if let sprintsOrder {
+            if cardioOrder != nil {
+                context.delete(sprintsOrder)
+            } else {
+                sprintsOrder.workoutType = "Cardio"
+            }
+        }
+
+        try? context.save()
+        settings.hasMigratedSprintsToCardio = true
+    }
+
     // MARK: - PR Calculation
 
     /// Computes personal records from all workouts. Returns a dictionary of

@@ -27,6 +27,7 @@
 | Chart (Pink) | `#BB2BC0` | A potential color for chart lines or bars |
 | Chart (Light Cyan) | `#8​FE6​F6` | A potential color for chart lines or bars |
 | Chart (Deep Blue) | `#0845​AD` | A potential color for chart lines or bars |
+| HealthKit Pink | `#FF2D55` | Source indicator heart icon on Workout Detail, peripheral glyphs on Home/Workouts/Plan, info sheet accents. Matches Apple's system pink used in the Health app. See HEALTHKIT.md § 15. |
 ---
 
 ## Ellipsis Menu SF Symbols
@@ -63,7 +64,7 @@ Icons rendered to the left of each label in the Summary section of the Workout D
 |-------|-----------|-----------|
 | RPE | `heart.gauge.open` | All workout types (when rated) |
 | Duration | `clock` | All workout types (when recorded) |
-| Distance | `ruler` | Cardio / Sprints only (when recorded) |
+| Distance | `ruler` | Cardio only (when recorded) |
 
 **Rendering (Workout Detail Summary):** Icon is rendered at the same size and color as the summary row label text, with standard spacing between icon and label. See SCREENS.md § Workout Detail.
 
@@ -71,11 +72,41 @@ Icons rendered to the left of each label in the Summary section of the Workout D
 
 ---
 
+## Workout Detail Health Data Icons
+
+Icons rendered to the left of each row in the **right column of the Summary two-column grid** on Workout Detail (visible only when `workout.healthKitUUID != nil` AND at least one HK measurement field is non-nil). The left column of that grid contains user-entered fields (see § Workout Detail Summary Icons above). See SCREENS.md § Workout Detail for the full layout — specifically the two-column variant of the Summary block.
+
+| Field | SF Symbol | Visible When |
+|-------|-----------|--------------|
+| Avg Heart Rate | `heart.fill` | `avgHeartRate != nil` |
+| Max Heart Rate | `heart.circle.fill` | `maxHeartRate != nil` |
+| Active Calories | `flame.fill` | `activeEnergyKcal != nil` |
+| Total Calories | `flame.circle.fill` | `totalEnergyBurnedKcal != nil` |
+| Elevation Ascended | `mountain.2.fill` | `elevationAscendedMeters != nil` |
+| Exercise Minutes | `timer` | `exerciseMinutes != nil` |
+| Indoor | `building.2.fill` | `indoor == true` (inline badge) |
+| Outdoor | `sun.max.fill` | `indoor == false` (inline badge) |
+
+**Row ordering within the right column** (top to bottom, omitting nil values):
+1. Heart Rate row (Avg HR · Max HR — paired on one row when both present)
+2. Calories row (Active · Total — paired on one row when both present)
+3. Elevation Ascended
+4. Exercise Minutes
+5. Indoor/Outdoor badge
+
+**Rendering:** Same size and color as the left-column (user-entered) row labels. Pairs (Avg HR + Max HR; Active kcal + Total kcal) render together within a single right-column row with a `·` separator. Conditional — rows with nil values are omitted entirely, and the right column as a whole does not render if every HK measurement field is nil (Summary falls back to its single-column layout in that case).
+
+---
+
 ## Workout Types
 
 ```swift
-["Strength Training", "HIIT", "Sprints", "Cardio", "Yoga", "Pilates"]
+["Strength Training", "HIIT", "Cardio", "Yoga", "Pilates", "Other"]
 ```
+
+"Other" is a catch-all for HealthKit imports whose activity type doesn't cleanly map to one of the first five categories (see § HealthKit Mapping below). It is also user-selectable in the Log Workout type dropdown, though most users will use it only for imported workouts.
+
+**Sprints removed:** Prior versions of FortiFit included a "Sprints" workout type. Phase 8 removes it and runs a one-time migration that rewrites all existing Sprints workouts to Cardio (see HEALTHKIT.md § 18).
 
 ### Workout Type Modifiers (Training Load)
 
@@ -83,10 +114,10 @@ Icons rendered to the left of each label in the Summary section of the Workout D
 |---|---|---|
 | Strength Training | 1.0 | Baseline. High neuromuscular demand. |
 | HIIT | 1.1 | Combines metabolic + muscular stress. |
-| Sprints | 0.9 | High CNS demand, shorter work time. |
 | Cardio | 0.7 | Sustained but lower peak intensity. |
 | Pilates | 0.5 | Moderate muscular engagement. |
 | Yoga | 0.3 | Primarily restorative. |
+| Other | 0.7 | Unknown-stress default. Matches Cardio as a safe midpoint — most "Other" HK activities (team sports, martial arts, racquet sports, outdoor recreation) land in this stress range. |
 
 ### Workout Type SF Symbols
 
@@ -96,12 +127,132 @@ Icons rendered to the left of the workout type name on Workout Type cards (Worko
 |--------------|-----------|
 | Strength Training | `dumbbell.fill` |
 | HIIT | `figure.highintensity.intervaltraining` |
-| Sprints | `figure.run` |
 | Cardio | `figure.mixed.cardio` |
 | Yoga | `figure.yoga` |
 | Pilates | `figure.pilates` |
+| Other | `figure` |
 
 **Rendering:** Icon is rendered at the same size and color as the workout type name text on the card, with standard spacing between icon and text. See SCREENS.md § Workout Type Card for placement.
+
+---
+
+## HealthKit Mapping
+
+Static lookup table mapping every `HKWorkoutActivityType` enum case to a FortiFit `workoutType` plus a friendly display string (stored on `Workout.healthKitActivityType`). Used by `HealthKitSyncService` at import time. See HEALTHKIT.md § 6 for the architectural rationale; see § 9 for where this table is consulted.
+
+**Rules:**
+- Every currently defined `HKWorkoutActivityType` has an explicit entry.
+- Unknown types (introduced by future iOS versions after this table was authored) fall through to `Other` with the raw enum case name as the display string (Claude Code implements this as a `default` case in the mapping function).
+- For activity types with indoor/outdoor variants (`running`, `cycling`, `rowing`, etc.), the display string is the base name; the `workout.indoor` flag layers on "Indoor"/"Outdoor" prefixing at display time in the UI (see SCREENS.md § Workout Detail).
+- Static table. Not user-configurable.
+
+### Mapping Table
+
+| HKWorkoutActivityType | Display String | FortiFit `workoutType` |
+|---|---|---|
+| `americanFootball` | American Football | Other |
+| `archery` | Archery | Other |
+| `australianFootball` | Australian Rules Football | Other |
+| `badminton` | Badminton | Other |
+| `barre` | Barre | Other |
+| `baseball` | Baseball | Other |
+| `basketball` | Basketball | Other |
+| `bowling` | Bowling | Other |
+| `boxing` | Boxing | Other |
+| `cardioDance` | Cardio Dance | Cardio |
+| `climbing` | Climbing | Other |
+| `cooldown` | Cooldown | Other |
+| `coreTraining` | Core Training | Strength Training |
+| `cricket` | Cricket | Other |
+| `crossCountrySkiing` | Cross-Country Skiing | Cardio |
+| `crossTraining` | Cross Training | HIIT |
+| `curling` | Curling | Other |
+| `cycling` | Cycling | Cardio |
+| `discSports` | Disc Sports | Other |
+| `downhillSkiing` | Downhill Skiing | Cardio |
+| `elliptical` | Elliptical | Cardio |
+| `equestrianSports` | Equestrian Sports | Other |
+| `fencing` | Fencing | Other |
+| `fishing` | Fishing | Other |
+| `fitnessGaming` | Fitness Gaming | HIIT |
+| `flexibility` | Flexibility | Other |
+| `functionalStrengthTraining` | Functional Strength Training | Strength Training |
+| `golf` | Golf | Other |
+| `gymnastics` | Gymnastics | Other |
+| `handCycling` | Hand Cycling | Cardio |
+| `handball` | Handball | Other |
+| `highIntensityIntervalTraining` | HIIT | HIIT |
+| `hiking` | Hiking | Cardio |
+| `hockey` | Hockey | Other |
+| `hunting` | Hunting | Other |
+| `jumpRope` | Jump Rope | Other |
+| `kickboxing` | Kickboxing | Other |
+| `lacrosse` | Lacrosse | Other |
+| `martialArts` | Martial Arts | Other |
+| `mindAndBody` | Mind and Body | Other |
+| `mixedCardio` | Mixed Cardio | Cardio |
+| `mixedMetabolicCardioTraining` | Mixed Metabolic Cardio Training | Cardio |
+| `paddleSports` | Paddle Sports | Cardio |
+| `pickleball` | Pickleball | Other |
+| `pilates` | Pilates | Pilates |
+| `play` | Play | Other |
+| `preparationAndRecovery` | Preparation and Recovery | Other |
+| `racquetball` | Racquetball | Other |
+| `rowing` | Rowing | Cardio |
+| `rugby` | Rugby | Other |
+| `running` | Running | Cardio |
+| `sailing` | Sailing | Other |
+| `skatingSports` | Skating Sports | Cardio |
+| `snowSports` | Snow Sports | Cardio |
+| `snowboarding` | Snowboarding | Cardio |
+| `soccer` | Soccer | Other |
+| `socialDance` | Social Dance | Cardio |
+| `softball` | Softball | Other |
+| `squash` | Squash | Other |
+| `stairClimbing` | Stair Climbing | Cardio |
+| `stairs` | Stairs | Cardio |
+| `stepTraining` | Step Training | Cardio |
+| `surfingSports` | Surfing | Cardio |
+| `swimBikeRun` | Swim Bike Run | Cardio |
+| `swimming` | Swimming | Cardio |
+| `tableTennis` | Table Tennis | Other |
+| `taiChi` | Tai Chi | Other |
+| `tennis` | Tennis | Other |
+| `trackAndField` | Track and Field | Cardio |
+| `traditionalStrengthTraining` | Traditional Strength Training | Strength Training |
+| `transition` | Transition | Cardio |
+| `underwaterDiving` | Underwater Diving | Other |
+| `volleyball` | Volleyball | Other |
+| `walking` | Walking | Cardio |
+| `waterFitness` | Water Fitness | Cardio |
+| `waterPolo` | Water Polo | Other |
+| `waterSports` | Water Sports | Cardio |
+| `wheelchairRunPace` | Wheelchair Run Pace | Cardio |
+| `wheelchairWalkPace` | Wheelchair Walk Pace | Cardio |
+| `wrestling` | Wrestling | Other |
+| `yoga` | Yoga | Yoga |
+| `other` | Other | Other |
+| *(unknown future types)* | *raw enum name* | Other |
+
+### Ambiguous Mappings (Judgment Calls)
+
+The following HK types had plausible arguments for more than one FortiFit category. The selections above were made based on the activity's typical stress profile and the user's likely mental model. Flagged here so the call can be reviewed and changed if needed — the mapping is authoritative in the table above; this list is informational.
+
+| HK Type | Chosen | Alternative | Rationale |
+|---|---|---|---|
+| `crossTraining` | HIIT | Strength Training | CrossFit-style mixed workouts blend both, but the metabolic intensity leans HIIT. |
+| `fitnessGaming` | HIIT | Cardio | Wide variance, but most (Ring Fit, Beat Saber fitness modes) are interval-based. |
+| `stepTraining` | Cardio | HIIT | Step aerobics is sustained moderate-intensity. |
+| `wrestling` | Other | Strength Training | Team/competitive context dominates over strength character for most users. |
+| `martialArts` | Other | HIIT | Huge variance (Krav Maga would be HIIT, Aikido would be closer to Other); "Other" is the safest default. |
+| `trackAndField` | Cardio | Other | Most tracked events (running, sprinting) are cardio; field events are rare. |
+| `paddleSports` | Cardio | Other | Kayaking/canoeing are sustained cardiovascular activity. |
+| `surfingSports` | Cardio | Other | Active paddling and balance work; net cardiovascular demand. |
+| `waterSports` | Cardio | Other | Generic water activities; leans cardio. |
+
+**Resolved to Other by design:** `barre`, `boxing`, `kickboxing`, `jumpRope`, `gymnastics`, `mindAndBody`, `taiChi`, `flexibility`, `cooldown`, `preparationAndRecovery`. Earlier drafts placed several of these in Pilates, HIIT, Strength Training, or Yoga; during spec review they were moved to Other to keep the five primary categories tight and to avoid muddying their Training Load modifiers with activities that have high stress variance.
+
+**Changing a mapping:** edit the table above, then verify the HK-to-category mapping unit test in `FortiFitTests` still passes (the test iterates every enum case and asserts the expected category — see TESTING.md § HealthKit Test Strategy).
 
 ---
 
@@ -336,10 +487,10 @@ Workout Volume, RPE Trend, Workout Type Breakdown, and Session Duration are avai
 |---|---|---|
 | Strength Training | Primary Accent Blue | `#3b82f6` |
 | HIIT | Secondary Blue | `#60a5fa` |
-| Sprints | Caution Yellow | `#C4F648` |
 | Cardio | Positive Green | `#10b981` |
 | Yoga | Warning Yellow | `#B7FF00` |
 | Pilates | Alert Red | `#ef4444` |
+| Other | Caution Yellow | `#C4F648` |
 
 Used by the Workout Type Breakdown chart.
 

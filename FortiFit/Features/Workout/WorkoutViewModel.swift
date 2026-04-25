@@ -200,7 +200,7 @@ final class WorkoutViewModel {
     }
 
     var isCardioOrSprints: Bool {
-        workoutType == "Cardio" || workoutType == "Sprints"
+        workoutType == "Cardio"
     }
 
     var isYogaOrPilates: Bool {

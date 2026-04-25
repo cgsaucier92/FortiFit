@@ -117,6 +117,7 @@ TextField("Workout name", text: $name)
 - Dropdowns: `workoutTypeDropdown`, `goalExerciseDropdown`
 - Menus: `homeEllipsisMenu`, `workoutsEllipsisMenu`, `workoutDetailEllipsis`, `addWidgetsMenuItem`, `saveAsTemplateMenuItem`, `viewSavedTemplatesMenuItem`
 - Cards: `workoutTypeCard_StrengthTraining`, `goalCard_benchPress`, `scheduledWorkoutCard_0`
+- HealthKit: `settings_appleHealthToggle`, `settings_appleHealthSyncNowButton`, `settings_appleHealthOpenSettingsButton`, `workoutDetail_healthSourceIndicator`, `workoutDetail_healthUnlinkButton`, `logWorkout_durationReadOnlyHelper`, `logWorkout_distanceReadOnlyHelper`, `logWorkout_dateReadOnlyHelper`, `matchPromptSheet_linkButton`, `matchPromptSheet_keepSeparateButton`, `matchPromptSheet_decideLaterButton`
 
 **Indexed-row pattern for dynamic rows.** When a screen has a list of rows a test needs to target individually (exercises in a workout form, templates in a selection sheet, etc.), suffix the identifier with the row index — and set/column index if the row itself contains multiple inputs:
 
@@ -208,8 +209,47 @@ Integration tests share helpers via `TestFixtures.swift` in the `FortiFitIntegra
 - `makeStrengthPRGoal(...)`, `makeRepsPRGoal(...)`, `makeSpeedDistanceGoal(...)` — factories for each goal type.
 - `makeTemplate(...)` — factory for a `WorkoutTemplate`.
 - `daysAgo(_:)` — computes a `Date` N days before now (for testing date-scoped logic).
+- `StubHealthKitClient` — in-memory stub conforming to the `HealthKitClient` protocol. Seed with fixture `HKWorkout`-equivalent structs; supports controlled "incoming workout," "upstream delete," and "upstream update" simulations. See HEALTHKIT.md § 19 Testing Strategy.
+- `makeHKWorkoutFixture(...)` — factory for `HKWorkout`-equivalent fixture data (HK activity type, start/end dates, duration, distance, HR stats, energy, elevation, effort score, source bundle ID). Used to seed `StubHealthKitClient`.
+- `makeLinkedWorkout(...)` — factory for a FortiFit `Workout` with `healthKitUUID`, `healthKitSourceBundleID`, and `healthKitActivityType` pre-populated; for testing link-aware logic without going through the full import path.
 
 If you find yourself repeating setup code across tests, add it to `TestFixtures.swift`.
+
+---
+
+## HealthKit Test Strategy
+
+HealthKit integration (Phase 8 — see HEALTHKIT.md) is tested via protocol stubbing. Real HealthKit calls never happen in automated tests; the simulator's HealthKit support is limited and background delivery does not fire in simulator.
+
+### Protocol Stubbing
+
+All HealthKit access goes through the `HealthKitClient` protocol (see SERVICES.md § HealthKitClient). Tests inject `StubHealthKitClient` from `TestFixtures.swift` instead of the concrete `DefaultHealthKitClient`. The stub exposes methods to seed fixture HK workouts, simulate upstream deletes, and simulate upstream updates without going through any Apple framework.
+
+**Rule:** no test file outside `StubHealthKitClient` itself imports `HealthKit`. If you find yourself needing to, stop — the coverage belongs in manual QA, not an automated test.
+
+### Test Distribution by Target
+
+| Target | Scenarios |
+|--------|-----------|
+| `FortiFitTests` (unit) | HK-to-FortiFit category mapping (every entry in CONSTANTS.md § HealthKit Mapping resolves correctly, including the "Other" fallback). `WorkoutMatcher` time-window rules in isolation (5-minute overlap buffer; 4-hour prompt threshold; same-day non-overlapping rejection). Field ownership rule application (HK-owned vs user-owned). Auto-create default field value construction (name formatting, `lastModifiedDate = .now`, empty sets/notes). 2-minute minimum-duration floor. |
+| `FortiFitIntegrationTests` | Auto-create from HK import fires full Workout Cascade (Training Load, Streak, Speed/Distance goals, GoalSnapshot). Link flow from both directions (HK-arrives-first and manual-log-first). Upstream delete nulls pointer + bumps `lastModifiedDate` without firing deletion cascade. `WorkoutMatchRejection` persistence blocks re-proposal. iOS 18 `workoutEffortScore` imports into `rpe` only when nil; never overwrites user-entered RPE. Sprints → Cardio one-time migration is idempotent. Unlink clears pointer fields but retains HK-sourced numeric values. |
+| `FortiFitUITests` | Settings "Apple Health" section toggle states (off, on-granted, on-denied). Workout Detail source indicator renders with correct `HKSource.name` and opens info sheet on tap. Unlink flow via all three entry points (ellipsis menu, info sheet button, Log Workout helper text). Match Prompt Sheet actions (Link / Keep Separate / Decide Later) produce correct state changes. Log Workout disabled fields (`durationMinutes`, `distanceKm`, `date`) show helper text and are non-editable when `healthKitUUID != nil`. |
+
+### Requires Manual QA (Not Automatable)
+
+These scenarios require a real device and cannot be covered by automated tests. Log them in a manual QA checklist before every TestFlight build:
+
+- Real HK observer query wake-up from background after a Watch workout ends.
+- `BGAppRefreshTask` execution under iOS throttling.
+- Force-quit recovery: kill the app, record a Watch workout, relaunch → workout appears via catch-up sync.
+- Persisted `HKQueryAnchor` survives app termination and simulator resets.
+- iOS authorization prompt UX on first toggle-on (copy, ordering of permission rows).
+- Denial path: deny permission in iOS Settings → FortiFit Settings status line shows "Permission denied" with working deep link.
+- `workoutEffortScore` round-trip on a real iOS 18 device (set score in Fitness app → appears in FortiFit `rpe` after next sync, when `rpe` was nil).
+
+### Identifier Constants
+
+All HealthKit-related accessibility identifiers are listed in the "HealthKit:" row of the § Accessibility Identifiers representative examples above. As with all identifiers, they live as string constants in `AccessibilityIdentifiers.swift` and are referenced from both views and tests — never hardcoded.
 
 ---
 
@@ -227,6 +267,10 @@ For regression tests:
 
 > "Here's the bug from BUGS.md #[N]: [paste]. Write a test that would have failed before the fix and passes after. Place it in the appropriate target and reference the bug number in the doc comment."
 
+For HealthKit integration tests:
+
+> "Read HEALTHKIT.md § [specific section] and SERVICES.md § HealthKitSyncService (or § WorkoutMatcher). Write integration tests in the style of `WorkoutCascadeIntegrationTests.swift` using `StubHealthKitClient` from `TestFixtures.swift`. Do not import `HealthKit` in the test file. Add the file to the `FortiFitIntegrationTests` target."
+
 ---
 
 ## Companion Documents
@@ -235,4 +279,5 @@ For regression tests:
 |----------|---------|
 | `SERVICES.md` | Service specs and cascade definitions — primary reference when writing integration tests |
 | `SCREENS.md` | Screen layouts and flows — primary reference when writing smoke tests |
+| `HEALTHKIT.md` | HealthKit integration spec — primary reference when writing HealthKit-related unit, integration, or UI tests. Protocol stubbing pattern and test distribution in § 19 |
 | `BUGS.md` | Bug log — source for regression test cases |

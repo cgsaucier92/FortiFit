@@ -45,6 +45,17 @@ Each screen specifies only its seed defaults, card definitions, and any deviatio
 - FortiFitDivider in the header is **per-screen**: kept on form/detail screens (Log Workout, Create Template, Schedule Workout), removed on list/tab screens (Home, Workouts, Plan, Trends, Goals, Saved Templates, Add Goal, Workout Detail).
 - Empty states use `.padding(.top, headerHeight)` so they sit below the floating header.
 
+**Peripheral HealthKit Glyph:** A small HealthKit-pink heart SF Symbol (`heart.fill`, color: HealthKit Pink `#FF2D55` — see CONSTANTS.md § Colors) rendered inline with workout titles on compact surfaces to indicate the workout was imported from Apple Health (i.e., `workout.healthKitUUID != nil`). Used on:
+- Home → Recent Workouts list rows
+- Workouts tab → Expanded Workout Preview Rows
+- Plan tab → Logged-only workout cards and completed scheduled workout cards linked to an imported Workout
+
+**Rendering:** 12px glyph (slightly smaller than surrounding body text to read as metadata rather than competing with the title), centered vertically with the workout name baseline, 6px right padding before the name. Glyph is always rendered in HealthKit Pink regardless of surrounding text color — the color is the signal.
+
+**Not used on:** Workout Detail (which uses the full Source Indicator row instead — see § Workout Detail), Log Workout (which uses disabled fields + helper text instead — see § Log Workout § Edit Mode — HealthKit-Linked Workouts), Trends, Goals, any widget body. The glyph is scoped exclusively to workout-title surfaces where space is tight.
+
+Component: `FortiFitHealthGlyph.swift` (see PRD.md § Project Structure → Design/Components/).
+
 ---
 
 ## Home Screen
@@ -55,7 +66,7 @@ Each screen specifies only its seed defaults, card definitions, and any deviatio
 Per § Standard Patterns: Sortable Card System, backed by `HomeWidget` records. Default seed order (first launch only): **Training Load, Workout Info, Weekly Streak**. Home's edit mode is a variant of the standard — see § Widget Edit Mode below.
 
 ### Layout
-Top: Left: blue ellipsis icon (functional — opens Home ellipsis menu). Right: blue gear icon (→ Settings). ✦ divider. Widget cards render vertically by `sortOrder`. Full-width blue-outlined "+ Log Workout" button below last widget. "Recent Workouts" header, then list of 5 most recent (name, date, exercise count, chevron). Recent Workouts list and "+ Log Workout" are unaffected by widget customization.
+Top: Left: blue ellipsis icon (functional — opens Home ellipsis menu). Right: blue gear icon (→ Settings). ✦ divider. Widget cards render vertically by `sortOrder`. Full-width blue-outlined "+ Log Workout" button below last widget. "Recent Workouts" header, then list of 5 most recent (name, date, exercise count, chevron). Imported workouts (where `healthKitUUID != nil`) display a small HealthKit-pink heart glyph (see § Peripheral HealthKit Glyph under Standard Patterns) to the left of the workout name. Recent Workouts list and "+ Log Workout" are unaffected by widget customization.
 
 ### Home Ellipsis Menu
 One option: **"Add Widgets"** with SF Symbol `plus.rectangle.on.rectangle` to the left → opens Add Widgets Menu overlay.
@@ -123,7 +134,7 @@ Two options: **"CREATE WORKOUT TEMPLATE"** with SF Symbol `square.and.pencil` to
 
 ### Expanded Workout Preview Rows
 Sorted newest-first (or by active sort). Each row separated by #404040 border:
-- **Workout Name** — 16px semibold.
+- **Workout Name** — 16px semibold. If `healthKitUUID != nil`, precede the name with a small HealthKit-pink heart glyph (see § Peripheral HealthKit Glyph under Standard Patterns).
 - **Date** — muted text.
 - **Duration** — muted text, Strength/HIIT only when recorded.
 - Trailing chevron (>).
@@ -195,6 +206,34 @@ Workout Type dropdown (6 types). Post-Workout RPE dropdown (1–10) + "?" toolti
 
 ### Edit Mode Behavior
 All fields pre-populated. Heading: "Edit Workout". Workout type dropdown locked. Blue trash icon (16px) in top-right → standard delete confirmation → deletes workout + ExerciseSets, cascade recalcs (PR, goals, Training Load, streak, Workout Type card), navigates to Workouts list. Adding exercise = new ExerciseSet on save. Modifying row = update ExerciseSet. Removing row = delete ExerciseSet. Ellipsis hidden.
+
+### Edit Mode — HealthKit-Linked Workouts
+
+When the workout being edited has `healthKitUUID != nil`, three fields become read-only and display helper text directing the user to unlink if they need to edit those values. See HEALTHKIT.md § 7 for field ownership rationale.
+
+**Read-only fields (when linked):**
+- **DatePicker (date/time)** — disabled. Date portion is HK-owned (`workout.date = HK start date`). Time component stays editable as a user-owned field via the date/time split (see below).
+- **Duration input** — disabled, pre-populated with HK value.
+- **Distance input** (Cardio only) — disabled, pre-populated with HK value.
+
+**Helper text treatment:**
+Below each disabled field, render a muted-text caption (11px, 700 weight, 2px letter-spacing, Muted Text color) reading: **"Linked to Apple Health · tap to unlink"**. Tapping the helper text (not the disabled field itself) opens the Workout Detail source indicator info sheet as a modal (see § Workout Detail → Source Indicator Info Sheet). From there, the user can confirm unlinking. After unlink, the fields become editable and the helper text disappears.
+
+**Rationale for helper text vs. just disabled state:** Users need to know WHY a field is disabled and HOW to recover the ability to edit it. A bare greyed-out field produces user confusion ("is this broken?"). Helper text is the cheapest reliable fix.
+
+**Date/time split:** The DatePicker widget in FortiFit uses `.dateAndTime` mode. Since `date` is HK-owned but `time` is user-owned, this field is conceptually split — but because both share a single input, the entire DatePicker is disabled when linked. A user who needs to adjust the time alone still has to unlink first. Acceptable tradeoff for MVP; revisit if users complain.
+
+**Fields that remain editable when linked:**
+- Workout name
+- RPE
+- Session notes
+- ExerciseSets (for Strength / HIIT)
+
+These are user-owned per § 7. Adding ExerciseSets to a linked Cardio workout imported from Apple Watch is allowed but not expected in practice.
+
+**Save button:** Behaves identically to non-linked save. Triggers `WorkoutService.update()`, which bumps `lastModifiedDate` and fires the Workout Cascade.
+
+**Accessibility:** Helper text has its own accessibility identifier (`logWorkout_durationReadOnlyHelper`, `logWorkout_distanceReadOnlyHelper`, `logWorkout_dateReadOnlyHelper`). See TESTING.md § Accessibility Identifiers.
 
 ---
 
@@ -330,7 +369,7 @@ Below the calendar. Renders one card per scheduled or logged workout on the sele
 
 **Logged-only workout card:**
 Rendered for each `Workout` that surfaces per § Logged-Only Workout Surfacing. Visually identical to a completed scheduled workout card (grey fill, green border, green checkmark, muted "COMPLETED" label). Fields:
-- Workout name (primary text, 16px semibold).
+- Workout name (primary text, 16px semibold). If `workout.healthKitUUID != nil`, precede the name with a small HealthKit-pink heart glyph (see § Peripheral HealthKit Glyph under Standard Patterns).
 - Workout type pill (muted, uppercase, 11px) followed by ` · LOGGED SESSION` metadata to the right of the pill (11px, 700 weight, uppercase, muted text — matches pill label styling but sits outside the pill boundary). `· LOGGED SESSION` is the source affordance and appears **only** on logged-only cards, not on completed scheduled cards.
 - Duration (muted, if `workout.durationMinutes` is set; omitted if nil).
 - Muted "COMPLETED" label with green checkmark in place of any action button.
@@ -339,7 +378,7 @@ Days with no scheduled or logged-only workouts show no content in the detail are
 
 **Overdue planned workouts** (scheduled date in the past, status still "planned"): Card shows a muted "OVERDUE" badge (11px, 700 weight, uppercase, muted text) below the workout type pill.
 
-**Completed scheduled workouts:** Card visually marked with green checkmark and muted styling. Next to the workout type name is `· PLANNED SESSION`. "Complete Planned Workout" button replaced with muted "COMPLETED" label. `· PLANNED SESSION` is the source affordance and appears **only** on scheduled-only cards, not on completed logged cards.
+**Completed scheduled workouts:** Card visually marked with green checkmark and muted styling. Next to the workout type name is `· PLANNED SESSION`. "Complete Planned Workout" button replaced with muted "COMPLETED" label. `· PLANNED SESSION` is the source affordance and appears **only** on scheduled-only cards, not on completed logged cards. If the completed workout's `healthKitUUID != nil`, precede the workout name with the HealthKit-pink heart glyph as on logged-only cards.
 
 **Skipped workouts:** Card visually dimmed (muted text, strikethrough on workout name, muted border). Button replaced with muted "SKIPPED" label.
 
@@ -452,20 +491,90 @@ When a user edits or deletes a recurring workout, prompt: **"This workout only"*
 ### Layout
 ← BACK. "Workout" label, name (blue), date, time, workout type (muted, e.g., "Mar 17, 2026 · 2:35 PM · Strength Training"). When time is nil (pre-feature workout), omit time component.
 
+**Source indicator (HK-linked workouts only):** Rendered on its own row directly below the workout type row when `workout.healthKitUUID != nil`. Contains: HealthKit-pink heart SF Symbol (`heart.fill`, HealthKit Pink color from CONSTANTS.md § Colors), `workout.healthKitActivityType` friendly string, and "from {HKSource.name}" suffix — all on a single row, styled as secondary/muted text using the app's Label treatment (11px, 700 weight, 2px letter-spacing, Muted Text color). Source name is resolved dynamically at render time via `HealthKitClient.sourceName(for:)` (see SERVICES.md § HealthKitClient). Falls back to "Apple Health" if resolution fails.
+
+Example renderings:
+- `❤ Traditional Strength Training · from Apple Watch`
+- `❤ Outdoor Run · from Strava`
+- `❤ Cycling · from Peloton`
+
+The row is tappable — tapping anywhere on the row opens the **Source Indicator Info Sheet** (see below). Row has accessibility identifier `workoutDetail_healthSourceIndicator` (see TESTING.md).
+
 Top-right icons: blue share icon (16px, `square.and.arrow.up`, #3b82f6), muted edit icon (16px), muted trash icon (16px). Blue ellipsis icon (16px) to right of trash, shown when at least one ellipsis menu item applies (see Ellipsis Menu below). Share → renders workout as styled image card and presents iOS share sheet (see Share Image Card below). Edit → Log Workout in edit mode. Trash → standard delete confirmation → cascade delete, back to Workouts list.
 
 **Ellipsis Menu:** Items appear conditionally based on workout type and state. The ellipsis icon itself is shown only when at least one item is visible.
 
 - **"Save as workout template"** with SF Symbol `square.and.arrow.down` to the left → naming prompt (pre-filled with workout name) → saves template (name, type, duration, exercises — NOT RPE, date, time, notes) → "Template saved!" toast (~2s). Visible only for Strength Training / HIIT workouts.
 - **"Show on Plan"** with SF Symbol `calendar.badge.plus` to the left → flips `workout.hiddenFromPlan` from `true` to `false`. No confirmation alert (non-destructive, trivially reversible). Toast: "Showing on Plan." (~2s auto-dismiss). Visible only when `workout.hiddenFromPlan == true`. Applies to all workout types — if this is the only applicable item (e.g., a hidden Cardio workout), the ellipsis icon appears with just this single option. When both items apply (a hidden Strength/HIIT workout), "Show on Plan" is rendered immediately below "Save as workout template".
+- **"Unlink from Apple Health"** with SF Symbol `link.badge.minus` to the left → confirmation alert: "Unlink this workout from Apple Health? Imported values (duration, distance, heart rate, etc.) will be retained as editable fields. Cancel / Unlink." On confirm: applies § HealthKit Unlink (clears `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`; retains numeric values; bumps `lastModifiedDate`; no cascade). Toast: "Unlinked from Apple Health." (~2s). Visible only when `workout.healthKitUUID != nil`. Renders below all other items in the menu. See HEALTHKIT.md § 14 and SERVICES.md § HealthKit Unlink.
 
-✦ divider. Content varies by type. Each summary field is rendered with a leading SF Symbol to the left of the label (see CONSTANTS.md § Workout Detail Summary Icons): RPE → `heart.gauge.open`, Duration → `clock`, Distance → `ruler`. Icons are rendered at the same size and color as the summary row label text, with standard spacing between icon and label.
+✦ divider. "Summary" header. Content varies by type AND by whether the workout is HK-linked. Each summary field is rendered with a leading SF Symbol to the left of the label (see CONSTANTS.md § Workout Detail Summary Icons for user-entered fields, CONSTANTS.md § Workout Detail Health Data Icons for HK-imported fields). Icons are rendered at the same size and color as the summary row label text, with standard spacing between icon and label.
 
-- **Strength/HIIT:** "Summary" header. RPE if rated + duration if entered (fields not entered are hidden). "Exercises" header, exercise list (name, sets, weight).
-- **Cardio/Sprints:** "Summary" header. RPE if rated, duration, distance (km or mi per useMiles) — unrecorded fields hidden.
-- **Yoga/Pilates:** "Summary" header. RPE if rated, duration — unrecorded fields hidden.
+**Layout depends on HK-linked state:**
+
+**Manual workout (or linked workout with no HK measurement data):** Single-column vertical list, unchanged from pre-Phase-8 behavior. Renders user-entered fields only (RPE → `heart.gauge.open`, Duration → `clock`, Distance → `ruler`).
+
+**HK-linked workout with at least one HK measurement field non-nil:** Two-column grid. Left column holds user-entered fields (RPE, Duration, Distance) in the same order and style as the single-column variant. Right column holds HK-imported fields in the order defined in CONSTANTS.md § Workout Detail Health Data Icons. Both columns are conditionally rendered — a row in either column appears only when its underlying value is non-nil. No empty "—" placeholders.
+
+The two columns are visually separated by standard inter-column spacing (no vertical divider line between them). Columns have equal width. If one column has more rows than the other, the shorter column simply stops; the longer column continues. The overall Summary block ends at the last non-nil row in either column.
+
+Example layouts (illustrative — actual row content per the conditional rules):
+
+*Manual Strength workout (RPE + Duration set):*
+```
+Summary
+  ❤ RPE 7
+  ⏱ Duration 45 min
+```
+
+*HK-linked Outdoor Run (full measurement data):*
+```
+Summary
+  ❤ RPE 6            ❤ Avg HR 142 bpm · Max HR 168 bpm
+  ⏱ Duration 32 min  🔥 Active 487 kcal · Total 612 kcal
+  📏 Distance 5.2 km  ⛰ Elevation 240 ft
+                     ⏲ Exercise 31 min
+                     ☀ Outdoor
+```
+
+*HK-linked indoor Pilates (HR only, no RPE entered yet):*
+```
+Summary
+  ⏱ Duration 35 min  ❤ Avg HR 108 bpm
+                     🏢 Indoor
+```
+
+Type-specific row visibility (left column):
+- **Strength/HIIT:** RPE if rated, Duration if entered.
+- **Cardio:** RPE if rated, Duration, Distance (km or mi per useMiles).
+- **Yoga/Pilates:** RPE if rated, Duration.
+- **Other:** RPE if rated, Duration. (The Other category is primarily used for HK imports; users rarely log Other workouts manually.)
+
+HK row visibility (right column) follows CONSTANTS.md § Workout Detail Health Data Icons — each row renders only when its underlying HK field is non-nil.
+
+**After Summary (for Strength/HIIT only):** "Exercises" header, exercise list (name, sets, weight). Appears below the Summary block regardless of whether the two-column or single-column variant was used.
 
 ✦ divider. "Session Notes" header + edit icon. Note card or textarea when editing + SAVE button.
+
+### Source Indicator Info Sheet
+
+Opened via:
+1. Tapping the Source Indicator row on Workout Detail.
+2. Tapping the "Linked to Apple Health · tap to unlink" helper text in Log Workout edit view (see § Log Workout → Edit Mode — HealthKit-Linked Workouts).
+
+Rendered as an iOS modal sheet (sheet presentation, swipe-down to dismiss).
+
+**Layout:**
+- **Header:** Centered HealthKit-pink heart SF Symbol (`heart.fill`, 32pt).
+- **Title:** "Imported from Apple Health" (primary text, 18px semibold, centered).
+- **Body paragraph:** "This workout was imported from {HKSource.name}. Measured values like duration, distance, heart rate, and calories are sourced from Apple Health and cannot be edited here." (secondary text, 14px, centered, with standard paragraph spacing).
+- **Activity type row:** "Activity Type: {workout.healthKitActivityType}" (muted label + primary text value, left-aligned).
+- **Source row:** "Source: {HKSource.name}" (muted label + primary text value, left-aligned).
+- **Imported date row:** "Imported: {formatted workout.dateCreated or equivalent}" (muted label + primary text value, left-aligned) — if captured. If not captured, omit this row.
+- **Primary action:** Full-width red "Unlink from Apple Health" button (Alert Red color, #ef4444). Tapping triggers the same confirmation flow as the ellipsis menu's Unlink item (see Ellipsis Menu above). Accessibility identifier: `workoutDetail_healthUnlinkButton`.
+- **Secondary action:** "Done" button (blue outline, full-width, bottom). Dismisses the sheet without action.
+
+**Dismiss:** Swipe down, tap outside the sheet, or tap "Done."
 
 ### Share Image Card
 
@@ -784,11 +893,155 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 
 ## Settings
 
-**Purpose:** Configure unit preferences.
+**Purpose:** Configure unit preferences and manage Apple Health integration.
 
 ### Layout
 ← BACK. "Settings" heading.
 
 **"General" header.** Weight Unit card (KG/LBS toggle). Distance Unit card (KM/MILES toggle).
 
-All changes take effect immediately.
+All General changes take effect immediately.
+
+✦ divider.
+
+**"Apple Health" header.** Section managing HealthKit integration. See HEALTHKIT.md § 16 for architectural detail and HEALTHKIT.md § 17 for authorization behavior.
+
+### Apple Health Section
+
+**Toggle:** "Connect to Apple Health" — FortiFitSegmentedToggle styled consistently with Weight Unit and Distance Unit toggles in the General section, but functionally a two-state on/off switch rather than a unit selector. Accessibility identifier: `settings_appleHealthToggle`.
+
+**Description text (below toggle):** Muted text, 13px, 700 weight. Reads:
+
+> "Import workouts from Apple Watch and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk."
+
+**Status line (below description):** Muted text, 11px, 700 weight, uppercase, 2px letter-spacing. Content depends on state — see State Table below.
+
+**Buttons (below status line, conditional):** Full-width or inline depending on state. See State Table.
+
+### Apple Health Section — State Table
+
+Four possible states driven by (toggle on/off) × (iOS authorization status):
+
+| Toggle | iOS Auth | Status Line | Visible Buttons | Behavior on Toggle Tap |
+|---|---|---|---|---|
+| Off | Any (including not-yet-requested) | *(hidden — no status shown)* | None | Flipping on triggers authorization request (if not yet granted/denied); otherwise simply re-enables sync using cached authorization. |
+| On | Granted | `CONNECTED · LAST SYNC {relative time}` OR `CONNECTED · NEVER SYNCED YET` | **"Sync Now"** (blue outlined, full-width) — accessibility identifier `settings_appleHealthSyncNowButton`. Tap → triggers immediate `HealthKitSyncService.importPendingWorkouts()`. Shows transient "Syncing…" label on button until complete, then updates status line. | Flipping off immediately suspends all sync activity. Existing linked workouts retain `healthKitUUID`. Confirmation alert: "Turn off Apple Health sync? Imported workouts will remain in FortiFit but new workouts from Apple Health won't appear automatically. Cancel / Turn Off." |
+| On | Denied | `PERMISSION DENIED IN IOS SETTINGS` | **"Open iOS Settings"** (blue outlined, full-width) — accessibility identifier `settings_appleHealthOpenSettingsButton`. Tap → deep-links via `UIApplication.openSettingsURLString`. | Same as granted — confirmation alert, then flip off. |
+| On | Not yet requested | *(transient, typically <1s)* | None during transient state | The authorization prompt fires immediately; this state resolves to granted or denied within a second. UI doesn't need to handle the transient case explicitly — just render the previous state until the prompt resolves. |
+
+### Relative Time Formatting for Status Line
+
+The "Last sync" timestamp follows iOS's relative date conventions:
+- <1 min → "JUST NOW"
+- 1–59 min → "X MIN AGO"
+- 1–23 hr → "X HR AGO"
+- 1–6 days → "X DAYS AGO"
+- >7 days → "ON {date}" (e.g., "ON APR 15")
+
+Source: `UserSettings.healthKitLastSyncDate`. Updated after every successful sync by `HealthKitSyncService`.
+
+### First-Time Toggle-On Flow
+
+On the first time a user flips the toggle to on:
+1. FortiFit calls `HealthKitClient.requestAuthorization()`.
+2. iOS presents the native permission prompt with the read permission list (see HEALTHKIT.md § 17).
+3. User grants or denies. iOS returns control to FortiFit.
+4. On grant: Settings status line updates to "CONNECTED · NEVER SYNCED YET." FortiFit immediately triggers a catch-up sync. Status line updates to "CONNECTED · JUST NOW" on completion.
+5. On deny: Settings status line updates to "PERMISSION DENIED IN IOS SETTINGS." Toggle remains on (user's expressed intent), but no sync activity occurs. "Open iOS Settings" button becomes visible.
+
+### Subsequent Toggle-Off → Toggle-On Flow
+
+If the user previously granted authorization, toggles off, then toggles back on later:
+- No re-authorization prompt (iOS caches the original grant).
+- Sync resumes immediately from the persisted `HKQueryAnchor`. Any workouts added, updated, or deleted upstream during the off period are processed in the next catch-up sweep.
+
+### Confirmation Alert Copy
+
+**Turn-off confirmation:**
+> Title: "Turn off Apple Health sync?"
+> Message: "Imported workouts will remain in FortiFit but new workouts from Apple Health won't appear automatically."
+> Buttons: "Cancel" / "Turn Off"
+
+Destructive action — "Turn Off" button styled in the standard destructive red.
+
+### States
+
+| State | What the User Sees |
+|-------|-------------------|
+| Initial load (General section) | KG/LBS and KM/MILES toggles reflect current preferences |
+| Apple Health off | Toggle off, description visible, no status line, no buttons |
+| Apple Health on — connected | Toggle on, description, "CONNECTED · …" status, "Sync Now" button |
+| Apple Health on — denied | Toggle on, description, "PERMISSION DENIED IN IOS SETTINGS" status, "Open iOS Settings" button |
+| Sync in progress | Same as connected state, but "Sync Now" button shows transient "Syncing…" label and is disabled until complete |
+
+---
+
+## Match Prompt Sheet
+
+**Purpose:** Resolve lower-confidence deduplication matches between HealthKit-imported workouts and existing FortiFit workouts. See HEALTHKIT.md § 13 and SERVICES.md § WorkoutMatcher for the matcher logic that produces pending matches.
+
+### Trigger
+
+Appears as a modal sheet on app foreground transition when `WorkoutMatcher.pendingMatches()` returns one or more pending pairings. One sheet per pending match — if multiple are queued, they appear sequentially (next sheet presents after the previous is resolved).
+
+**Not triggered by:** navigation to any specific screen, user tap, or settings toggle. Foreground transition is the sole automatic trigger. The sheet is dismissible via "Decide Later" (leaves the match in the queue) so the user is never trapped.
+
+### Layout
+
+iOS modal sheet (sheet presentation, medium detent). Swipe-down dismissal maps to "Decide Later."
+
+- **Header:** "Possible Match" (primary text, 20px 900 weight, centered).
+- **Body paragraph:** "Apple Health imported a workout that looks similar to one you already logged. Would you like to link them?" (secondary text, 14px, centered, standard paragraph spacing).
+- **Side-by-side summary cards:** Two FortiFitCards rendered horizontally side-by-side. Each card displays the workout's key metadata in a compact layout.
+
+  **Left card — HealthKit workout:**
+  - HealthKit-pink heart icon (`heart.fill`) + "FROM APPLE HEALTH" label (HealthKit Pink color, 11px 700 weight uppercase, 2px letter-spacing)
+  - Workout type pill (using FortiFit category mapped from HK type)
+  - `healthKitActivityType` display string (primary text, 14px semibold)
+  - Start time (e.g., "7:02 PM", muted 13px)
+  - Duration (e.g., "45 min", muted 13px)
+  - Distance if present (e.g., "5.2 km", muted 13px; unit per useMiles)
+  - Avg HR if present (e.g., "142 bpm avg", muted 13px)
+  - Active calories if present (e.g., "487 kcal", muted 13px)
+
+  **Right card — FortiFit workout:**
+  - "YOUR LOG" label (muted, 11px 700 weight uppercase, 2px letter-spacing)
+  - Workout type pill
+  - `workout.name` (primary text, 14px semibold)
+  - Start time from `workout.time` (muted 13px)
+  - Duration if present (muted 13px)
+  - RPE if rated (e.g., "RPE 7", muted 13px)
+  - ExerciseSets count if present (e.g., "5 exercises", muted 13px)
+
+- **Primary action row (three vertically stacked buttons):**
+  - **"Link these workouts"** — Full-width blue-filled button (Primary Accent #3b82f6). Accessibility identifier `matchPromptSheet_linkButton`. Tap → `WorkoutMatcher.resolvePending(...decision: .link)` → applies link per SERVICES.md § WorkoutMatcher → Link Application → sheet dismisses → toast "Workouts linked." (~2s).
+  - **"Keep separate"** — Full-width blue-outlined button. Accessibility identifier `matchPromptSheet_keepSeparateButton`. Tap → `WorkoutMatcher.resolvePending(...decision: .keepSeparate)` → creates `WorkoutMatchRejection` → sheet dismisses → no toast.
+  - **"Decide later"** — Text-only link-style button (muted text). Accessibility identifier `matchPromptSheet_decideLaterButton`. Tap → `WorkoutMatcher.resolvePending(...decision: .decideLater)` → leaves match in queue → sheet dismisses → no toast.
+
+### Button Ordering Rationale
+
+Link is primary because it's the most common correct answer when the matcher has already filtered for same-type, same-day, within-4-hours workouts. Keep Separate is secondary (less common but deliberate). Decide Later is de-emphasized (punt action, low commitment).
+
+### Post-Resolution Behavior
+
+**On Link:** `WorkoutMatcher.applyLink()` runs — HK-owned fields copied from the snapshot to the FortiFit Workout, user-owned fields preserved, `lastModifiedDate` bumped, Workout Cascade fires. The Workout is now surfaced as HK-linked everywhere (source indicator on Workout Detail, peripheral glyph on Home/Workouts/Plan).
+
+**On Keep Separate:** `WorkoutMatchRejection` record persists the (`healthKitUUID`, `workoutId`) pair. Future sync events will not re-propose this pairing. The HK workout proceeds to auto-create as a new separate FortiFit Workout (if it hasn't already been auto-created by a prior sync pass).
+
+**On Decide Later:** Match stays queued. Re-prompts on next foreground transition. No auto-create yet — the HK workout remains in `WorkoutMatcher`'s candidate pool pending resolution.
+
+### Sequential Multi-Match Handling
+
+If 3 pending matches are queued, the user sees 3 sheets in sequence. Each resolves independently. No batch-resolve option in MVP — the sequential approach is simpler and keeps each decision explicit.
+
+### Accessibility
+
+All three buttons have accessibility identifiers (see § Button list above). The summary card contents use standard VoiceOver traversal (header → cards left-to-right → buttons top-to-bottom). No custom accessibility actions needed.
+
+### States
+
+| State | What the User Sees |
+|-------|-------------------|
+| Match queued | Sheet presents on foreground transition with side-by-side summary cards and three actions |
+| Resolving (transient) | After tap, sheet dismisses immediately; toast or next sheet appears |
+| No pending matches | Sheet does not present — normal app state |
