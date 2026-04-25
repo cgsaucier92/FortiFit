@@ -8,7 +8,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com​.fitnavi​.template</string>
+			<string>com.fitnavi.template</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>fitnavi</string>
