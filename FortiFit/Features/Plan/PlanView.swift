@@ -312,6 +312,7 @@ struct PlanView: View {
                         onSkip: { viewModel.skipWorkout(scheduledWorkout, context: modelContext) },
                         onRestore: { viewModel.restoreWorkout(scheduledWorkout, context: modelContext) },
                         onRemoveFromPlan: { viewModel.confirmRemoveFromPlan(item) },
+                        isCompletedHealthKitLinked: isCompletedWorkoutHealthKitLinked(scheduledWorkout),
                         onTap: scheduledWorkout.status == "completed" ? {
                             navigateToWorkoutDetail(completedWorkoutId: scheduledWorkout.completedWorkoutId)
                         } : nil
@@ -357,6 +358,18 @@ struct PlanView: View {
         default:
             Text("")
         }
+    }
+
+    // MARK: - HealthKit Helpers
+
+    private func isCompletedWorkoutHealthKitLinked(_ scheduledWorkout: ScheduledWorkout) -> Bool {
+        guard scheduledWorkout.status == "completed",
+              let workoutId = scheduledWorkout.completedWorkoutId else { return false }
+        let predicate = #Predicate<Workout> { w in w.id == workoutId }
+        var descriptor = FetchDescriptor<Workout>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let workout = try? modelContext.fetch(descriptor).first else { return false }
+        return workout.isHealthKitLinked
     }
 
     // MARK: - Navigation Helpers

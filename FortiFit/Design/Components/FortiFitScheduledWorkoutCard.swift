@@ -6,6 +6,7 @@ struct FortiFitScheduledWorkoutCard: View {
     var onSkip: () -> Void
     var onRestore: () -> Void
     var onRemoveFromPlan: () -> Void
+    var isCompletedHealthKitLinked: Bool = false
     var onTap: (() -> Void)? = nil
 
     private var isOverdue: Bool {
@@ -18,10 +19,15 @@ struct FortiFitScheduledWorkoutCard: View {
         FortiFitCard(borderColor: cardBorderColor) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                 // Workout name
-                Text(scheduledWorkout.workoutName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(nameColor)
-                    .strikethrough(scheduledWorkout.status == "skipped")
+                HStack(spacing: 6) {
+                    if isCompletedHealthKitLinked && scheduledWorkout.status == "completed" {
+                        FortiFitHealthGlyph()
+                    }
+                    Text(scheduledWorkout.workoutName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(nameColor)
+                        .strikethrough(scheduledWorkout.status == "skipped")
+                }
 
                 // Workout type pill
                 HStack(spacing: 0) {
@@ -169,9 +175,14 @@ struct FortiFitLoggedWorkoutCard: View {
         FortiFitCard(borderColor: FortiFitColors.positive) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                 // Workout name
-                Text(workout.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(FortiFitColors.primaryText)
+                HStack(spacing: 6) {
+                    if workout.isHealthKitLinked {
+                        FortiFitHealthGlyph()
+                    }
+                    Text(workout.name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.primaryText)
+                }
 
                 // Workout type pill + LOGGED affordance
                 HStack(spacing: 0) {

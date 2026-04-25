@@ -759,9 +759,14 @@ struct HomeView: View {
     private func recentWorkoutRow(_ workout: Workout) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(workout.name)
-                    .font(FortiFitTypography.dataValue)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                HStack(spacing: 6) {
+                    if workout.isHealthKitLinked {
+                        FortiFitHealthGlyph()
+                    }
+                    Text(workout.name)
+                        .font(FortiFitTypography.dataValue)
+                        .foregroundStyle(FortiFitColors.primaryText)
+                }
 
                 HStack(spacing: FortiFitSpacing.elementSpacing) {
                     Text(workout.date.dayFormatted)

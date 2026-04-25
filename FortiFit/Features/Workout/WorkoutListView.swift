@@ -666,9 +666,14 @@ struct WorkoutListView: View {
     private func workoutPreviewRow(_ workout: Workout) -> some View {
         HStack(alignment: .top, spacing: FortiFitSpacing.gapSmall) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(workout.name)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(FortiFitColors.primaryText)
+                HStack(spacing: 6) {
+                    if workout.isHealthKitLinked {
+                        FortiFitHealthGlyph()
+                    }
+                    Text(workout.name)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(FortiFitColors.primaryText)
+                }
 
                 Text(workout.date.dayFormatted)
                     .font(FortiFitTypography.bodySmall)
