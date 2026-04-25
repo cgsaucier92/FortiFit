@@ -62,6 +62,9 @@ enum AccessibilityID {
 
     static let settingsWeightUnitToggle = "settings_weightUnitToggle"
     static let settingsBackButton = "settingsBackButton"
+    static let settingsAppleHealthToggle = "settings_appleHealthToggle"
+    static let settingsAppleHealthSyncNowButton = "settings_appleHealthSyncNowButton"
+    static let settingsAppleHealthOpenSettingsButton = "settings_appleHealthOpenSettingsButton"
 
     // MARK: - Workout Detail
 

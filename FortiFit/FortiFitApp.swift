@@ -13,6 +13,10 @@ struct FortiFitApp: App {
     @State private var importPayload: TemplatePayload?
     @State private var showImportPrompt = false
     @State private var showImportError = false
+    @State private var healthKitMatcher = WorkoutMatcher()
+    @State private var healthKitSyncService: HealthKitSyncService = {
+        HealthKitSyncService(client: DefaultHealthKitClient(), matcher: WorkoutMatcher())
+    }()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -68,9 +72,16 @@ struct FortiFitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(healthKitSyncService)
                 .task {
                     let context = sharedModelContainer.mainContext
                     WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
+                    healthKitSyncService.setContext(context)
+                    if UserSettings.shared.healthKitEnabled {
+                        await healthKitSyncService.importPendingWorkouts(context: context)
+                        healthKitSyncService.startObserving()
+                        healthKitSyncService.registerBackgroundTask()
+                    }
                 }
                 .onOpenURL { url in
                     guard url.scheme == "fitnavi", url.host == "template" else { return }
