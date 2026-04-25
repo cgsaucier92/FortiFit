@@ -26,6 +26,7 @@ struct FortiFitApp: App {
             TrendsChart.self,
             ScheduledWorkout.self,
             GoalSnapshot.self,
+            WorkoutMatchRejection.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -15,8 +15,24 @@ final class Workout {
     var lastModifiedDate: Date? = nil
     var hiddenFromPlan: Bool = false
 
+    // HealthKit fields (Phase 8)
+    var healthKitUUID: UUID?
+    var healthKitSourceBundleID: String?
+    var healthKitActivityType: String?
+    var avgHeartRate: Int?
+    var maxHeartRate: Int?
+    var activeEnergyKcal: Double?
+    var totalEnergyBurnedKcal: Double?
+    var elevationAscendedMeters: Double?
+    var exerciseMinutes: Int?
+    var indoor: Bool?
+
     @Relationship(deleteRule: .cascade, inverse: \ExerciseSet.workout)
     var exerciseSets: [ExerciseSet]
+
+    var isHealthKitLinked: Bool {
+        healthKitUUID != nil
+    }
 
     init(
         id: UUID = UUID(),
@@ -28,7 +44,17 @@ final class Workout {
         durationMinutes: Int? = nil,
         distanceKm: Double? = nil,
         time: Date? = nil,
-        exerciseSets: [ExerciseSet] = []
+        exerciseSets: [ExerciseSet] = [],
+        healthKitUUID: UUID? = nil,
+        healthKitSourceBundleID: String? = nil,
+        healthKitActivityType: String? = nil,
+        avgHeartRate: Int? = nil,
+        maxHeartRate: Int? = nil,
+        activeEnergyKcal: Double? = nil,
+        totalEnergyBurnedKcal: Double? = nil,
+        elevationAscendedMeters: Double? = nil,
+        exerciseMinutes: Int? = nil,
+        indoor: Bool? = nil
     ) {
         self.id = id
         self.name = name
@@ -40,5 +66,15 @@ final class Workout {
         self.distanceKm = distanceKm
         self.time = time
         self.exerciseSets = exerciseSets
+        self.healthKitUUID = healthKitUUID
+        self.healthKitSourceBundleID = healthKitSourceBundleID
+        self.healthKitActivityType = healthKitActivityType
+        self.avgHeartRate = avgHeartRate
+        self.maxHeartRate = maxHeartRate
+        self.activeEnergyKcal = activeEnergyKcal
+        self.totalEnergyBurnedKcal = totalEnergyBurnedKcal
+        self.elevationAscendedMeters = elevationAscendedMeters
+        self.exerciseMinutes = exerciseMinutes
+        self.indoor = indoor
     }
 }
