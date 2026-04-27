@@ -156,7 +156,7 @@ At the end of each development session, before closing or pausing work:
 | Progress bar animations (0.4s) | PRD.md § Interaction Style |
 | Save button transitions (0.2s) | PRD.md § Interaction Style |
 | Empty states (all screens, per-chart) | SCREENS.md (States tables per screen), CONSTANTS.md § Chart Thresholds |
-| Hint tooltips ("?" on Training Load, RPE, Power Level) | PRD.md § Design Language (Contextual Hints) |
+| Hint tooltips ("?" on Training Load, Effort, Power Level) | PRD.md § Design Language (Contextual Hints) |
 | Goal drag-and-drop | SCREENS.md § Goals |
 | PR auto-detection | SERVICES.md § Goal Auto-Update |
 | Edge cases (missing data, zero targets, BW, long names, backdated workouts, edit/delete cascading) | SERVICES.md § Deletion Cascading Behavior; add integration tests in `FortiFitIntegrationTests` |
@@ -177,7 +177,7 @@ At the end of each development session, before closing or pausing work:
 | FortiFitAddChartMenu component | Mirrors FortiFitAddWidgetMenu |
 | Personal Records redesign (exercise dropdown, bar chart) | SCREENS.md § Trends (PR Definition, PR Layout, PR Edge Cases) |
 | Workout Volume chart | SCREENS.md § Trends (Chart Definitions), CONSTANTS.md § Chart Types |
-| RPE Trend chart | SCREENS.md § Trends (Chart Definitions), CONSTANTS.md § Chart Types |
+| Effort Trend chart | SCREENS.md § Trends (Chart Definitions), CONSTANTS.md § Chart Types |
 | Workout Type Breakdown chart | SCREENS.md § Trends (Chart Definitions), CONSTANTS.md § Chart Types |
 | Session Duration chart | SCREENS.md § Trends (Chart Definitions), CONSTANTS.md § Chart Types |
 | Chart deletion cascading | SERVICES.md § Deletion Cascading Behavior (Chart Deletion) |

@@ -288,3 +288,29 @@
 | Root Cause | `DefaultHealthKitClient.authorizationStatus()` used `HKHealthStore.authorizationStatus(for:)`, which returns **sharing/write** authorization status (`.sharingAuthorized` / `.sharingDenied`). Since FortiFit is read-only (`toShare: []` in the authorization request), HealthKit always returns `.sharingDenied` for the workout type — the code then incorrectly mapped this to the app's `.denied` enum case. For read-only HealthKit apps, iOS intentionally hides whether read access was granted or denied; `authorizationStatus(for:)` is meaningless for read types. |
 | Resolution | Added a `healthKitAuthorizationRequested` boolean flag to `UserSettings`. `DefaultHealthKitClient.requestAuthorization()` sets this flag to `true` after the authorization prompt completes. `authorizationStatus()` now returns `.granted` when the flag is set, `.notDetermined` otherwise — bypassing the unusable `HKHealthStore.authorizationStatus(for:)` API entirely. |
 | Status | Resolved |
+
+---
+
+### BUG-022
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-04-24 |
+| Phase | Phase 8 — HealthKit Sync (imported workouts not visible on Workouts screen) |
+| Description | Workouts auto-imported from Apple Watch via HealthKit do not appear on the Workouts screen. The workouts exist in SwiftData but the Workouts screen shows no type card for them. |
+| Root Cause | `HealthKitSyncService.autoCreate(from:context:)` called `WorkoutService.logWorkout()` but did not call `WorkoutTypeOrderService.ensureOrderExists(for:context:)`. The Workouts screen groups workouts by `WorkoutTypeOrder` records — without a type order entry for the imported workout's type, no type card is rendered and the workout is invisible. Additionally, `GoalService.recalculateGoals()` was not called, so goals were not updated by HK imports. |
+| Resolution | Added `WorkoutTypeOrderService.ensureOrderExists(for: mapping.workoutType, context: context)` and `GoalService.recalculateGoals(...)` after the `logWorkout` call in `autoCreate`, matching the cascade used by `WorkoutViewModel.saveWorkout` and `PlanService.completePlannedWorkout`. |
+| Status | Resolved |
+
+---
+
+### BUG-023
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-04-25 |
+| Phase | Phase 8 — HealthKit Sync (effort score / RPE never populates on imported workouts) |
+| Description | Workouts imported from Apple Watch via HealthKit do not receive the `workoutEffortScore` value in the `rpe` field, even when the user rated effort on the Watch. The effort score is nil on all HK-imported workouts. |
+| Root Cause | Race condition with no retry mechanism. `workoutEffortScore` is a separate `HKQuantitySample` in HealthKit — not a property of `HKWorkout`. When the anchored query delivers a new workout, `HealthKitSyncService.processSnapshot` calls `applyEffortScoreIfNeeded`, which calls `DefaultHealthKitClient.fetchEffortScore`. However, the effort score sample typically syncs from Apple Watch *after* the workout sample, so the query returns nil. Three factors make this failure permanent: (1) `fetchEffortScore` errors are silently swallowed by `try?` at the call sites in `processSnapshot` (lines 121 and 129 of `HealthKitSyncService.swift`), providing no signal that a retry is needed; (2) `handleUpstreamUpdate` (line 170) does not attempt effort score nil-fill — correct per HEALTHKIT.md § 11 which says `rpe` is user-owned and never touched by upstream updates, but this creates a gap when the initial import misses the score; (3) effort score samples are a different `HKQuantityType` than workouts, so their arrival in HealthKit does not trigger the `HKObserverQuery` on `HKObjectType.workoutType()`, meaning no re-import is attempted when the score becomes available. |
+| Resolution | Three-layer fix: (1) `handleUpstreamUpdate` now calls `applyEffortScoreIfNeeded` when `rpe` is nil, so upstream workout updates backfill the score. (2) Added `backfillMissingEffortScores(context:)` which scans all HK-linked workouts with nil `rpe` and fetches effort scores — called at the end of every `importPendingWorkouts` cycle as a catch-all. (3) Added `observeEffortScoreChanges` to `HealthKitClient` protocol; `DefaultHealthKitClient` registers an `HKObserverQuery` on `HKQuantityType(.workoutEffortScore)` with background delivery, triggering backfill when effort score samples arrive independently of workout updates. Regression tests: `test_upstreamUpdate_nilFillsEffortScoreWhenRPEIsNil`, `test_upstreamUpdate_preservesExistingRPEDuringUpdate`, `test_backfillEffortScores_fillsMissingRPEOnLinkedWorkouts`. |
+| Status | Resolved |

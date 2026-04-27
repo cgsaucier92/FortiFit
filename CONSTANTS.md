@@ -62,7 +62,7 @@ Icons rendered to the left of each label in the Summary section of the Workout D
 
 | Field | SF Symbol | Visible On |
 |-------|-----------|-----------|
-| RPE | `heart.gauge.open` | All workout types (when rated) |
+| Effort | `heart.gauge.open` | All workout types (when rated) |
 | Duration | `clock` | All workout types (when recorded) |
 | Distance | `ruler` | Cardio only (when recorded) |
 
@@ -326,7 +326,7 @@ All alias targets must exist in the Exercise Dictionary.
 
 ---
 
-## RPE Scale
+## Effort Scale
 
 Integers 1 through 10.
 
@@ -471,7 +471,7 @@ Power Level not included by default.
 | `personalRecords` | Personal Records | Compares your latest personal record against the previous record for each exercise. |
 | `trainingLoadTrend` | Training Load Trend | Visualizes your daily training load score over the last two weeks so you can spot overtraining or recovery windows. |
 | `workoutVolume` | Workout Volume | Tracks your total training volume per session over time to reveal whether you're progressively overloading. |
-| `rpeTrend` | RPE Trend | Shows your average perceived exertion per week so you can monitor training intensity over time. |
+| `rpeTrend` | Effort Trend | Shows your average perceived exertion per week so you can monitor training intensity over time. |
 | `workoutTypeBreakdown` | Workout Type Breakdown | Shows the distribution of your workout types so you can see if your training is balanced. |
 | `sessionDuration` | Session Duration | Tracks your average workout duration per week to help you manage your time in the gym. |
 
@@ -479,7 +479,7 @@ Power Level not included by default.
 ```swift
 ["strengthTracker", "trainingFrequency", "personalRecords", "trainingLoadTrend"]
 ```
-Workout Volume, RPE Trend, Workout Type Breakdown, and Session Duration are available via Add Charts but not included by default.
+Workout Volume, Effort Trend, Workout Type Breakdown, and Session Duration are available via Add Charts but not included by default.
 
 ### Workout Type Chart Colors
 
@@ -571,7 +571,7 @@ Thresholds: < −10% = Deloading, −10% to +10% = Steady, > +10% = Rising.
 | Personal Records | 1 exercise with ≥ 1 PR event | "Log more workouts to display personal records" |
 | Training Load Trend | 3 days with ≥ 1 workout in last 14 days | "Log more workouts to display load trends" |
 | Workout Volume | 2 Strength Training or HIIT workouts with ≥ 1 ExerciseSet | "Log more Strength or HIIT workouts to display volume trends" |
-| RPE Trend | 1 full Mon–Sun week with ≥ 1 workout with recorded RPE | "Log workouts with RPE ratings to display effort trends" |
+| Effort Trend | 1 full Mon–Sun week with ≥ 1 workout with recorded RPE | "Log workouts with RPE ratings to display effort trends" |
 | Workout Type Breakdown | 2 workouts of any type | "Log more workouts to display your training breakdown" |
 | Session Duration | 1 full Mon–Sun week with ≥ 1 workout with recorded duration | "Log workouts with duration to display session length trends" |
 

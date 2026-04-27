@@ -74,12 +74,20 @@ One option: **"Add Widgets"** with SF Symbol `plus.rectangle.on.rectangle` to th
 ### Add Widgets Menu
 Per § Standard Patterns: Sortable Card System → Add Menu.
 
+### Widget Context Menu (Long Press)
+Long-pressing any widget card (uses Standard Long-Press Tease) opens a context menu. Two options:
+
+**"Reorder Widgets":** Enters Widget Edit Mode (see below). Always visible in the context menu regardless of widget count.
+
+**"Delete Widget":** Standard delete confirmation for the long-pressed widget. Removes the `HomeWidget` record, removes the card, re-indexes remaining `sortOrder`. No underlying workout data affected.
+
 ### Widget Edit Mode
-Activated by long-pressing any widget card (uses Standard Long-Press Tease). Unlike the standard "Reorder from context menu" pattern, Home combines delete + drag in one edit mode entered directly by long-press:
+Entered via the context menu's "Reorder Widgets" item. Unlike the standard reorder pattern, Home combines delete + drag in a single edit mode:
 - "x" button appears in top-right of each widget (24x24pt circular, #2d2d2d bg, #404040 border, muted "×"). Tapping deletes the `HomeWidget` record, removes the card, re-indexes remaining `sortOrder`.
 - Gear icons on Training Load and Weekly Streak widgets are hidden during edit mode.
 - Cards are draggable with the same drag physics as Standard Reorder Edit Mode (0.2s ease, sortOrder re-indexed on drop).
 - Cards maintain full styling during edit and drag.
+- Long-press context menu is disabled during edit mode.
 - Exit by tapping outside any widget. "x" buttons fade out (0.15s).
 
 ### Widget Definitions
@@ -154,7 +162,7 @@ Long-press card header to open.
 
 **Filter by...** sub-menu (multiple filters, AND logic between filter types):
 - **Date range:** Last 7 days, Last 30 days, Last 3 months, Last 6 months, This year, All time (default), Custom range (date picker sheet with start/end, Cancel/Apply).
-- **RPE range:** Min/max stepper 1–10. Nil RPE workouts excluded when active.
+- **Effort range:** Min/max stepper 1–10. Nil Effort workouts excluded when active.
 - **Duration range:** Preset buckets — Under 30 min, 30–60 min, 60–90 min, 90+ min. Multiple selectable (OR within, AND with other filters). Hidden for Yoga/Pilates.
 
 **Reorder Workout Types:** Enters Standard Reorder Edit Mode (see § Standard Patterns). Persists to `WorkoutTypeOrder.sortOrder`. Expand/collapse is additionally disabled during reorder.
@@ -189,7 +197,7 @@ Long-press card header to open.
 
 Workout Name input. Single SwiftUI `DatePicker` with `.dateAndTime` components — date defaults to today, constrained to today or earlier; any time selectable; format follows iOS locale (12/24-hour). Date stored on `workout.date`, time on `workout.time`.
 
-Workout Type dropdown (6 types). Post-Workout RPE dropdown (1–10) + "?" tooltip. Duration field (minutes, optional) — shown for all types, below RPE.
+Workout Type dropdown (6 types). Post-Workout Effort dropdown (1–10) + "?" tooltip. Duration field (minutes, optional) — shown for all types, below Effort.
 
 **Type-specific fields below duration:**
 - **Strength Training / HIIT:** Exercise cards (name input with autocomplete, sets/reps/weight table, + ADD ROW, remove). "+ Add Exercise" button. Each table row = one ExerciseSet.
@@ -197,7 +205,7 @@ Workout Type dropdown (6 types). Post-Workout RPE dropdown (1–10) + "?" toolti
 - **Yoga / Pilates:** No additional fields. No distance.
 
 ### Log Workout Ellipsis Menu (New Mode Only)
-**"Use workout template"** with SF Symbol `doc.badge.arrow.up` to the left → Centered selector overlay listing all templates (name + type). Selecting pre-populates form (name, type, duration, exercises). Date/time default to now, RPE empty. All fields editable. Shows "No saved templates yet." when empty.
+**"Use workout template"** with SF Symbol `doc.badge.arrow.up` to the left → Centered selector overlay listing all templates (name + type). Selecting pre-populates form (name, type, duration, exercises). Date/time default to now, Effort empty. All fields editable. Shows "No saved templates yet." when empty.
 
 **"Save as workout template"** with SF Symbol `square.and.arrow.down` to the left → Grayed out when type isn't Strength/HIIT or when name + exercise not yet entered. Opens naming prompt (pre-filled with workout name). Saves template to SwiftData + "Template saved!" toast (auto-dismiss ~2s). Does NOT log the workout.
 
@@ -225,7 +233,7 @@ Below each disabled field, render a muted-text caption (11px, 700 weight, 2px le
 
 **Fields that remain editable when linked:**
 - Workout name
-- RPE
+- Effort
 - Session notes
 - ExerciseSets (for Strength / HIIT)
 
@@ -242,7 +250,7 @@ These are user-owned per § 7. Adding ExerciseSets to a linked Cardio workout im
 **Purpose:** Build a reusable workout template from scratch, or edit an existing one.
 
 ### Layout
-← BACK. Heading: "Create Template" (new) / "Edit Template" (edit). Template Name input (required). Workout Type dropdown — Strength Training and HIIT only. Duration (optional). Exercise cards identical to Log Workout for Strength/HIIT. "+ Add Exercise" button. No RPE, no DatePicker, no distance.
+← BACK. Heading: "Create Template" (new) / "Edit Template" (edit). Template Name input (required). Workout Type dropdown — Strength Training and HIIT only. Duration (optional). Exercise cards identical to Log Workout for Strength/HIIT. "+ Add Exercise" button. No Effort, no DatePicker, no distance.
 
 "SAVE TEMPLATE" / "Save Changes" button. Disabled until name + at least one exercise with sets/reps entered. Saves to SwiftData, navigates back.
 
@@ -417,11 +425,11 @@ Empty state applies only when **no** `ScheduledWorkout` records exist AND no non
 2. **Date Resolution** (see below) — if date prompt is needed, resolve first.
 3. **Compact Confirmation Sheet** slides up (elevated surface #1a1a1a, border #404040, dimmed background overlay):
    - Workout name displayed at top (non-editable, for context, primary text 16px 700 weight).
-   - **RPE** — horizontal row of numbered pills (1–10), consistent with Log Workout RPE input. Optional. No default value.
+   - **Effort** — horizontal row of numbered pills (1–10), consistent with Log Workout Effort input. Optional. No default value.
    - **Duration** — FortiFitInput with "min" suffix label. Optional. Pre-filled from template's `durationMinutes` if available.
    - **"Save Workout"** button (full-width, blue filled, prominent).
    - **"Modify Exercises"** button below "Save Workout" (full-width, blue-outlined secondary style). Routes to full Log Workout view pre-populated from template snapshot.
-4. **On "Save Workout":** Creates `Workout` from template snapshot (name, type, exercises/sets/reps/weights) plus RPE and duration from sheet. Marks `ScheduledWorkout` as completed, stores new `Workout.id` in `completedWorkoutId`. Dismisses sheet. Toast: "Workout completed." (~2s auto-dismiss).
+4. **On "Save Workout":** Creates `Workout` from template snapshot (name, type, exercises/sets/reps/weights) plus Effort and duration from sheet. Marks `ScheduledWorkout` as completed, stores new `Workout.id` in `completedWorkoutId`. Dismisses sheet. Toast: "Workout completed." (~2s auto-dismiss).
 5. **On "Modify Exercises":** Dismisses compact sheet. Opens Log Workout in new-workout mode, pre-populated from template snapshot. `ScheduledWorkout` ID carried through. On save in Log Workout: same completion logic (mark slot completed, link workout ID). On back-out without saving: slot remains "planned".
 
 Dismiss compact sheet via close button or outside tap (does not complete the workout).
@@ -504,7 +512,7 @@ Top-right icons: blue share icon (16px, `square.and.arrow.up`, #3b82f6), muted e
 
 **Ellipsis Menu:** Items appear conditionally based on workout type and state. The ellipsis icon itself is shown only when at least one item is visible.
 
-- **"Save as workout template"** with SF Symbol `square.and.arrow.down` to the left → naming prompt (pre-filled with workout name) → saves template (name, type, duration, exercises — NOT RPE, date, time, notes) → "Template saved!" toast (~2s). Visible only for Strength Training / HIIT workouts.
+- **"Save as workout template"** with SF Symbol `square.and.arrow.down` to the left → naming prompt (pre-filled with workout name) → saves template (name, type, duration, exercises — NOT Effort, date, time, notes) → "Template saved!" toast (~2s). Visible only for Strength Training / HIIT workouts.
 - **"Show on Plan"** with SF Symbol `calendar.badge.plus` to the left → flips `workout.hiddenFromPlan` from `true` to `false`. No confirmation alert (non-destructive, trivially reversible). Toast: "Showing on Plan." (~2s auto-dismiss). Visible only when `workout.hiddenFromPlan == true`. Applies to all workout types — if this is the only applicable item (e.g., a hidden Cardio workout), the ellipsis icon appears with just this single option. When both items apply (a hidden Strength/HIIT workout), "Show on Plan" is rendered immediately below "Save as workout template".
 - **"Unlink from Apple Health"** with SF Symbol `link.badge.minus` to the left → confirmation alert: "Unlink this workout from Apple Health? Imported values (duration, distance, heart rate, etc.) will be retained as editable fields. Cancel / Unlink." On confirm: applies § HealthKit Unlink (clears `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`; retains numeric values; bumps `lastModifiedDate`; no cascade). Toast: "Unlinked from Apple Health." (~2s). Visible only when `workout.healthKitUUID != nil`. Renders below all other items in the menu. See HEALTHKIT.md § 14 and SERVICES.md § HealthKit Unlink.
 
@@ -512,43 +520,43 @@ Top-right icons: blue share icon (16px, `square.and.arrow.up`, #3b82f6), muted e
 
 **Layout depends on HK-linked state:**
 
-**Manual workout (or linked workout with no HK measurement data):** Single-column vertical list, unchanged from pre-Phase-8 behavior. Renders user-entered fields only (RPE → `heart.gauge.open`, Duration → `clock`, Distance → `ruler`).
+**Manual workout (or linked workout with no HK measurement data):** Single-column vertical list, unchanged from pre-Phase-8 behavior. Renders user-entered fields only (Effort → `heart.gauge.open`, Duration → `clock`, Distance → `ruler`).
 
-**HK-linked workout with at least one HK measurement field non-nil:** Two-column grid. Left column holds user-entered fields (RPE, Duration, Distance) in the same order and style as the single-column variant. Right column holds HK-imported fields in the order defined in CONSTANTS.md § Workout Detail Health Data Icons. Both columns are conditionally rendered — a row in either column appears only when its underlying value is non-nil. No empty "—" placeholders.
+**HK-linked workout with at least one HK measurement field non-nil:** Two-column grid. Left column holds user-entered fields (Effort, Duration, Distance) in the same order and style as the single-column variant. Right column holds HK-imported fields in the order defined in CONSTANTS.md § Workout Detail Health Data Icons. Both columns are conditionally rendered — a row in either column appears only when its underlying value is non-nil. No empty "—" placeholders.
 
 The two columns are visually separated by standard inter-column spacing (no vertical divider line between them). Columns have equal width. If one column has more rows than the other, the shorter column simply stops; the longer column continues. The overall Summary block ends at the last non-nil row in either column.
 
 Example layouts (illustrative — actual row content per the conditional rules):
 
-*Manual Strength workout (RPE + Duration set):*
+*Manual Strength workout (Effort + Duration set):*
 ```
 Summary
-  ❤ RPE 7
+  ❤ Effort 7
   ⏱ Duration 45 min
 ```
 
 *HK-linked Outdoor Run (full measurement data):*
 ```
 Summary
-  ❤ RPE 6            ❤ Avg HR 142 bpm · Max HR 168 bpm
-  ⏱ Duration 32 min  🔥 Active 487 kcal · Total 612 kcal
+  ❤ Effort 6             · Total 612 kcal 
+  ⏱ Duration 32 min  🔥 Active 487 kcal 
   📏 Distance 5.2 km  ⛰ Elevation 240 ft
-                     ⏲ Exercise 31 min
-                     ☀ Outdoor
+  ❤ Avg HR 142 bpm     ❤ Max HR 168 bpm              
+    
 ```
 
-*HK-linked indoor Pilates (HR only, no RPE entered yet):*
+*HK-linked Pilates (HR only, no Effort entered yet):*
 ```
 Summary
   ⏱ Duration 35 min  ❤ Avg HR 108 bpm
-                     🏢 Indoor
+                     
 ```
 
 Type-specific row visibility (left column):
-- **Strength/HIIT:** RPE if rated, Duration if entered.
-- **Cardio:** RPE if rated, Duration, Distance (km or mi per useMiles).
-- **Yoga/Pilates:** RPE if rated, Duration.
-- **Other:** RPE if rated, Duration. (The Other category is primarily used for HK imports; users rarely log Other workouts manually.)
+- **Strength/HIIT:** Effort if rated, Duration if entered.
+- **Cardio:** Effort if rated, Duration, Distance (km or mi per useMiles).
+- **Yoga/Pilates:** Effort if rated, Duration.
+- **Other:** Effort if rated, Duration. (The Other category is primarily used for HK imports; users rarely log Other workouts manually.)
 
 HK row visibility (right column) follows CONSTANTS.md § Workout Detail Health Data Icons — each row renders only when its underlying HK field is non-nil.
 
@@ -584,13 +592,13 @@ Tapping the share icon renders the workout as a styled PNG image card and presen
 
 | Workout Type | Content Shown |
 |---|---|
-| Strength Training / HIIT | Workout name, date/time, workout type, summary pills (RPE if rated, duration if recorded), exercise list (name, sets × reps @ weight per unit preference; "BW" for nil weight) |
-| Cardio / Sprints | Workout name, date/time, workout type, summary pills (RPE if rated, duration if recorded, distance in km/mi per useMiles if recorded) |
-| Yoga / Pilates | Workout name, date/time, workout type, summary pills (RPE if rated, duration if recorded) |
+| Strength Training / HIIT | Workout name, date/time, workout type, summary pills (Effort if rated, duration if recorded), exercise list (name, sets × reps @ weight per unit preference; "BW" for nil weight) |
+| Cardio / Sprints | Workout name, date/time, workout type, summary pills (Effort if rated, duration if recorded, distance in km/mi per useMiles if recorded) |
+| Yoga / Pilates | Workout name, date/time, workout type, summary pills (Effort if rated, duration if recorded) |
 
 Summary pills with nil values are omitted entirely (no empty pill shown). When `workout.time` is nil, the time component is omitted from the date line.
 
-**Summary pill icons:** Each summary pill renders with a leading SF Symbol matching the corresponding field on the Workout Detail screen — RPE → `heart.gauge.open`, Duration → `clock`, Distance → `ruler` (Cardio/Sprints only). See CONSTANTS.md § Workout Detail Summary Icons and § Share Image Card Styling.
+**Summary pill icons:** Each summary pill renders with a leading SF Symbol matching the corresponding field on the Workout Detail screen — Effort → `heart.gauge.open`, Duration → `clock`, Distance → `ruler` (Cardio/Sprints only). See CONSTANTS.md § Workout Detail Summary Icons and § Share Image Card Styling.
 
 **Exercise cap:** Maximum 10 exercises displayed. If the workout has more than 10, the first 10 are shown followed by a muted "+X more exercises" line (e.g., "+3 more exercises").
 
@@ -604,7 +612,7 @@ Summary pills with nil values are omitted entirely (no empty pill shown). When `
 
 | Scenario | Behavior |
 |----------|----------|
-| All optional fields nil (no RPE, no duration, no distance) | No summary pills rendered; card shows name, date, type, and exercises (if any) |
+| All optional fields nil (no Effort, no duration, no distance) | No summary pills rendered; card shows name, date, type, and exercises (if any) |
 | Workout has >10 exercises | First 10 shown + "+X more exercises" in muted text |
 | Exercise with nil weight (bodyweight) | Displays as `{sets} × {reps} (BW)` |
 | Very long workout name | Truncated with ellipsis at 2 lines max |
@@ -652,7 +660,7 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `TrendsChart.s
 
 **Workout Volume** (`workoutVolume`): Line chart of total session volume (sets × reps × weight) over time for Strength Training and HIIT workouts. 30D/60D/90D toggles. Each data point = one workout. Blue line with data point dots.
 
-**RPE Trend** (`rpeTrend`): Bar chart of weekly average RPE (8-week rolling window, same as Training Frequency). Horizontal dashed reference line at RPE 7. Includes workouts with and without recorded RPE.
+**Effort Trend** (`rpeTrend`): Bar chart of weekly average Effort (8-week rolling window, same as Training Frequency). Horizontal dashed reference line at Effort 7. Includes workouts with and without recorded Effort.
 
 **Workout Type Breakdown** (`workoutTypeBreakdown`): Donut chart (`SectorMark`) showing proportion of each workout type. Time range toggles: 30D / 60D / 90D / All Time. Each segment colored by workout type (see CONSTANTS.md § Workout Type Chart Colors). Segments labeled with type name + count. Legend below chart.
 
@@ -703,7 +711,7 @@ Y-axis: weight (kg or lbs per `useLbs`). X-axis: two category labels — "Previo
 | Personal Records | 1 exercise with ≥ 1 PR event | "Log more workouts to display personal records" |
 | Training Load Trend | 3 days with ≥ 1 workout in last 14 days | "Log more workouts to display load trends" |
 | Workout Volume | 2 Strength Training or HIIT workouts with ≥ 1 ExerciseSet | "Log more Strength or HIIT workouts to display volume trends" |
-| RPE Trend | 1 full Mon–Sun week with ≥ 1 workout with recorded RPE | "Log workouts with RPE ratings to display effort trends" |
+| Effort Trend | 1 full Mon–Sun week with ≥ 1 workout with recorded Effort | "Log workouts with effort ratings to display effort trends" |
 | Workout Type Breakdown | 2 workouts of any type | "Log more workouts to display your training breakdown" |
 | Session Duration | 1 full Mon–Sun week with ≥ 1 workout with recorded duration | "Log workouts with duration to display session length trends" |
 
@@ -1010,7 +1018,7 @@ iOS modal sheet (sheet presentation, medium detent). Swipe-down dismissal maps t
   - `workout.name` (primary text, 14px semibold)
   - Start time from `workout.time` (muted 13px)
   - Duration if present (muted 13px)
-  - RPE if rated (e.g., "RPE 7", muted 13px)
+  - Effort if rated (e.g., "Effort 7", muted 13px)
   - ExerciseSets count if present (e.g., "5 exercises", muted 13px)
 
 - **Primary action row (three vertically stacked buttons):**
