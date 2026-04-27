@@ -105,7 +105,7 @@ struct WorkoutShareCardView: View {
     private var summaryPillsRow: some View {
         HStack(spacing: 8) {
             if let rpe = workout.rpe {
-                summaryPill(label: "RPE", value: "\(rpe)", field: "RPE")
+                summaryPill(label: "EFFORT", value: "\(rpe)", field: "RPE")
             }
             if let duration = workout.durationMinutes {
                 summaryPill(label: "DURATION", value: "\(duration) min", field: "Duration")

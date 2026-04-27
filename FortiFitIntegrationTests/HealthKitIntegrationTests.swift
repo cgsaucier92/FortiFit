@@ -274,6 +274,105 @@ final class HealthKitIntegrationTests: XCTestCase {
         XCTAssertEqual(workout.durationMinutes, 60)
     }
 
+    // MARK: - Effort Score Backfill (BUG-023)
+
+    /// Regression test for BUG-023:
+    /// Upstream update on a linked workout with nil rpe now nil-fills the effort score.
+    func test_upstreamUpdate_nilFillsEffortScoreWhenRPEIsNil() async throws {
+        let hkUUID = UUID()
+        let workout = TestFixtures.makeLinkedWorkout(
+            name: "Morning Run",
+            workoutType: "Cardio",
+            healthKitUUID: hkUUID,
+            durationMinutes: 30,
+            in: context
+        )
+        XCTAssertNil(workout.rpe)
+
+        let stubClient = StubHealthKitClient()
+        stubClient.effortScoreToReturn = 6
+        let matcher = WorkoutMatcher()
+        let syncService = HealthKitSyncService(client: stubClient, matcher: matcher)
+        syncService.setContext(context)
+
+        UserSettings.shared.healthKitEnabled = true
+
+        let updatedSnapshot = TestFixtures.makeHKWorkoutFixture(
+            uuid: hkUUID,
+            activityTypeRawValue: 37,
+            durationMinutes: 35
+        )
+        stubClient.workoutsToReturn = [updatedSnapshot]
+
+        await syncService.importPendingWorkouts(context: context)
+
+        XCTAssertEqual(workout.rpe, 6, "Effort score should nil-fill into rpe during upstream update")
+    }
+
+    /// Regression test for BUG-023:
+    /// Upstream update must NOT overwrite a user-set rpe value.
+    func test_upstreamUpdate_preservesExistingRPEDuringUpdate() async throws {
+        let hkUUID = UUID()
+        let workout = TestFixtures.makeLinkedWorkout(
+            name: "Morning Run",
+            workoutType: "Cardio",
+            healthKitUUID: hkUUID,
+            durationMinutes: 30,
+            in: context
+        )
+        workout.rpe = 9
+        try context.save()
+
+        let stubClient = StubHealthKitClient()
+        stubClient.effortScoreToReturn = 4
+        let matcher = WorkoutMatcher()
+        let syncService = HealthKitSyncService(client: stubClient, matcher: matcher)
+        syncService.setContext(context)
+
+        UserSettings.shared.healthKitEnabled = true
+
+        let updatedSnapshot = TestFixtures.makeHKWorkoutFixture(
+            uuid: hkUUID,
+            activityTypeRawValue: 37,
+            durationMinutes: 35
+        )
+        stubClient.workoutsToReturn = [updatedSnapshot]
+
+        await syncService.importPendingWorkouts(context: context)
+
+        XCTAssertEqual(workout.rpe, 9, "User-set RPE must NOT be overwritten by effort score")
+    }
+
+    /// Regression test for BUG-023:
+    /// backfillMissingEffortScores finds linked workouts with nil rpe and fills them.
+    func test_backfillEffortScores_fillsMissingRPEOnLinkedWorkouts() async throws {
+        let hkUUID1 = UUID()
+        let hkUUID2 = UUID()
+        let workoutNilRPE = TestFixtures.makeLinkedWorkout(
+            name: "HK Workout A",
+            healthKitUUID: hkUUID1,
+            in: context
+        )
+        let workoutWithRPE = TestFixtures.makeLinkedWorkout(
+            name: "HK Workout B",
+            healthKitUUID: hkUUID2,
+            in: context
+        )
+        workoutWithRPE.rpe = 8
+        try context.save()
+
+        let stubClient = StubHealthKitClient()
+        stubClient.effortScoreToReturn = 5
+        let matcher = WorkoutMatcher()
+        let syncService = HealthKitSyncService(client: stubClient, matcher: matcher)
+        syncService.setContext(context)
+
+        await syncService.backfillMissingEffortScores(context: context)
+
+        XCTAssertEqual(workoutNilRPE.rpe, 5, "Nil rpe should be backfilled with effort score")
+        XCTAssertEqual(workoutWithRPE.rpe, 8, "Existing rpe should not be overwritten by backfill")
+    }
+
     // MARK: - Upstream Update
 
     func test_upstreamUpdate_HKWinsOnOwnedFields() async throws {

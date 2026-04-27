@@ -28,6 +28,13 @@ final class HealthKitSyncService {
                 await self.importPendingWorkouts(context: context)
             }
         }
+        client.observeEffortScoreChanges { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                guard let context = self.activeContext else { return }
+                await self.backfillMissingEffortScores(context: context)
+            }
+        }
     }
 
     func registerBackgroundTask() {
@@ -101,6 +108,8 @@ final class HealthKitSyncService {
             settings.healthKitAnchor = result.newAnchor
             settings.healthKitLastSyncDate = .now
             try? context.save()
+
+            await backfillMissingEffortScores(context: context)
         } catch {
             // Anchor not updated on failure; next sync retries from last good anchor
         }
@@ -108,7 +117,7 @@ final class HealthKitSyncService {
 
     private func processSnapshot(_ snapshot: HealthKitWorkoutSnapshot, context: ModelContext) async {
         if let existing = fetchWorkoutByHKUUID(snapshot.uuid, context: context) {
-            handleUpstreamUpdate(existing: existing, snapshot: snapshot, context: context)
+            await handleUpstreamUpdate(existing: existing, snapshot: snapshot, context: context)
             return
         }
 
@@ -134,10 +143,7 @@ final class HealthKitSyncService {
 
     private func autoCreate(from snapshot: HealthKitWorkoutSnapshot, context: ModelContext) {
         let mapping = snapshot.mapping
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMM d, h:mm a"
-        let dateString = dateFormatter.string(from: snapshot.startDate)
-        let name = "\(mapping.displayString) — \(dateString)"
+        let name = mapping.displayString
 
         let workout = Workout(
             name: name,
@@ -159,11 +165,18 @@ final class HealthKitSyncService {
         )
 
         WorkoutService.logWorkout(workout, context: context)
+        WorkoutTypeOrderService.ensureOrderExists(for: mapping.workoutType, context: context)
+        GoalService.recalculateGoals(
+            affectedExerciseNames: [],
+            affectedWorkoutTypes: [mapping.workoutType],
+            workout: workout,
+            context: context
+        )
     }
 
     // MARK: - Upstream Update
 
-    private func handleUpstreamUpdate(existing: Workout, snapshot: HealthKitWorkoutSnapshot, context: ModelContext) {
+    private func handleUpstreamUpdate(existing: Workout, snapshot: HealthKitWorkoutSnapshot, context: ModelContext) async {
         existing.date = snapshot.startDate
         existing.durationMinutes = snapshot.durationMinutes
         existing.distanceKm = snapshot.distanceKm
@@ -176,6 +189,7 @@ final class HealthKitSyncService {
         existing.indoor = snapshot.indoor
         existing.healthKitActivityType = snapshot.mapping.displayString
         existing.lastModifiedDate = .now
+        await applyEffortScoreIfNeeded(workout: existing, snapshot: snapshot)
         try? context.save()
     }
 
@@ -201,6 +215,27 @@ final class HealthKitSyncService {
     private func applyEffortScoreIfNeeded(snapshot: HealthKitWorkoutSnapshot, context: ModelContext) async {
         guard let workout = fetchWorkoutByHKUUID(snapshot.uuid, context: context) else { return }
         await applyEffortScoreIfNeeded(workout: workout, snapshot: snapshot)
+    }
+
+    // MARK: - Effort Score Backfill
+
+    func backfillMissingEffortScores(context: ModelContext) async {
+        let predicate = #Predicate<Workout> { workout in
+            workout.healthKitUUID != nil && workout.rpe == nil
+        }
+        let descriptor = FetchDescriptor<Workout>(predicate: predicate)
+        guard let workouts = try? context.fetch(descriptor) else { return }
+
+        var changed = false
+        for workout in workouts {
+            guard let hkUUID = workout.healthKitUUID else { continue }
+            guard let score = try? await client.fetchEffortScore(for: hkUUID) else { continue }
+            workout.rpe = score
+            changed = true
+        }
+        if changed {
+            try? context.save()
+        }
     }
 
     // MARK: - Queries

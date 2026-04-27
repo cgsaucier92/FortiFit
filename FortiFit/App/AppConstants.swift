@@ -149,7 +149,7 @@ enum AppConstants {
         "personalRecords": "Personal Records",
         "trainingLoadTrend": "Training Load Trend",
         "workoutVolume": "Workout Volume",
-        "rpeTrend": "RPE Trend",
+        "rpeTrend": "Effort Trend",
         "workoutTypeBreakdown": "Workout Type Breakdown",
         "sessionDuration": "Session Duration"
     ]
@@ -160,7 +160,7 @@ enum AppConstants {
         "personalRecords": "Compares your latest personal record against the previous record for each exercise.",
         "trainingLoadTrend": "Visualizes your daily training load score over the last two weeks so you can spot overtraining or recovery windows.",
         "workoutVolume": "Tracks your total training volume per session over time to reveal whether you're progressively overloading.",
-        "rpeTrend": "Shows your average perceived exertion per week so you can monitor training intensity over time.",
+        "rpeTrend": "Shows your average effort per week so you can monitor training intensity over time.",
         "workoutTypeBreakdown": "Shows the distribution of your workout types so you can see if your training is balanced.",
         "sessionDuration": "Tracks your average workout duration per week to help you manage your time in the gym."
     ]
@@ -184,7 +184,7 @@ enum AppConstants {
         "personalRecords": "Log more workouts to display personal records.",
         "trainingLoadTrend": "Log more workouts to display load trends.",
         "workoutVolume": "Log more Strength or HIIT workouts to display volume trends.",
-        "rpeTrend": "Log workouts with RPE ratings to display effort trends.",
+        "rpeTrend": "Log workouts with effort ratings to display effort trends.",
         "workoutTypeBreakdown": "Log more workouts to display your training breakdown.",
         "sessionDuration": "Log workouts with duration to display session length trends."
     ]

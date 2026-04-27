@@ -1,69 +1,121 @@
 import SwiftUI
 
-struct FortiFitHealthDataSubsection: View {
-    let workout: Workout
+struct SummaryItem: Identifiable {
+    let id = UUID()
+    let symbol: String
+    let symbolColor: Color
+    let label: String
+    let value: String
+}
 
-    private var settings: UserSettings { UserSettings.shared }
+struct FortiFitSummaryGrid: View {
+    let items: [SummaryItem]
+
+    private let columns = [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            if workout.avgHeartRate != nil || workout.maxHeartRate != nil {
-                HStack {
-                    if let avg = workout.avgHeartRate {
-                        healthRow(symbol: "heart.fill", label: "Avg HR", value: "\(avg) bpm")
+        LazyVGrid(columns: columns, alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+            ForEach(items) { item in
+                HStack(spacing: 4) {
+                    Image(systemName: item.symbol)
+                        .font(FortiFitTypography.body)
+                        .foregroundStyle(item.symbolColor)
+                    if !item.label.isEmpty {
+                        Text(item.label)
+                            .font(FortiFitTypography.body)
+                            .foregroundStyle(FortiFitColors.primaryText)
                     }
-                    if let max = workout.maxHeartRate {
-                        healthRow(symbol: "heart.fill", label: "Max HR", value: "\(max) bpm")
-                    }
+                    Text(item.value)
+                        .font(FortiFitTypography.dataValue)
+                        .foregroundStyle(FortiFitColors.primaryAccent)
                 }
-            }
-
-            if workout.activeEnergyKcal != nil || workout.totalEnergyBurnedKcal != nil {
-                HStack {
-                    if let active = workout.activeEnergyKcal {
-                        healthRow(symbol: "flame.fill", label: "Active", value: "\(Int(active)) kcal")
-                    }
-                    if let total = workout.totalEnergyBurnedKcal {
-                        healthRow(symbol: "flame", label: "Total", value: "\(Int(total)) kcal")
-                    }
-                }
-            }
-
-            if let elevation = workout.elevationAscendedMeters {
-                let displayValue: String = {
-                    if settings.useMiles {
-                        let feet = elevation * 3.28084
-                        return "\(Int(feet)) ft"
-                    }
-                    return "\(Int(elevation)) m"
-                }()
-                healthRow(symbol: "arrow.up.right", label: "Elevation", value: displayValue)
-            }
-
-            if let exerciseMin = workout.exerciseMinutes {
-                healthRow(symbol: "figure.walk", label: "Exercise", value: "\(exerciseMin) min")
-            }
-
-            if let indoor = workout.indoor {
-                healthRow(symbol: indoor ? "building.2" : "sun.max", label: "", value: indoor ? "Indoor" : "Outdoor")
             }
         }
     }
+}
 
-    private func healthRow(symbol: String, label: String, value: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol)
-                .font(.system(size: 12))
-                .foregroundStyle(.pink)
-            if !label.isEmpty {
-                Text(label)
-                    .font(FortiFitTypography.bodySmall)
-                    .foregroundStyle(FortiFitColors.secondaryText)
-            }
-            Text(value)
-                .font(FortiFitTypography.dataValue)
-                .foregroundStyle(FortiFitColors.primaryAccent)
-            Spacer()
+enum SummaryItemBuilder {
+    static func items(for workout: Workout, useLbs: Bool = UserSettings.shared.useLbs, useMiles: Bool = UserSettings.shared.useMiles) -> [SummaryItem] {
+        var result: [SummaryItem] = []
+
+        // Pair: RPE | Duration
+        if let rpe = workout.rpe {
+            result.append(SummaryItem(
+                symbol: AppConstants.summaryFieldSymbols["RPE"] ?? "gauge",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Effort",
+                value: "\(rpe)"
+            ))
         }
+        if let duration = workout.durationMinutes {
+            result.append(SummaryItem(
+                symbol: AppConstants.summaryFieldSymbols["Duration"] ?? "clock",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Duration",
+                value: "\(duration) min"
+            ))
+        }
+        // Pair: Distance | Elevation
+        if let distance = workout.distanceKm {
+            result.append(SummaryItem(
+                symbol: AppConstants.summaryFieldSymbols["Distance"] ?? "ruler",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Distance",
+                value: UnitConversion.displayDistance(distance, useMiles: useMiles)
+            ))
+        }
+        if let elevation = workout.elevationAscendedMeters {
+            let displayValue = useMiles ? "\(Int(elevation * 3.28084)) ft" : "\(Int(elevation)) m"
+            result.append(SummaryItem(
+                symbol: "arrow.up.right",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Elevation",
+                value: displayValue
+            ))
+        }
+        // Pair: Avg HR | Max HR
+        if let avg = workout.avgHeartRate {
+            result.append(SummaryItem(
+                symbol: "heart.fill",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Avg HR",
+                value: "\(avg) bpm"
+            ))
+        }
+        if let max = workout.maxHeartRate {
+            result.append(SummaryItem(
+                symbol: "heart.fill",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Max HR",
+                value: "\(max) bpm"
+            ))
+        }
+        // Pair: Active | Total
+        if let active = workout.activeEnergyKcal {
+            result.append(SummaryItem(
+                symbol: "flame.fill",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Active",
+                value: "\(Int(active)) kcal"
+            ))
+        }
+        if let total = workout.totalEnergyBurnedKcal {
+            result.append(SummaryItem(
+                symbol: "flame",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Total",
+                value: "\(Int(total)) kcal"
+            ))
+        }
+        if let exerciseMin = workout.exerciseMinutes {
+            result.append(SummaryItem(
+                symbol: "figure.walk",
+                symbolColor: FortiFitColors.primaryText,
+                label: "Exercise",
+                value: "\(exerciseMin) min"
+            ))
+        }
+
+        return result
     }
 }

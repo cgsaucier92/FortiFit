@@ -105,7 +105,7 @@ struct GoalsView: View {
                     .scrollClipDisabled()
                 }
 
-                VStack(spacing: 0) {
+                FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
                         ellipsisMenu
 
@@ -130,25 +130,6 @@ struct GoalsView: View {
                                 )
                         }
                         .accessibilityIdentifier(AccessibilityID.addGoalButton)
-                    }
-                    .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                    .padding(.top, FortiFitSpacing.screenTop)
-                    .padding(.bottom, FortiFitSpacing.elementSpacing)
-                    .background(FortiFitColors.background.opacity(0.90))
-
-                    LinearGradient(
-                        colors: [FortiFitColors.background.opacity(0.90), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 30)
-                    .allowsHitTesting(false)
-                }
-                .overlay {
-                    GeometryReader { geo in
-                        Color.clear
-                            .onAppear { headerHeight = geo.size.height }
-                            .onChange(of: geo.size.height) { _, newValue in headerHeight = newValue }
                     }
                 }
             }

@@ -507,6 +507,8 @@ final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
 
     func observeWorkoutChanges(handler: @escaping @Sendable () -> Void) {}
 
+    func observeEffortScoreChanges(handler: @escaping @Sendable () -> Void) {}
+
     func fetchEffortScore(for hkWorkoutUUID: UUID) async throws -> Int? {
         effortScoreToReturn
     }

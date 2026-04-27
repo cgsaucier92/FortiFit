@@ -146,7 +146,7 @@ struct MatchPromptSheetView: View {
                     }
 
                     if let rpe = workout.rpe {
-                        Text("RPE \(rpe)")
+                        Text("Effort \(rpe)")
                             .font(.system(size: 13))
                             .foregroundStyle(FortiFitColors.mutedText)
                     }

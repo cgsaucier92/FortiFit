@@ -32,6 +32,7 @@ protocol HealthKitClient: Sendable {
     func authorizationStatus() -> HealthKitAuthorizationStatus
     func fetchWorkouts(since anchor: Data?) async throws -> (workouts: [HealthKitWorkoutSnapshot], deletedUUIDs: [UUID], newAnchor: Data?)
     func observeWorkoutChanges(handler: @escaping @Sendable () -> Void)
+    func observeEffortScoreChanges(handler: @escaping @Sendable () -> Void)
     func fetchEffortScore(for hkWorkoutUUID: UUID) async throws -> Int?
     func sourceName(for bundleID: String) -> String?
 }

@@ -54,7 +54,7 @@ struct FortiFitProgressView: View {
                     }
                 }
 
-                VStack(spacing: 0) {
+                FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
                         Menu {
                             Button {
@@ -68,25 +68,6 @@ struct FortiFitProgressView: View {
                         }
                         .accessibilityIdentifier(AccessibilityID.trendsEllipsisMenu)
                         Spacer()
-                    }
-                    .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                    .padding(.top, FortiFitSpacing.screenTop)
-                    .padding(.bottom, FortiFitSpacing.elementSpacing)
-                    .background(FortiFitColors.background.opacity(0.90))
-
-                    LinearGradient(
-                        colors: [FortiFitColors.background.opacity(0.90), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 30)
-                    .allowsHitTesting(false)
-                }
-                .overlay {
-                    GeometryReader { geo in
-                        Color.clear
-                            .onAppear { headerHeight = geo.size.height }
-                            .onChange(of: geo.size.height) { _, newValue in headerHeight = newValue }
                     }
                 }
             }
@@ -604,16 +585,16 @@ struct FortiFitProgressView: View {
     private var rpeTrendCard: some View {
         FortiFitCard(borderColor: FortiFitColors.border) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                FortiFitWidgetHeader(title: "RPE Trend")
+                FortiFitWidgetHeader(title: "Effort Trend")
 
                 if !viewModel.hasRPEData {
-                    emptyChartMessage("Log workouts with RPE ratings to display effort trends")
+                    emptyChartMessage("Log workouts with effort ratings to display effort trends")
                 } else {
                     Chart {
                         ForEach(viewModel.rpeWeeklyData) { entry in
                             BarMark(
                                 x: .value("Week", weekLabel(entry.weekStart)),
-                                y: .value("RPE", entry.averageRPE)
+                                y: .value("Effort", entry.averageRPE)
                             )
                             .foregroundStyle(Color(hex: "FFBF51"))
                         }

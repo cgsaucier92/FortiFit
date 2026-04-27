@@ -185,7 +185,7 @@ struct PlanView: View {
                 }
                 .scrollClipDisabled()
 
-                VStack(spacing: 0) {
+                FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
                         FortiFitEllipsisButton(menuItems: [
                             (label: "Saved Templates", systemImage: "doc.on.doc", identifier: AccessibilityID.planSavedTemplatesMenuItem, action: {
@@ -201,9 +201,10 @@ struct PlanView: View {
                             viewModel.openScheduleSheet()
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 16))
                                 .foregroundStyle(FortiFitColors.primaryAccent)
-                                .frame(width: FortiFitSpacing.minTouchTarget, height: FortiFitSpacing.minTouchTarget)
+                                .frame(height: FortiFitSpacing.minTouchTarget)
+                                .padding(.horizontal, 12)
                                 .background(
                                     RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
                                         .fill(.clear)
@@ -211,25 +212,6 @@ struct PlanView: View {
                                 )
                         }
                         .accessibilityIdentifier(AccessibilityID.planAddButton)
-                    }
-                    .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                    .padding(.top, FortiFitSpacing.screenTop)
-                    .padding(.bottom, FortiFitSpacing.elementSpacing)
-                    .background(FortiFitColors.background.opacity(0.90))
-
-                    LinearGradient(
-                        colors: [FortiFitColors.background.opacity(0.90), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 30)
-                    .allowsHitTesting(false)
-                }
-                .overlay {
-                    GeometryReader { headerGeo in
-                        Color.clear
-                            .onAppear { headerHeight = headerGeo.size.height }
-                            .onChange(of: headerGeo.size.height) { _, newValue in headerHeight = newValue }
                     }
                 }
             }

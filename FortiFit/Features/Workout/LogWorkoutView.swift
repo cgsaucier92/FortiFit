@@ -59,7 +59,7 @@ struct LogWorkoutView: View {
 
                     // RPE
                     HStack(spacing: FortiFitSpacing.elementSpacing) {
-                        FortiFitLabel("Post-Workout RPE", color: FortiFitColors.primaryText)
+                        FortiFitLabel("Post-Workout Effort", color: FortiFitColors.primaryText)
                         FortiFitHintTooltip(
                             message: "Rate of Perceived Exertion (1–10). How hard did the workout feel overall? 1 = very easy, 10 = maximal effort",
                             isVisible: $showRPETooltip
@@ -71,7 +71,7 @@ struct LogWorkoutView: View {
                             get: { viewModel.selectedRPE.map { String($0) } ?? "" },
                             set: { viewModel.selectedRPE = Int($0) }
                         ),
-                        placeholder: "Select RPE (optional)"
+                        placeholder: "Select Effort (optional)"
                     )
 
                     // Duration (all workout types)
@@ -121,7 +121,7 @@ struct LogWorkoutView: View {
             .scrollDismissesKeyboard(.interactively)
 
             // Fixed header
-            VStack(spacing: 0) {
+            FortiFitFixedHeader(headerHeight: $headerHeight) {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
                     HStack {
                         FortiFitBackButton { dismiss() }
@@ -146,25 +146,6 @@ struct LogWorkoutView: View {
                     }
 
                     FortiFitDivider()
-                }
-                .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                .padding(.top, FortiFitSpacing.screenTop)
-                .padding(.bottom, FortiFitSpacing.elementSpacing)
-                .background(FortiFitColors.background.opacity(0.90))
-
-                LinearGradient(
-                    colors: [FortiFitColors.background.opacity(0.90), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 30)
-                .allowsHitTesting(false)
-            }
-            .overlay {
-                GeometryReader { geo in
-                    Color.clear
-                        .onAppear { headerHeight = geo.size.height }
-                        .onChange(of: geo.size.height) { _, newValue in headerHeight = newValue }
                 }
             }
         }

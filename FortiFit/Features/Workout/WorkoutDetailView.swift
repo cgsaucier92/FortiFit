@@ -66,7 +66,7 @@ struct WorkoutDetailView: View {
             .scrollClipDisabled()
 
             // Fixed header
-            VStack(spacing: 0) {
+            FortiFitFixedHeader(headerHeight: $headerHeight) {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
                     HStack {
                         FortiFitBackButton { dismiss() }
@@ -126,25 +126,6 @@ struct WorkoutDetailView: View {
                             .accessibilityIdentifier(AccessibilityID.workoutDetailEllipsis)
                         }
                     }
-                }
-                .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                .padding(.top, FortiFitSpacing.screenTop)
-                .padding(.bottom, FortiFitSpacing.elementSpacing)
-                .background(FortiFitColors.background.opacity(0.90))
-
-                LinearGradient(
-                    colors: [FortiFitColors.background.opacity(0.90), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 30)
-                .allowsHitTesting(false)
-            }
-            .overlay {
-                GeometryReader { geo in
-                    Color.clear
-                        .onAppear { headerHeight = geo.size.height }
-                        .onChange(of: geo.size.height) { _, newValue in headerHeight = newValue }
                 }
             }
         }
@@ -292,23 +273,12 @@ struct WorkoutDetailView: View {
 
     private var strengthDetailSection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            if workout.rpe != nil || workout.durationMinutes != nil || workout.isHealthKitLinked {
+            let items = SummaryItemBuilder.items(for: workout)
+            if !items.isEmpty {
                 FortiFitWidgetHeader(title: "Summary")
 
                 FortiFitCard(borderColor: FortiFitColors.border) {
-                    HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
-                        VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                            if let rpe = workout.rpe {
-                                summaryRow(field: "RPE", value: "\(rpe)")
-                            }
-                            if let duration = workout.durationMinutes {
-                                summaryRow(field: "Duration", value: "\(duration) min")
-                            }
-                        }
-                        if workout.isHealthKitLinked {
-                            FortiFitHealthDataSubsection(workout: workout)
-                        }
-                    }
+                    FortiFitSummaryGrid(items: items)
                 }
             }
 
@@ -353,27 +323,14 @@ struct WorkoutDetailView: View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
             FortiFitWidgetHeader(title: "Summary")
 
+            let items = SummaryItemBuilder.items(for: workout)
             FortiFitCard(borderColor: FortiFitColors.border) {
-                HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        if let rpe = workout.rpe {
-                            summaryRow(field: "RPE", value: "\(rpe)")
-                        }
-                        if let duration = workout.durationMinutes {
-                            summaryRow(field: "Duration", value: "\(duration) min")
-                        }
-                        if let distance = workout.distanceKm {
-                            summaryRow(field: "Distance", value: UnitConversion.displayDistance(distance, useMiles: settings.useMiles))
-                        }
-                        if workout.rpe == nil && workout.durationMinutes == nil && workout.distanceKm == nil && !workout.isHealthKitLinked {
-                            Text(workout.workoutType)
-                                .font(FortiFitTypography.bodySmall)
-                                .foregroundStyle(FortiFitColors.secondaryText)
-                        }
-                    }
-                    if workout.isHealthKitLinked {
-                        FortiFitHealthDataSubsection(workout: workout)
-                    }
+                if items.isEmpty {
+                    Text(workout.workoutType)
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(FortiFitColors.secondaryText)
+                } else {
+                    FortiFitSummaryGrid(items: items)
                 }
             }
         }
@@ -385,45 +342,16 @@ struct WorkoutDetailView: View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
             FortiFitWidgetHeader(title: "Summary")
 
+            let items = SummaryItemBuilder.items(for: workout)
             FortiFitCard(borderColor: FortiFitColors.border) {
-                HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        if let rpe = workout.rpe {
-                            summaryRow(field: "RPE", value: "\(rpe)")
-                        }
-                        if let duration = workout.durationMinutes {
-                            summaryRow(field: "Duration", value: "\(duration) min")
-                        }
-                        if workout.rpe == nil && workout.durationMinutes == nil && !workout.isHealthKitLinked {
-                            Text(workout.workoutType)
-                                .font(FortiFitTypography.bodySmall)
-                                .foregroundStyle(FortiFitColors.secondaryText)
-                        }
-                    }
-                    if workout.isHealthKitLinked {
-                        FortiFitHealthDataSubsection(workout: workout)
-                    }
+                if items.isEmpty {
+                    Text(workout.workoutType)
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(FortiFitColors.secondaryText)
+                } else {
+                    FortiFitSummaryGrid(items: items)
                 }
             }
-        }
-    }
-
-    // MARK: - Summary Row
-
-    private func summaryRow(field: String, value: String) -> some View {
-        HStack {
-            if let symbolName = AppConstants.summaryFieldSymbols[field] {
-                Image(systemName: symbolName)
-                    .font(FortiFitTypography.body)
-                    .foregroundStyle(FortiFitColors.primaryText)
-            }
-            Text(field)
-                .font(FortiFitTypography.body)
-                .foregroundStyle(FortiFitColors.primaryText)
-            Spacer()
-            Text(value)
-                .font(FortiFitTypography.dataValue)
-                .foregroundStyle(FortiFitColors.primaryAccent)
         }
     }
 

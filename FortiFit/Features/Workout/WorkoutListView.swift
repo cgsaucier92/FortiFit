@@ -24,7 +24,7 @@ struct WorkoutListView: View {
                     workoutTypeList
                 }
 
-                VStack(spacing: 0) {
+                FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
                         Menu {
                             Button {
@@ -61,25 +61,6 @@ struct WorkoutListView: View {
                                         .stroke(FortiFitColors.primaryAccent, lineWidth: 1)
                                 )
                         }
-                    }
-                    .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                    .padding(.top, FortiFitSpacing.screenTop)
-                    .padding(.bottom, FortiFitSpacing.elementSpacing)
-                    .background(FortiFitColors.background.opacity(0.90))
-
-                    LinearGradient(
-                        colors: [FortiFitColors.background.opacity(0.90), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 30)
-                    .allowsHitTesting(false)
-                }
-                .overlay {
-                    GeometryReader { geo in
-                        Color.clear
-                            .onAppear { headerHeight = geo.size.height }
-                            .onChange(of: geo.size.height) { _, newValue in headerHeight = newValue }
                     }
                 }
             }
@@ -393,7 +374,7 @@ struct WorkoutListView: View {
                 showRPEFilterSheet = true
             } label: {
                 HStack {
-                    Text("RPE range")
+                    Text("Effort range")
                     if currentFilter.rpeMin != nil || currentFilter.rpeMax != nil {
                         Image(systemName: "checkmark")
                     }
@@ -762,10 +743,10 @@ struct WorkoutListView: View {
     private var rpeRangeSheet: some View {
         NavigationStack {
             Form {
-                Stepper("Min RPE: \(rpeMin)", value: $rpeMin, in: 1...rpeMax)
-                Stepper("Max RPE: \(rpeMax)", value: $rpeMax, in: rpeMin...10)
+                Stepper("Min Effort: \(rpeMin)", value: $rpeMin, in: 1...rpeMax)
+                Stepper("Max Effort: \(rpeMax)", value: $rpeMax, in: rpeMin...10)
             }
-            .navigationTitle("RPE Range")
+            .navigationTitle("Effort Range")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -788,7 +769,7 @@ struct WorkoutListView: View {
                 }
                 #if os(iOS)
                 ToolbarItem(placement: .bottomBar) {
-                    Button("Clear RPE Filter") {
+                    Button("Clear Effort Filter") {
                         if let wType = rpeFilterWorkoutType {
                             var state = viewModel.filterState(forType: wType)
                             state.rpeMin = nil

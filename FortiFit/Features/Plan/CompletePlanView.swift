@@ -34,7 +34,7 @@ struct CompletePlanView: View {
 
             // RPE selector
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
-                Text("RPE")
+                Text("EFFORT")
                     .font(.system(size: 16, weight: .bold))
                     .kerning(2)
                     .foregroundStyle(FortiFitColors.primaryText)

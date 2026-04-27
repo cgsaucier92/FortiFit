@@ -6,7 +6,7 @@ enum FortiFitTypography {
     static let brandKerning: CGFloat = 4
 
     // MARK: - Screen Headings
-    static let screenHeading = Font.system(size: 24, weight: .bold)
+    static let screenHeading = Font.system(size: 22, weight: .bold)
     static let screenHeadingKerning: CGFloat = 2
 
     // MARK: - Widget Headers

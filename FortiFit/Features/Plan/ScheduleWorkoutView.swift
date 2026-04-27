@@ -148,7 +148,7 @@ struct ScheduleWorkoutView: View {
             .scrollClipDisabled()
 
             // Fixed header
-            VStack(spacing: 0) {
+            FortiFitFixedHeader(headerHeight: $headerHeight) {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
                     HStack {
                         Text("Schedule Workout")
@@ -167,25 +167,6 @@ struct ScheduleWorkoutView: View {
                     }
 
                     FortiFitDivider()
-                }
-                .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                .padding(.top, FortiFitSpacing.screenTop)
-                .padding(.bottom, FortiFitSpacing.elementSpacing)
-                .background(FortiFitColors.background.opacity(0.90))
-
-                LinearGradient(
-                    colors: [FortiFitColors.background.opacity(0.90), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 30)
-                .allowsHitTesting(false)
-            }
-            .overlay {
-                GeometryReader { headerGeo in
-                    Color.clear
-                        .onAppear { headerHeight = headerGeo.size.height }
-                        .onChange(of: headerGeo.size.height) { _, newValue in headerHeight = newValue }
                 }
             }
             }

@@ -364,7 +364,7 @@ struct AppConstantsChartTypeTests {
         #expect(AppConstants.trendsChartDisplayNames["personalRecords"] == "Personal Records")
         #expect(AppConstants.trendsChartDisplayNames["trainingLoadTrend"] == "Training Load Trend")
         #expect(AppConstants.trendsChartDisplayNames["workoutVolume"] == "Workout Volume")
-        #expect(AppConstants.trendsChartDisplayNames["rpeTrend"] == "RPE Trend")
+        #expect(AppConstants.trendsChartDisplayNames["rpeTrend"] == "Effort Trend")
         #expect(AppConstants.trendsChartDisplayNames["workoutTypeBreakdown"] == "Workout Type Breakdown")
         #expect(AppConstants.trendsChartDisplayNames["sessionDuration"] == "Session Duration")
     }

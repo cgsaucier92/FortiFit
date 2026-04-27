@@ -84,6 +84,17 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
         healthStore.enableBackgroundDelivery(for: HKObjectType.workoutType(), frequency: .immediate) { _, _ in }
     }
 
+    func observeEffortScoreChanges(handler: @escaping @Sendable () -> Void) {
+        guard #available(iOS 18.0, *) else { return }
+        let effortType = HKQuantityType(.workoutEffortScore)
+        let query = HKObserverQuery(sampleType: effortType, predicate: nil) { _, _, error in
+            guard error == nil else { return }
+            handler()
+        }
+        healthStore.execute(query)
+        healthStore.enableBackgroundDelivery(for: effortType, frequency: .immediate) { _, _ in }
+    }
+
     func fetchEffortScore(for hkWorkoutUUID: UUID) async throws -> Int? {
         guard #available(iOS 18.0, *) else { return nil }
 

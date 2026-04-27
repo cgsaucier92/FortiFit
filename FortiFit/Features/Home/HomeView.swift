@@ -95,7 +95,7 @@ struct HomeView: View {
                     }
 
                     // Header (floats on top of scroll content)
-                    VStack(spacing: 0) {
+                    FortiFitFixedHeader(headerHeight: $headerHeight) {
                         HStack {
                             FortiFitEllipsisButton(menuItems: [
                                 (label: "Add Widgets", systemImage: "plus.rectangle.on.rectangle", identifier: AccessibilityID.addWidgetsMenuItem, action: {
@@ -116,25 +116,6 @@ struct HomeView: View {
                                     )
                             }
                             .accessibilityIdentifier(AccessibilityID.settingsGearIcon)
-                        }
-                        .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                        .padding(.top, FortiFitSpacing.screenTop)
-                        .padding(.bottom, FortiFitSpacing.elementSpacing)
-                        .background(FortiFitColors.background.opacity(0.90))
-
-                        LinearGradient(
-                            colors: [FortiFitColors.background.opacity(0.90), .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 30)
-                        .allowsHitTesting(false)
-                    }
-                    .overlay {
-                        GeometryReader { geo in
-                            Color.clear
-                                .onAppear { headerHeight = geo.size.height }
-                                .onChange(of: geo.size.height) { _, newValue in headerHeight = newValue }
                         }
                     }
                 }

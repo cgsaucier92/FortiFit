@@ -6,11 +6,9 @@ struct FortiFitHealthSourceIndicator: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "heart.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.pink)
-            Text("\(activityType) from \(sourceName ?? "Apple Health")")
-                .font(FortiFitTypography.label)
+            FortiFitHealthGlyph()
+            Text("\(activityType) from \(sourceName ?? "Apple Watch")")
+                .font(FortiFitTypography.bodySmall)
                 .foregroundStyle(FortiFitColors.mutedText)
         }
         .accessibilityIdentifier(AccessibilityID.workoutDetailHealthSourceIndicator)
