@@ -32,7 +32,7 @@ A holistic health app that helps users track and understand the interaction betw
 - **Typography:** Heavy and commanding. Headings: 800–900 weight, wide letter-spacing (1–6px). Widget headers: 13px, 900 weight, blue, uppercase, 2px spacing. Labels: exclusively uppercase, 11px, 700 weight, 2px spacing, muted. Body: 13–15px, 600–700 weight. No thin/light weights.
 - **Spacing & Density:** Moderately dense. Screen padding: 20px horizontal, 24px top. Cards: 16px internal padding, 10–14px vertical gaps.
 - **Decorative Motif:** Thin border line interrupted by a centered blue ✦ diamond. Acts as section separator app-wide.
-- **Contextual Hints:** 16x16 circular "?" tooltip buttons next to complex widgets (Training Load, Effort, Power Level), positioned close to the widget title (left-aligned with small padding). 16x16 blue gear icons in the upper-right corner of configurable widgets (Training Load, Weekly Streak) open settings modals.
+- **Contextual Hints:** 16x16 circular "?" tooltip buttons next to complex widgets (Training Load, Effort, Power Level), positioned close to the widget title (left-aligned with small padding). Configurable widgets (Training Load, Weekly Streak) expose their settings modal via long-press → "Configure Settings" — see SCREENS.md § Home Screen → Widget Context Menu.
 - **Inspiration:** Data density of Strong, premium dark aesthetic of Oura Ring, earned-achievement tone of Strava.
 
 ### Interaction Style
@@ -188,8 +188,8 @@ Home → Log Workout (CTA button)
 Home → Workout Detail (tap recent workout)
 Home → Add Widget Menu (ellipsis → "Add Widget" → overlay)
 Home → Widget Edit Mode (long-press widget → "x" delete, drag reorder)
-Home → Training Load Settings Modal (gear icon on Training Load widget)
-Home → Weekly Streak Settings Modal (gear icon on Weekly Streak widget)
+Home → Training Load Settings Modal (long-press Training Load widget → "Configure Settings")
+Home → Weekly Streak Settings Modal (long-press Weekly Streak widget → "Configure Settings")
 Home → Complete Planned Workout (Today's Plan widget → compact confirmation sheet)
 
 Workouts → Log Workout ("+ LOG")
@@ -421,7 +421,7 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 
 | Screen | Purpose | Key Elements |
 |--------|---------|-------------|
-| Home | Central hub with customizable widgets | Training Load widget (gear icon → settings modal), Workout Info widget, Week Streak widget (gear icon → settings modal), Power Level widget (optional), "+ Log Workout" CTA, Recent Workouts list (5 most recent, HK glyph on imported rows), ellipsis menu for Add Widget, long-press edit mode for widget management |
+| Home | Central hub with customizable widgets | Training Load widget (long-press → "Configure Settings" → modal), Workout Info widget, Week Streak widget (long-press → "Configure Settings" → modal), Power Level widget (optional), "+ Log Workout" CTA, Recent Workouts list (5 most recent, HK glyph on imported rows), ellipsis menu for Add Widget, long-press edit mode for widget management |
 | Workouts | Training log organized by type | Expandable Workout Type cards, preview rows (newest-first, HK glyph on imported rows), swipe-to-delete on preview rows, bulk delete workout type via context menu, pagination (30 per page), search (>20 workouts), sort/filter via context menu, template management via ellipsis |
 | Plan | Schedule workouts in advance using templates | Day-by-day scrollable week strip with month indicator, month grid toggle, blue filled circle selected day, scheduled workout cards per day (HK glyph on cards linked to imported workouts), "Complete Planned Workout" flow with compact confirmation sheet, recurrence (weekly/biweekly), skip/restore, date resolution logic, Today's Plan HomeWidget, ellipsis → Saved Templates |
 | Log Workout | Form for new/edit workout | Name, DatePicker (.dateAndTime), type dropdown, Effort, duration. Adapts by type: Strength/HIIT → exercise cards with autocomplete; Cardio → distance; Yoga/Pilates → duration only. Edit mode: pre-populated, type locked, trash icon for delete. Ellipsis for templates (new mode only). When `healthKitUUID != nil`: `durationMinutes`, `distanceKm`, and `date` are disabled with "Linked to Apple Health · tap to unlink" helper text (see HEALTHKIT.md § 15). |
@@ -431,8 +431,8 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 | Template Import | Save a template from QR code | Deep link import prompt with template preview, duplicate auto-rename, Cancel/Save. |
 | Trends | Training trend charts with customizable layout | Customizable chart cards (TrendsChart-backed), long-press context menu to delete or reorder, ellipsis menu for Add Charts overlay. Strength Tracker (line chart, exercise selector, 30/60/90D), Training Frequency (bar chart, 8 weeks), Personal Records (exercise dropdown, bar chart comparing current vs. previous PR), Training Load Trend (daily dots, zone-colored, 7-day avg). Additional charts available via Add Charts: Workout Volume, Effort Trend, Workout Type Breakdown, Session Duration. Each chart has independent data thresholds. |
 | Goals | Track targets | Three-section left column (Goal / Target / Progress with sentence-case Primary Accent labels), large right-justified circular progress rings with goal-type SF Symbol silhouettes and centered overall % readout, dual-arc rings for Speed and Distance with tap-to-toggle legend overlay, expandable sparkline cards (30-day history, always visible on expand), long-press context menu (delete, reset progress, reorder), ellipsis menu (Filter Goals, Expand/Collapse All), completion pulse animation on screen visit. Completed state uses blue border + 3% blue wash + "COMPLETED [date]" micro-label. |
-| Add Goal | Create a goal | Type selector (Strength PR / Repetitions PR / Speed and Distance / Number of Weekly Workouts), conditional fields per type, validation. Weekly Workouts target read from UserSettings (read-only, configured via Weekly Streak widget gear icon). |
-| Settings | Configure preferences | General: weight unit, distance unit. Training Load and Streak settings accessed via gear icons on their respective Home screen widgets. Apple Health section: "Connect to Apple Health" toggle, status line, "Sync Now" button (when connected), "Open iOS Settings" button (when permission denied) — see HEALTHKIT.md § 16. |
+| Add Goal | Create a goal | Type selector (Strength PR / Repetitions PR / Speed and Distance / Number of Weekly Workouts), conditional fields per type, validation. Weekly Workouts target read from UserSettings (read-only, configured via long-press → "Configure Settings" on the Weekly Streak widget). |
+| Settings | Configure preferences | General: weight unit, distance unit. Training Load and Streak settings accessed via long-press → "Configure Settings" on their respective Home screen widgets. Apple Health section: "Connect to Apple Health" toggle, status line, "Sync Now" button (when connected), "Open iOS Settings" button (when permission denied) — see HEALTHKIT.md § 16. |
 | Match Prompt Sheet | Resolve ambiguous HK-to-FortiFit workout matches | Modal sheet on app foreground when `WorkoutMatcher` has queued a lower-confidence match. Side-by-side summary of the two workouts, three actions: "Link these workouts," "Keep separate," "Decide later." See HEALTHKIT.md § 13. |
 
 ---

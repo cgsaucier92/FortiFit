@@ -87,6 +87,10 @@ enum AppConstants {
     static let experienceIntermediate = 1
     static let experienceAdvanced = 2
 
+    // MARK: - Widget Context Menu SF Symbols
+
+    static let configureSettingsIcon = "gear"
+
     // MARK: - Widgets
 
     static let widgetTypes = [

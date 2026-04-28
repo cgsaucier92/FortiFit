@@ -4,7 +4,6 @@ struct FortiFitStreakWidget: View {
     let streak: Int
     let message: String
     var isReorderMode: Bool = false
-    var onGearTap: (() -> Void)? = nil
 
     private var tier: StreakService.Tier {
         StreakService.tier(for: streak)
@@ -23,7 +22,7 @@ struct FortiFitStreakWidget: View {
                         .font(.system(size: 32, weight: .black))
                         .foregroundStyle(FortiFitColors.primaryText)
 
-                    Text("Weekly Streak")
+                    Text("Week Streak")
                         .font(.system(size: 20, weight: .semibold))
                         .kerning(2)
                         .foregroundStyle(FortiFitColors.primaryAccent)
@@ -36,21 +35,6 @@ struct FortiFitStreakWidget: View {
                 Spacer()
             }
             .padding(.trailing, isReorderMode ? 24 : 0)
-        }
-        .overlay(alignment: .topTrailing) {
-            if let onGearTap, !isReorderMode {
-                Button(action: onGearTap) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(FortiFitColors.primaryAccent)
-                        .frame(
-                            width: FortiFitSpacing.minTouchTarget,
-                            height: FortiFitSpacing.minTouchTarget
-                        )
-                }
-                .padding(.top, 4)
-                .padding(.trailing, 4)
-            }
         }
     }
 

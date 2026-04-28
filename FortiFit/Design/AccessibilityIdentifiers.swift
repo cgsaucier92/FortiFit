@@ -19,6 +19,8 @@ enum AccessibilityID {
     static let homeEllipsisMenu = "homeEllipsisMenu"
     static let addWidgetsMenuItem = "addWidgetsMenuItem"
     static let addWidgetsMenuDismiss = "addWidgetsMenuDismiss"
+    static let homeWidget_trainingLoad_configureSettings = "homeWidget_trainingLoad_configureSettings"
+    static let homeWidget_weeklyStreak_configureSettings = "homeWidget_weeklyStreak_configureSettings"
 
     static func addWidgetRow(_ widgetType: String) -> String {
         "addWidgetRow_\(widgetType)"

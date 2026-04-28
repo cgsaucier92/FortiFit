@@ -75,16 +75,17 @@ One option: **"Add Widgets"** with SF Symbol `plus.rectangle.on.rectangle` to th
 Per § Standard Patterns: Sortable Card System → Add Menu.
 
 ### Widget Context Menu (Long Press)
-Long-pressing any widget card (uses Standard Long-Press Tease) opens a context menu. Two options:
+Long-pressing any widget card (uses Standard Long-Press Tease) opens a context menu. Items render top-to-bottom in the order below; "Configure Settings" is conditional and appears only on configurable widgets (Training Load, Weekly Streak).
 
-**"Reorder Widgets":** Enters Widget Edit Mode (see below). Always visible in the context menu regardless of widget count.
+**"Configure Settings":** SF Symbol `gear` to the left of the label (see CONSTANTS.md § Widget Context Menu SF Symbols). Visible only on Training Load and Weekly Streak widgets — opens that widget's existing settings modal (Training Load Settings Modal or Weekly Streak Settings Modal — see § Widget Definitions). Not rendered on Workout Info, Power Level, or Today's Plan widgets.
+
+**"Reorder Widgets":** Enters Widget Edit Mode (see below). Always visible regardless of widget count.
 
 **"Delete Widget":** Standard delete confirmation for the long-pressed widget. Removes the `HomeWidget` record, removes the card, re-indexes remaining `sortOrder`. No underlying workout data affected.
 
 ### Widget Edit Mode
 Entered via the context menu's "Reorder Widgets" item. Unlike the standard reorder pattern, Home combines delete + drag in a single edit mode:
 - "x" button appears in top-right of each widget (24x24pt circular, #2d2d2d bg, #404040 border, muted "×"). Tapping deletes the `HomeWidget` record, removes the card, re-indexes remaining `sortOrder`.
-- Gear icons on Training Load and Weekly Streak widgets are hidden during edit mode.
 - Cards are draggable with the same drag physics as Standard Reorder Edit Mode (0.2s ease, sortOrder re-indexed on drop).
 - Cards maintain full styling during edit and drag.
 - Long-press context menu is disabled during edit mode.
@@ -92,13 +93,13 @@ Entered via the context menu's "Reorder Widgets" item. Unlike the standard reord
 
 ### Widget Definitions
 
-**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header + "?" tooltip positioned close to the title (left-aligned with small padding), blue gear icon in the upper-right corner of the card. Tapping "?" opens the standard Training Load explanation. Tapping the gear icon opens the **Training Load Settings Modal** (see below). Zone label (e.g., "Moderate"), gradient progress bar (LOW→HIGH), context-aware advisory text below. Advisory shows readiness variant (no workout today) or post-training variant (trained today). See `CONSTANTS.md` for advisory text table and `SERVICES.md` for algorithm. Score updates in real time on workout log/edit/delete.
+**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header + "?" tooltip positioned close to the title (left-aligned with small padding). Tapping "?" opens the standard Training Load explanation. Settings access via long-press → **"Configure Settings"** (see § Widget Context Menu) opens the **Training Load Settings Modal** (see below). Zone label (e.g., "Moderate"), gradient progress bar (LOW→HIGH), context-aware advisory text below. Advisory shows readiness variant (no workout today) or post-training variant (trained today). See `CONSTANTS.md` for advisory text table and `SERVICES.md` for algorithm. Score updates in real time on workout log/edit/delete.
 
 **Training Load Settings Modal:** Centered modal with dimmed background. "Configure Training Load" heading + "?" tooltip (explains experience affects decay rate and stress capacity). Training Experience card (3-position slider: Beginner/Intermediate/Advanced). Target Workout Duration card (slider 0–300 min) — fallback duration for Training Load algorithm. All changes take effect immediately. Experience level change recalculates Training Load. Dismiss via close button or outside tap.
 
 **Workout Info** (`workoutInfo`): "Workout Info" header. Interior split by vertical divider (#404040). Left: "LAST WORKOUT" muted label above name + date of most recent workout (or "—"). Right: "TOTAL WORKOUTS" muted label above count (or "—").
 
-**Weekly Streak** (`weekStreak`): "Weekly Streak" card. Blue gear icon in the upper-right corner of the card. Tapping the gear icon opens the **Weekly Streak Settings Modal** (see below). Left: animated blue flame SVG scaling by tier. Right: streak count (32px, 900 weight), "WEEK STREAK" label (blue uppercase), motivational message (muted italic). See `CONSTANTS.md` for flame tiers and messages, `SERVICES.md` for algorithm. Flame flickers (1.2s outer, 0.9s inner loops).
+**Weekly Streak** (`weekStreak`): "Weekly Streak" card. Settings access via long-press → **"Configure Settings"** (see § Widget Context Menu) opens the **Weekly Streak Settings Modal** (see below). Left: animated blue flame SVG scaling by tier. Right: streak count (32px, 900 weight), "WEEK STREAK" label (blue uppercase), motivational message (muted italic). See `CONSTANTS.md` for flame tiers and messages, `SERVICES.md` for algorithm. Flame flickers (1.2s outer, 0.9s inner loops).
 
 **Weekly Streak Settings Modal:** Centered modal with dimmed background. "Configure Streak Widget" heading. Target Workouts per Week card (slider 0–99). Used exclusively by Streak algorithm. All changes take effect immediately. Target workouts change recalculates streak retroactively. Dismiss via close button or outside tap.
 
@@ -891,7 +892,7 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 
 **Speed and Distance:** Goal name input. Optional: Current distance / Target distance (km or mi per useMiles). Optional: Current duration / Target duration (minutes). At least one target required. Both = speed target (completion requires both). Duration alone = endurance (higher = better). Distance values stored as km.
 
-**Number of Weekly Workouts:** Target workouts per week displayed as a read-only value reflecting the current `targetWorkoutsPerWeek` from UserSettings. Below the target value, an informational note in muted italic text: "This goal tracks your weekly workout target. To change the target, tap the gear icon on the Weekly Streak widget on the Home screen." No editable fields — the target is controlled exclusively via the Weekly Streak Settings Modal. The goal auto-updates its current value based on the current week's workout count (Mon–Sun).
+**Number of Weekly Workouts:** Target workouts per week displayed as a read-only value reflecting the current `targetWorkoutsPerWeek` from UserSettings. Below the target value, an informational note in muted italic text: "This goal tracks your weekly workout target. To change the target, long-press the Weekly Streak widget on the Home screen and tap Configure Settings." No editable fields — the target is controlled exclusively via the Weekly Streak Settings Modal. The goal auto-updates its current value based on the current week's workout count (Mon–Sun).
 
 "Save Goal" button. Validation: Strength PR → exercise + target weight > 0. Reps PR → exercise + target reps > 0. Speed/Distance → name + at least one target > 0. Weekly Workouts → always valid (target read from Settings; save button enabled immediately). Only one Weekly Workouts goal can exist at a time — if one already exists, the "NUMBER OF WEEKLY WORKOUTS" option in the Goal Type selector is grayed out with a muted "Already added" label.
 

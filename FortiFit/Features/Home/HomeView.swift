@@ -250,6 +250,24 @@ struct HomeView: View {
         ))
         .contextMenu {
             if !viewModel.isEditMode {
+                if widget.widgetType == "trainingLoad" {
+                    Button {
+                        showTrainingLoadSettings = true
+                    } label: {
+                        Label("Configure Settings", systemImage: AppConstants.configureSettingsIcon)
+                    }
+                    .accessibilityIdentifier(AccessibilityID.homeWidget_trainingLoad_configureSettings)
+                }
+
+                if widget.widgetType == "weekStreak" {
+                    Button {
+                        showStreakSettings = true
+                    } label: {
+                        Label("Configure Settings", systemImage: AppConstants.configureSettingsIcon)
+                    }
+                    .accessibilityIdentifier(AccessibilityID.homeWidget_weeklyStreak_configureSettings)
+                }
+
                 Button {
                     viewModel.isEditMode = true
                 } label: {
@@ -334,8 +352,7 @@ struct HomeView: View {
             FortiFitStreakWidget(
                 streak: viewModel.streakResult.streak,
                 message: viewModel.streakResult.message,
-                isReorderMode: viewModel.isEditMode,
-                onGearTap: { showStreakSettings = true }
+                isReorderMode: viewModel.isEditMode
             )
 
         case "powerLevel":
@@ -472,21 +489,6 @@ struct HomeView: View {
                 }
             }
             .padding(.trailing, viewModel.isEditMode ? 24 : 0)
-        }
-        .overlay(alignment: .topTrailing) {
-            if !viewModel.isEditMode {
-                Button { showTrainingLoadSettings = true } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(FortiFitColors.primaryAccent)
-                        .frame(
-                            width: FortiFitSpacing.minTouchTarget,
-                            height: FortiFitSpacing.minTouchTarget
-                        )
-                }
-                .padding(.top, 4)
-                .padding(.trailing, 4)
-            }
         }
     }
 

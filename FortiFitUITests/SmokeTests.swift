@@ -220,8 +220,8 @@ final class SmokeTests: XCTestCase {
 
         // Menu auto-dismisses after adding; Weekly Streak should now be on Home
         XCTAssertTrue(
-            app.staticTexts["Weekly Streak"].waitForExistence(timeout: 3),
-            "Expected Weekly Streak widget to appear after Add"
+            app.staticTexts["Week Streak"].waitForExistence(timeout: 3),
+            "Expected Week Streak widget to appear after Add"
         )
     }
 
@@ -533,7 +533,81 @@ final class SmokeTests: XCTestCase {
         XCTAssertFalse(app.buttons["Select Goal Type"].exists, "Add Goal screen should be dismissed after tab reset")
     }
 
-    // MARK: - Smoke 17: Settings — Apple Health Section
+    // MARK: - Smoke 17: Long-Press Training Load → Configure Settings
+
+    /// Long-pressing the Training Load widget reveals "Configure Settings" which opens the modal.
+    func test_longPressTrainingLoadWidget_revealsConfigureSettings_opensModal() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let trainingLoadText = app.staticTexts["Training Load"]
+        XCTAssertTrue(trainingLoadText.waitForExistence(timeout: 3), "Training Load widget should be visible")
+
+        trainingLoadText.press(forDuration: 1.0)
+
+        let configureButton = app.buttons["homeWidget_trainingLoad_configureSettings"]
+        XCTAssertTrue(configureButton.waitForExistence(timeout: 3), "Configure Settings should appear in context menu")
+        configureButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Configure Training Load"].waitForExistence(timeout: 3),
+            "Training Load Settings Modal should open"
+        )
+    }
+
+    // MARK: - Smoke 18: Long-Press Weekly Streak → Configure Settings
+
+    /// Long-pressing the Weekly Streak widget reveals "Configure Settings" which opens the modal.
+    func test_longPressWeeklyStreakWidget_revealsConfigureSettings_opensModal() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        // Add Weekly Streak widget (not in defaults)
+        app.buttons["homeEllipsisMenu"].tap()
+        app.buttons["addWidgetsMenuItem"].tap()
+        app.buttons["addWidgetRow_weekStreak"].tap()
+
+        let streakText = app.staticTexts["Week Streak"]
+        XCTAssertTrue(streakText.waitForExistence(timeout: 3), "Week Streak widget should be visible")
+
+        streakText.press(forDuration: 1.0)
+
+        let configureButton = app.buttons["homeWidget_weeklyStreak_configureSettings"]
+        XCTAssertTrue(configureButton.waitForExistence(timeout: 3), "Configure Settings should appear in context menu")
+        configureButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Configure Streak Widget"].waitForExistence(timeout: 3),
+            "Weekly Streak Settings Modal should open"
+        )
+    }
+
+    // MARK: - Smoke 19: Long-Press Non-Configurable Widget → No Configure Settings
+
+    /// Long-pressing a non-configurable widget (Today's Plan) does not show "Configure Settings".
+    func test_longPressNonConfigurableWidget_doesNotShowConfigureSettings() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let todaysPlanText = app.staticTexts["Today's Plan"]
+        XCTAssertTrue(todaysPlanText.waitForExistence(timeout: 3), "Today's Plan widget should be visible")
+
+        todaysPlanText.press(forDuration: 1.0)
+
+        let reorderButton = app.buttons["Reorder Widgets"]
+        XCTAssertTrue(reorderButton.waitForExistence(timeout: 3), "Reorder Widgets should appear")
+
+        let deleteButton = app.buttons["Delete Widget"]
+        XCTAssertTrue(deleteButton.exists, "Delete Widget should appear")
+
+        XCTAssertFalse(
+            app.buttons["homeWidget_trainingLoad_configureSettings"].exists,
+            "Configure Settings should not appear on non-configurable widget"
+        )
+        XCTAssertFalse(
+            app.buttons["homeWidget_weeklyStreak_configureSettings"].exists,
+            "Configure Settings should not appear on non-configurable widget"
+        )
+    }
+
+    // MARK: - Smoke 20: Settings — Apple Health Section
 
     /// Settings screen shows Apple Health toggle and description text.
     func test_settings_appleHealthSection_showsToggleAndDescription() {

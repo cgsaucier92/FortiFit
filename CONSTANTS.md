@@ -56,6 +56,19 @@ Icons displayed to the left of each option in the top-nav ellipsis (`…`) menus
 
 ---
 
+## Widget Context Menu SF Symbols
+
+Icons displayed to the left of each option in the long-press context menu on Home widget cards. See SCREENS.md § Home Screen → Widget Context Menu.
+
+| Widget | Option | SF Symbol |
+|--------|--------|-----------|
+| Training Load | Configure Settings | `gear` |
+| Weekly Streak | Configure Settings | `gear` |
+
+"Configure Settings" is conditional — rendered only on configurable widgets (Training Load, Weekly Streak). "Reorder Widgets" and "Delete Widget" use no leading SF Symbols.
+
+---
+
 ## Workout Detail Summary Icons
 
 Icons rendered to the left of each label in the Summary section of the Workout Detail screen. Also rendered on the Share Image Card summary pills for visual consistency (see § Share Image Card Styling).

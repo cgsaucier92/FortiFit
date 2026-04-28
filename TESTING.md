@@ -115,7 +115,7 @@ TextField("Workout name", text: $name)
 - Actions: `logWorkoutCTA`, `saveWorkoutButton`, `addExerciseButton`, `saveGoalButton`, `planAddButton`
 - Inputs: `workoutNameInput`, `durationInput`, `distanceInput`, `goalTargetWeightInput`
 - Dropdowns: `workoutTypeDropdown`, `goalExerciseDropdown`
-- Menus: `homeEllipsisMenu`, `workoutsEllipsisMenu`, `workoutDetailEllipsis`, `addWidgetsMenuItem`, `saveAsTemplateMenuItem`, `viewSavedTemplatesMenuItem`
+- Menus: `homeEllipsisMenu`, `workoutsEllipsisMenu`, `workoutDetailEllipsis`, `addWidgetsMenuItem`, `saveAsTemplateMenuItem`, `viewSavedTemplatesMenuItem`, `homeWidget_trainingLoad_configureSettings`, `homeWidget_weeklyStreak_configureSettings`
 - Cards: `workoutTypeCard_StrengthTraining`, `goalCard_benchPress`, `scheduledWorkoutCard_0`
 - HealthKit: `settings_appleHealthToggle`, `settings_appleHealthSyncNowButton`, `settings_appleHealthOpenSettingsButton`, `workoutDetail_healthSourceIndicator`, `workoutDetail_healthUnlinkButton`, `logWorkout_durationReadOnlyHelper`, `logWorkout_distanceReadOnlyHelper`, `logWorkout_dateReadOnlyHelper`, `matchPromptSheet_linkButton`, `matchPromptSheet_keepSeparateButton`, `matchPromptSheet_decideLaterButton`
 
