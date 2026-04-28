@@ -59,7 +59,7 @@ struct LogWorkoutView: View {
 
                     // RPE
                     HStack(spacing: FortiFitSpacing.elementSpacing) {
-                        FortiFitLabel("Post-Workout Effort", color: FortiFitColors.primaryText)
+                        FortiFitLabel("Effort", color: FortiFitColors.primaryText)
                         FortiFitHintTooltip(
                             message: "Rate of Perceived Exertion (1–10). How hard did the workout feel overall? 1 = very easy, 10 = maximal effort",
                             isVisible: $showRPETooltip
@@ -71,8 +71,10 @@ struct LogWorkoutView: View {
                             get: { viewModel.selectedRPE.map { String($0) } ?? "" },
                             set: { viewModel.selectedRPE = Int($0) }
                         ),
-                        placeholder: "Select Effort (optional)"
+                        placeholder: "1–10"
                     )
+                    .frame(width: 120, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Duration (all workout types)
                     FortiFitLabel("Duration (minutes)", color: FortiFitColors.primaryText)
@@ -83,6 +85,8 @@ struct LogWorkoutView: View {
                         #endif
                         .disabled(viewModel.isHealthKitLinked)
                         .opacity(viewModel.isHealthKitLinked ? 0.5 : 1)
+                        .frame(width: 120, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     if viewModel.isHealthKitLinked {
                         healthKitHelperText(identifier: AccessibilityID.logWorkoutDurationReadOnlyHelper)
