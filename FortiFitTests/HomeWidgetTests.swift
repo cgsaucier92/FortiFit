@@ -183,3 +183,19 @@ struct HomeWidgetServiceTests {
         #expect(remaining.isEmpty)
     }
 }
+
+// MARK: - Widget Info Modal Copy Tests
+
+struct WidgetInfoModalCopyTests {
+
+    @Test func eachConfigurableWidget_hasInfoModalCopy() {
+        let configurableWidgets = ["trainingLoad", "powerLevel"]
+        for widgetType in configurableWidgets {
+            let copy = AppConstants.widgetInfoModalCopy[widgetType]
+            #expect(copy != nil, "Missing widgetInfoModalCopy for \(widgetType)")
+            #expect(copy?.title.isEmpty == false, "Empty title for \(widgetType)")
+            #expect(copy?.intro.isEmpty == false, "Empty intro for \(widgetType)")
+            #expect((copy?.sections.count ?? 0) >= 1, "No sections for \(widgetType)")
+        }
+    }
+}

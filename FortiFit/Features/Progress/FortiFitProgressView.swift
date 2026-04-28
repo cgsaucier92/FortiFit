@@ -115,9 +115,11 @@ struct FortiFitProgressView: View {
             get: { infoChartType.map { InfoChartID(chartType: $0) } },
             set: { infoChartType = $0?.chartType }
         )) { item in
-            FortiFitChartInfoModal(chartType: item.chartType)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+            if let content = AppConstants.chartInfoModalCopy[item.chartType] {
+                FortiFitSeeInfoModal(content: content)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)

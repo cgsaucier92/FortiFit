@@ -2,20 +2,12 @@ import SwiftUI
 
 struct FortiFitPowerLevelWidget: View {
     let result: PowerLevelService.PowerLevelResult
-    @Binding var showTooltip: Bool
     var isReorderMode: Bool = false
 
     var body: some View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                HStack {
-                    FortiFitWidgetHeader(title: "Power Level")
-                    FortiFitHintTooltip(
-                        message: "Measures your average exercise volume trend for Strength Training and HIIT workouts",
-                        isVisible: $showTooltip
-                    )
-                    Spacer()
-                }
+                FortiFitWidgetHeader(title: "Power Level")
 
                 if result.status == .noData {
                     Text(result.message)

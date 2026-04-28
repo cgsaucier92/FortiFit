@@ -646,13 +646,75 @@ final class SmokeTests: XCTestCase {
             "Modal should be open"
         )
 
-        let closeButton = app.buttons["trendsChart_infoModal_closeButton"]
+        let closeButton = app.buttons["seeInfoModal_closeButton"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 2))
         closeButton.tap()
 
         XCTAssertFalse(
             app.staticTexts["About Strength Tracker"].waitForExistence(timeout: 2),
             "Chart Info Modal should be dismissed after tapping close"
+        )
+    }
+
+    // MARK: - Home Widget See Info Tests
+
+    /// Long-pressing the Training Load widget shows See Info; tapping opens the modal.
+    func test_longPressTrainingLoadWidget_revealsSeeInfo_opensModal() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let trainingLoadHeader = app.staticTexts["Training Load"]
+        XCTAssertTrue(trainingLoadHeader.waitForExistence(timeout: 3))
+
+        trainingLoadHeader.press(forDuration: 1.0)
+
+        let seeInfoButton = app.buttons["homeWidget_trainingLoad_seeInfo"]
+        XCTAssertTrue(seeInfoButton.waitForExistence(timeout: 3))
+        seeInfoButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["About Training Load"].waitForExistence(timeout: 3),
+            "See Info Modal should be open with Training Load content"
+        )
+    }
+
+    /// Long-pressing the Power Level widget shows See Info; tapping opens the modal.
+    func test_longPressPowerLevelWidget_revealsSeeInfo_opensModal() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let powerLevelHeader = app.staticTexts["Power Level"]
+        XCTAssertTrue(powerLevelHeader.waitForExistence(timeout: 3))
+
+        powerLevelHeader.press(forDuration: 1.0)
+
+        let seeInfoButton = app.buttons["homeWidget_powerLevel_seeInfo"]
+        XCTAssertTrue(seeInfoButton.waitForExistence(timeout: 3))
+        seeInfoButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["About Power Level"].waitForExistence(timeout: 3),
+            "See Info Modal should be open with Power Level content"
+        )
+    }
+
+    /// Long-pressing a non-info widget (Today's Plan) does not show See Info.
+    func test_longPressNonInfoWidget_doesNotShowSeeInfo() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let todaysPlanHeader = app.staticTexts["Today's Plan"]
+        XCTAssertTrue(todaysPlanHeader.waitForExistence(timeout: 3))
+
+        todaysPlanHeader.press(forDuration: 1.0)
+
+        let seeInfoButton = app.buttons["homeWidget_trainingLoad_seeInfo"]
+        XCTAssertFalse(
+            seeInfoButton.waitForExistence(timeout: 2),
+            "See Info should not appear on Today's Plan widget"
+        )
+
+        let reorderButton = app.buttons["Reorder Widgets"]
+        XCTAssertTrue(
+            reorderButton.waitForExistence(timeout: 2),
+            "Reorder Widgets should be present on Today's Plan widget"
         )
     }
 

@@ -19,6 +19,8 @@ enum AccessibilityID {
     static let homeEllipsisMenu = "homeEllipsisMenu"
     static let addWidgetsMenuItem = "addWidgetsMenuItem"
     static let addWidgetsMenuDismiss = "addWidgetsMenuDismiss"
+    static let homeWidget_trainingLoad_seeInfo = "homeWidget_trainingLoad_seeInfo"
+    static let homeWidget_powerLevel_seeInfo = "homeWidget_powerLevel_seeInfo"
     static let homeWidget_trainingLoad_configureSettings = "homeWidget_trainingLoad_configureSettings"
     static let homeWidget_weeklyStreak_configureSettings = "homeWidget_weeklyStreak_configureSettings"
 
@@ -131,7 +133,7 @@ enum AccessibilityID {
     static let trendsAddChartsMenuItem = "trendsAddChartsMenuItem"
     static let addChartsMenuOverlay = "addChartsMenuOverlay"
     static let trendsChart_seeInfoMenuItem = "trendsChart_seeInfoMenuItem"
-    static let trendsChart_infoModal_closeButton = "trendsChart_infoModal_closeButton"
+    static let seeInfoModal_closeButton = "seeInfoModal_closeButton"
 
     // MARK: - Helpers
 

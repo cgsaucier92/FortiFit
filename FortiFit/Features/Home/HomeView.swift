@@ -7,9 +7,8 @@ struct HomeView: View {
     @State private var viewModel = HomeViewModel()
     @State private var workoutVM = WorkoutViewModel()
     @State private var showSettings = false
-    @State private var showLoadTooltip = false
-    @State private var showPowerLevelTooltip = false
     @State private var draggingWidgetType: String?
+    @State private var seeInfoWidgetType: String?
     @State private var showTrainingLoadSettings = false
     @State private var showStreakSettings = false
     @State private var settings = UserSettings.shared
@@ -161,8 +160,6 @@ struct HomeView: View {
                 showPlanCompletion = false
                 viewModel.showAddWidgetMenu = false
                 viewModel.isEditMode = false
-                showLoadTooltip = false
-                showPowerLevelTooltip = false
                 showTrainingLoadSettings = false
                 showStreakSettings = false
             }
@@ -207,6 +204,16 @@ struct HomeView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(FortiFitColors.cardSurface)
             }
+            .sheet(item: Binding(
+                get: { seeInfoWidgetType.flatMap { SeeInfoWidgetID(widgetType: $0) } },
+                set: { seeInfoWidgetType = $0?.widgetType }
+            )) { item in
+                if let content = AppConstants.widgetInfoModalCopy[item.widgetType] {
+                    FortiFitSeeInfoModal(content: content)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
+            }
         }
     }
 
@@ -250,6 +257,19 @@ struct HomeView: View {
         ))
         .contextMenu {
             if !viewModel.isEditMode {
+                if widget.widgetType == "trainingLoad" || widget.widgetType == "powerLevel" {
+                    Button {
+                        seeInfoWidgetType = widget.widgetType
+                    } label: {
+                        Label("See Info", systemImage: AppConstants.seeInfoIcon)
+                    }
+                    .accessibilityIdentifier(
+                        widget.widgetType == "trainingLoad"
+                            ? AccessibilityID.homeWidget_trainingLoad_seeInfo
+                            : AccessibilityID.homeWidget_powerLevel_seeInfo
+                    )
+                }
+
                 if widget.widgetType == "trainingLoad" {
                     Button {
                         showTrainingLoadSettings = true
@@ -358,7 +378,6 @@ struct HomeView: View {
         case "powerLevel":
             FortiFitPowerLevelWidget(
                 result: viewModel.powerLevelResult,
-                showTooltip: $showPowerLevelTooltip,
                 isReorderMode: viewModel.isEditMode
             )
 
@@ -454,14 +473,7 @@ struct HomeView: View {
     private var trainingLoadWidget: some View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                HStack {
-                    FortiFitWidgetHeader(title: "Training Load")
-                    FortiFitHintTooltip(
-                        message: "Measures your daily training stress based on your workout patterns and experience level",
-                        isVisible: $showLoadTooltip
-                    )
-                    Spacer()
-                }
+                FortiFitWidgetHeader(title: "Training Load")
 
                 Text(viewModel.loadResult.zone)
                     .font(FortiFitTypography.dataValue)
@@ -502,22 +514,11 @@ struct HomeView: View {
 
             VStack(spacing: FortiFitSpacing.gapLarge) {
                 // Header
-                HStack {
-                    Text("Configure Training Load")
-                        .font(FortiFitTypography.widgetHeader)
-                        .kerning(FortiFitTypography.labelKerning)
-                        .foregroundStyle(FortiFitColors.primaryAccent)
-                    Spacer()
-                    Button { dismissTrainingLoadSettings() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(FortiFitColors.mutedText)
-                            .frame(
-                                width: FortiFitSpacing.minTouchTarget,
-                                height: FortiFitSpacing.minTouchTarget
-                            )
-                    }
-                }
+                Text("Configure Training Load")
+                    .font(FortiFitTypography.widgetHeader)
+                    .kerning(FortiFitTypography.labelKerning)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Training Experience
                 FortiFitCard(borderColor: FortiFitColors.border) {
@@ -601,6 +602,18 @@ struct HomeView: View {
                     .fill(FortiFitColors.cardSurface)
                     .stroke(FortiFitColors.border, lineWidth: 1)
             )
+            .overlay(alignment: .topTrailing) {
+                Button { dismissTrainingLoadSettings() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.mutedText)
+                        .frame(
+                            width: FortiFitSpacing.minTouchTarget,
+                            height: FortiFitSpacing.minTouchTarget
+                        )
+                }
+                .padding([.top, .trailing], FortiFitSpacing.cardPadding / 2)
+            }
             .padding(.horizontal, FortiFitSpacing.screenHorizontal + 8)
         }
     }
@@ -620,22 +633,11 @@ struct HomeView: View {
 
             VStack(spacing: FortiFitSpacing.gapLarge) {
                 // Header
-                HStack {
-                    Text("Configure Streak Widget")
-                        .font(FortiFitTypography.widgetHeader)
-                        .kerning(FortiFitTypography.labelKerning)
-                        .foregroundStyle(FortiFitColors.primaryAccent)
-                    Spacer()
-                    Button { dismissStreakSettings() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(FortiFitColors.mutedText)
-                            .frame(
-                                width: FortiFitSpacing.minTouchTarget,
-                                height: FortiFitSpacing.minTouchTarget
-                            )
-                    }
-                }
+                Text("Configure Streak Widget")
+                    .font(FortiFitTypography.widgetHeader)
+                    .kerning(FortiFitTypography.labelKerning)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Target Workouts Per Week
                 FortiFitCard(borderColor: FortiFitColors.border) {
@@ -675,6 +677,18 @@ struct HomeView: View {
                     .fill(FortiFitColors.cardSurface)
                     .stroke(FortiFitColors.border, lineWidth: 1)
             )
+            .overlay(alignment: .topTrailing) {
+                Button { dismissStreakSettings() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.mutedText)
+                        .frame(
+                            width: FortiFitSpacing.minTouchTarget,
+                            height: FortiFitSpacing.minTouchTarget
+                        )
+                }
+                .padding([.top, .trailing], FortiFitSpacing.cardPadding / 2)
+            }
             .padding(.horizontal, FortiFitSpacing.screenHorizontal + 8)
         }
     }
@@ -771,6 +785,13 @@ struct HomeView: View {
         }
         .padding(.vertical, FortiFitSpacing.elementSpacing)
     }
+}
+
+// MARK: - See Info Widget Identifier
+
+private struct SeeInfoWidgetID: Identifiable {
+    let widgetType: String
+    var id: String { widgetType }
 }
 
 // MARK: - Widget Drop Delegate

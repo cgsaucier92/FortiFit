@@ -1,12 +1,8 @@
 import SwiftUI
 
-struct FortiFitChartInfoModal: View {
-    let chartType: String
+struct FortiFitSeeInfoModal: View {
+    let content: AppConstants.ChartInfoCopy
     @Environment(\.dismiss) private var dismiss
-
-    private var copy: AppConstants.ChartInfoCopy? {
-        AppConstants.chartInfoModalCopy[chartType]
-    }
 
     var body: some View {
         ScrollView {
@@ -22,31 +18,29 @@ struct FortiFitChartInfoModal: View {
                                 height: FortiFitSpacing.minTouchTarget
                             )
                     }
-                    .accessibilityIdentifier(AccessibilityID.trendsChart_infoModal_closeButton)
+                    .accessibilityIdentifier(AccessibilityID.seeInfoModal_closeButton)
                     .accessibilityLabel("Close")
                 }
 
-                if let copy {
-                    Text(copy.title)
-                        .font(.system(size: 20, weight: .black))
+                Text(content.title)
+                    .font(.system(size: 20, weight: .black))
+                    .foregroundStyle(FortiFitColors.primaryAccent)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                Text(content.intro)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(FortiFitColors.secondaryText)
+                    .padding(.top, 24)
+
+                ForEach(Array(content.sections.enumerated()), id: \.offset) { _, section in
+                    Text(section.heading)
+                        .font(.system(size: 15, weight: .heavy))
                         .foregroundStyle(FortiFitColors.primaryText)
-                        .frame(maxWidth: .infinity, alignment: .center)
-
-                    Text(copy.intro)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(FortiFitColors.secondaryText)
+                        .accessibilityAddTraits(.isHeader)
                         .padding(.top, 24)
+                        .padding(.bottom, 8)
 
-                    ForEach(Array(copy.sections.enumerated()), id: \.offset) { _, section in
-                        Text(section.heading)
-                            .font(.system(size: 15, weight: .heavy))
-                            .foregroundStyle(FortiFitColors.primaryText)
-                            .accessibilityAddTraits(.isHeader)
-                            .padding(.top, 24)
-                            .padding(.bottom, 8)
-
-                        sectionBody(section.body)
-                    }
+                    sectionBody(section.body)
                 }
             }
             .padding(.horizontal, 20)

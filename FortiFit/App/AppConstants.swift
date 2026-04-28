@@ -184,6 +184,35 @@ enum AppConstants {
         "Other": Color(hex: "C4F648")                 // Caution Yellow
     ]
 
+    // MARK: - Widget Info Modal Copy
+
+    static let widgetInfoModalCopy: [String: ChartInfoCopy] = [
+        "trainingLoad": ChartInfoCopy(
+            title: "About Training Load",
+            intro: "Training Load is a 0–100 score that summarizes how much training stress you've accumulated over the past 10 days. The zone label and advisory beneath it suggest whether to push, ease off, or rest today.",
+            sections: [
+                ("How it's calculated", "Each workout you've logged in the last 10 days contributes a stress value based on your Effort rating for that session, how long it lasted, the workout type, and the volume you put in (sets × reps for Strength and HIIT). Recent sessions count more than older ones — stress decays over about 10 days."),
+                ("Your experience level", "Set via long-press → Configure Settings on the widget. Beginner, Intermediate, and Advanced each have a different recovery rate and stress capacity. Higher experience means stress decays faster and you can absorb more training before the score climbs into peak territory."),
+                ("Consecutive training days", "Stacking training days back-to-back adds a small multiplier to your score, up to 32% extra at five or more consecutive days. Take a rest day and the multiplier resets."),
+                ("Same-day floor", "If you've already trained today, the score won't drop low enough to suggest \"train hard\" — there's a built-in floor based on what you logged today that lifts on its own tomorrow."),
+                ("Zones", "- Low (1–30, green): well recovered\n- Moderate (31–55, yellow): some accumulated fatigue\n- High (56–80, dark yellow): significant fatigue\n- Peak (81–100, red): high stress, prioritize recovery"),
+                ("What's not counted", "Workouts logged with no exercises, no Effort rating, and no duration are skipped — they're treated as placeholder entries with no meaningful stress to add."),
+                ("Empty state", "If you haven't logged a workout in the last 10 days, the score sits at 0 (Resting) and the advisory shows \"No recent training stress.\"")
+            ]
+        ),
+        "powerLevel": ChartInfoCopy(
+            title: "About Power Level",
+            intro: "Power Level shows whether your strength training volume is rising, holding steady, or trending down compared to where you were a month ago. It answers \"am I progressing?\" at a glance.",
+            sections: [
+                ("How it's calculated", "FitNavi averages your workout volume across the last 30 days and compares it to your average across the prior 30 days. Volume per workout is sets × reps × weight, summed across every exercise in the session."),
+                ("What workouts count", "Only Strength Training and HIIT workouts. Cardio, yoga, pilates, and other types don't track exercise sets, so they don't contribute to a volume comparison."),
+                ("Bodyweight exercises", "Sets logged without a weight value count as if the weight were 1, since they still represent work performed. This keeps bodyweight volume from disappearing entirely from the comparison."),
+                ("Status thresholds", "- Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days\n- Steady (—, blue): within 10% in either direction — your volume is holding consistent\n- Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days"),
+                ("Empty state", "If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.")
+            ]
+        )
+    ]
+
     // MARK: - Chart Data Thresholds
 
     static let chartEmptyMessages: [String: String] = [
