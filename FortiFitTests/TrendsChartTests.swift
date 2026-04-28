@@ -384,6 +384,27 @@ struct AppConstantsChartTypeTests {
     }
 }
 
+// MARK: - Chart Info Modal Copy Tests
+
+struct ChartInfoModalCopyTests {
+
+    @Test func eachChartType_hasInfoModalCopy() {
+        for chartType in AppConstants.trendsChartTypes {
+            let copy = AppConstants.chartInfoModalCopy[chartType]
+            #expect(copy != nil, "Missing chartInfoModalCopy for \(chartType)")
+            #expect(copy?.title.isEmpty == false, "Empty title for \(chartType)")
+            #expect(copy?.intro.isEmpty == false, "Empty intro for \(chartType)")
+            #expect((copy?.sections.count ?? 0) >= 1, "No sections for \(chartType)")
+        }
+    }
+
+    @Test func chartInfoModalCopy_keysMatchChartTypes() {
+        let copyKeys = Set(AppConstants.chartInfoModalCopy.keys)
+        let chartTypes = Set(AppConstants.trendsChartTypes)
+        #expect(copyKeys == chartTypes, "chartInfoModalCopy keys don't match trendsChartTypes")
+    }
+}
+
 // MARK: - UserSettings Seeding Flag Tests
 
 struct UserSettingsTrendsChartTests {

@@ -130,6 +130,8 @@ enum AccessibilityID {
     static let trendsEllipsisMenu = "trendsEllipsisMenu"
     static let trendsAddChartsMenuItem = "trendsAddChartsMenuItem"
     static let addChartsMenuOverlay = "addChartsMenuOverlay"
+    static let trendsChart_seeInfoMenuItem = "trendsChart_seeInfoMenuItem"
+    static let trendsChart_infoModal_closeButton = "trendsChart_infoModal_closeButton"
 
     // MARK: - Helpers
 

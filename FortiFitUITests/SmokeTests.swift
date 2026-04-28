@@ -609,6 +609,53 @@ final class SmokeTests: XCTestCase {
 
     // MARK: - Smoke 20: Settings — Apple Health Section
 
+    /// Long-pressing a Trends chart reveals "See Info" which opens the Chart Info Modal.
+    func test_longPressTrendsChart_revealsSeeInfo_opensModal() {
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+
+        let strengthHeader = app.staticTexts["Strength Tracker"]
+        XCTAssertTrue(strengthHeader.waitForExistence(timeout: 3), "Strength Tracker chart card should be visible")
+
+        strengthHeader.press(forDuration: 1.0)
+
+        let seeInfoButton = app.buttons["trendsChart_seeInfoMenuItem"]
+        XCTAssertTrue(seeInfoButton.waitForExistence(timeout: 3), "See Info should appear in context menu")
+        seeInfoButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["About Strength Tracker"].waitForExistence(timeout: 3),
+            "Chart Info Modal should open with the chart's title"
+        )
+    }
+
+    /// Tapping the close button on the Chart Info Modal dismisses it.
+    func test_chartInfoModal_dismissesViaCloseButton() {
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+
+        let strengthHeader = app.staticTexts["Strength Tracker"]
+        XCTAssertTrue(strengthHeader.waitForExistence(timeout: 3))
+
+        strengthHeader.press(forDuration: 1.0)
+
+        let seeInfoButton = app.buttons["trendsChart_seeInfoMenuItem"]
+        XCTAssertTrue(seeInfoButton.waitForExistence(timeout: 3))
+        seeInfoButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["About Strength Tracker"].waitForExistence(timeout: 3),
+            "Modal should be open"
+        )
+
+        let closeButton = app.buttons["trendsChart_infoModal_closeButton"]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 2))
+        closeButton.tap()
+
+        XCTAssertFalse(
+            app.staticTexts["About Strength Tracker"].waitForExistence(timeout: 2),
+            "Chart Info Modal should be dismissed after tapping close"
+        )
+    }
+
     /// Settings screen shows Apple Health toggle and description text.
     func test_settings_appleHealthSection_showsToggleAndDescription() {
         app.tabBars.buttons[Tab.home.rawValue].tap()

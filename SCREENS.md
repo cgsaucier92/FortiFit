@@ -640,14 +640,41 @@ One option: **"Add Charts"** with SF Symbol `chart.xyaxis.line` to the left → 
 Per § Standard Patterns: Sortable Card System → Add Menu. Component: `FortiFitAddChartMenu` (mirrors `FortiFitAddWidgetMenu`).
 
 ### Chart Card Context Menu (Long Press)
-Activated by long-pressing any chart card (uses Standard Long-Press Tease). Two options:
+Activated by long-pressing any chart card (uses Standard Long-Press Tease). Items render top-to-bottom in this order — all three apply to every chart type:
+
+**"See Info":** SF Symbol `info.circle` to the left of the label (see CONSTANTS.md § Trends Chart Context Menu SF Symbols). Opens the **Chart Info Modal** (see below) for that chart, populated from CONSTANTS.md § Chart Info Modal Copy.
+
+**"Reorder Charts":** Enters Standard Reorder Edit Mode. Always visible regardless of chart count.
 
 **"Delete Chart":** Per § Standard Patterns: Sortable Card System → Delete. Confirmation: "Delete [Chart Display Name]? This cannot be undone."
 
-**"Reorder Charts":** Enters Standard Reorder Edit Mode. Always visible in the context menu regardless of chart count.
-
 ### Reorder Edit Mode
 Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `TrendsChart.sortOrder`.
+
+### Chart Info Modal
+
+Modal sheet explaining how a single chart works. Opened via the chart card's long-press → "See Info". Distinct sheet per chart, populated from CONSTANTS.md § Chart Info Modal Copy.
+
+**Presentation:** iOS modal sheet (sheet presentation, `.large` detent). Swipe-down to dismiss. Background uses Card Surface `#1a1a1a`.
+
+**Header:** Centered title — "About [Chart Display Name]" (e.g., "About Strength Tracker"). Primary Text `#e5e5e5`, 20px, 900 weight, sentence case, centered. Title style matches the Match Prompt Sheet header (see § Match Prompt Sheet).
+
+**Close button:** Top-right corner, 24x24pt circular, `#2d2d2d` bg, `#404040` border, muted `×`. Same close-button pattern used by the Saved Templates QR Modal and Settings widget modals. Accessibility identifier `trendsChart_infoModal_closeButton`.
+
+**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the header. Content rendered top-to-bottom:
+
+1. **Intro paragraph** — first paragraph below the title. Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned, normal line height. No section heading above it.
+2. **Sections** — each section is a heading + body paragraph(s):
+   - Section heading: Primary Text `#e5e5e5`, 15px, 800 weight, sentence case, left-aligned, normal letter-spacing. 24px top margin (separates sections), 8px bottom margin before its body. Follows the standard heading typography rule (see PRD.md § 2 Design Language → Typography).
+   - Body: Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned. Normal paragraph spacing.
+   - Body may include a markdown-style bulleted list when the source copy provides one (see Training Load Trend's Zones section in CONSTANTS.md). Each bullet renders as a row in a `VStack` with a leading `•` glyph and 8pt left indent. Bullet text inherits body styling.
+3. **Footer:** none. Sheet ends after the last section's body, with standard bottom safe-area padding.
+
+**Content source:** every visible string is read from CONSTANTS.md § Chart Info Modal Copy via `AppConstants` — never hardcoded in views. The modal renders the title, intro, and sections array in order.
+
+**Empty / unknown chart fallback:** the modal is only invoked from a chart card's context menu, so chart type is always known. No fallback content needed.
+
+**Accessibility:** modal title is announced first by VoiceOver, followed by intro and section headings/bodies in order. Close button reads "Close, button". Section headings traverse as headers (`accessibilityAddTraits(.isHeader)`).
 
 ### Chart Definitions
 

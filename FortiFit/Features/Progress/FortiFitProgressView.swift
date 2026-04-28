@@ -18,6 +18,7 @@ struct FortiFitProgressView: View {
     @State private var draggingChartType: String?
     @State private var deleteTarget: TrendsChart?
     @State private var showDeleteConfirm = false
+    @State private var infoChartType: String?
     @State private var headerHeight: CGFloat = 0
     private var settings: UserSettings { UserSettings.shared }
     var selectedTab: Int = 3
@@ -94,6 +95,7 @@ struct FortiFitProgressView: View {
             viewModel.isReorderMode = false
             showDeleteConfirm = false
             deleteTarget = nil
+            infoChartType = nil
         }
         .alert("Delete \(deleteTarget.flatMap { AppConstants.trendsChartDisplayNames[$0.chartType] } ?? "Chart")?",
                isPresented: $showDeleteConfirm) {
@@ -108,6 +110,14 @@ struct FortiFitProgressView: View {
             }
         } message: {
             Text("You can always add it again from the Add Charts menu")
+        }
+        .sheet(item: Binding(
+            get: { infoChartType.map { InfoChartID(chartType: $0) } },
+            set: { infoChartType = $0?.chartType }
+        )) { item in
+            FortiFitChartInfoModal(chartType: item.chartType)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
@@ -156,6 +166,13 @@ struct FortiFitProgressView: View {
         ))
         .contextMenu {
             if !viewModel.isReorderMode {
+                Button {
+                    infoChartType = chart.chartType
+                } label: {
+                    Label("See Info", systemImage: AppConstants.seeInfoIcon)
+                }
+                .accessibilityIdentifier(AccessibilityID.trendsChart_seeInfoMenuItem)
+
                 Button {
                     viewModel.isReorderMode = true
                 } label: {
@@ -858,6 +875,13 @@ private struct FlowLayout: Layout {
 
         return (CGSize(width: maxWidth, height: y + rowHeight), positions)
     }
+}
+
+// MARK: - Info Chart Identifier
+
+private struct InfoChartID: Identifiable {
+    let chartType: String
+    var id: String { chartType }
 }
 
 // MARK: - Chart Drop Delegate

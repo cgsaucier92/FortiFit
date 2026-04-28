@@ -91,6 +91,10 @@ enum AppConstants {
 
     static let configureSettingsIcon = "gear"
 
+    // MARK: - Trends Chart Context Menu SF Symbols
+
+    static let seeInfoIcon = "info.circle"
+
     // MARK: - Widgets
 
     static let widgetTypes = [
@@ -270,4 +274,95 @@ enum AppConstants {
 
     static let recurrenceLookaheadWeeks = 12
     static let recurrenceRegenerationThreshold = 4
+
+    // MARK: - Chart Info Modal Copy
+
+    struct ChartInfoCopy {
+        let title: String
+        let intro: String
+        let sections: [(heading: String, body: String)]
+    }
+
+    static let chartInfoModalCopy: [String: ChartInfoCopy] = [
+        "strengthTracker": ChartInfoCopy(
+            title: "About Strength Tracker",
+            intro: "Strength Tracker shows how the heaviest weight you lift for a single exercise changes over time. Pick an exercise from the dropdown to see how your top set has trended in recent sessions.",
+            sections: [
+                ("How it's calculated", "Each data point on the chart is the heaviest weight you lifted for the selected exercise on that date, taken from the top set across all of that day's matching workouts. If you trained the same exercise twice in one day, only the heavier of the two sets is plotted."),
+                ("Time range", "Toggle 30, 60, or 90 days to widen or narrow the view. The chart re-renders immediately on switch."),
+                ("What's tracked", "Only sets with a recorded weight count toward the trend. Bodyweight exercises (logged without a weight value) aren't included — they don't have a number to plot. Exercise names are matched case-insensitively, so \"Bench Press\" and \"bench press\" share the same line."),
+                ("Empty state", "At least 2 workouts containing the selected exercise with a recorded weight are needed before the chart can render. Until then, you'll see a prompt to log more sessions.")
+            ]
+        ),
+        "trainingFrequency": ChartInfoCopy(
+            title: "About Training Frequency",
+            intro: "Training Frequency shows how many workouts you've completed each week over the last 8 weeks.",
+            sections: [
+                ("How it's calculated", "Each bar is the count of workouts whose date falls within that calendar week (Monday 12:00 AM through Sunday 11:59 PM). Every workout type counts equally — a yoga session and a strength session each add one to the bar for that week."),
+                ("Time range", "The 8 most recent calendar weeks, including the current in-progress week. Older weeks roll off as new ones begin."),
+                ("Empty state", "You need at least one full Monday–Sunday week with at least one logged workout before the chart renders.")
+            ]
+        ),
+        "personalRecords": ChartInfoCopy(
+            title: "About Personal Records",
+            intro: "Personal Records compares your most recent PR for an exercise against the PR before it, so you can see how much you improved on your latest breakthrough.",
+            sections: [
+                ("What counts as a PR", "A PR is recorded the first time you exceed your previous heaviest weight for a given exercise. The very first time you log an exercise establishes your baseline — that workout isn't a PR by itself. Every subsequent workout that beats your highest weight to date logs a new PR event."),
+                ("How records are tracked", "PR events are calculated per exercise name (case-insensitive) and ordered chronologically by workout date. If you log the same exercise on multiple days at the same weight, no new PR is logged — the weight has to exceed the previous record. Bodyweight exercises (logged without a weight) aren't tracked because there's no number to compare."),
+                ("What you'll see", "The dropdown lists every exercise that has at least one PR event, sorted alphabetically. Selecting an exercise shows two bars: your previous record on the left and your most recent record on the right, with the date each was set."),
+                ("Empty state", "At least one exercise needs at least one PR event before the chart renders. If you've only ever lifted the same weight on a given exercise, no PR exists yet.")
+            ]
+        ),
+        "trainingLoadTrend": ChartInfoCopy(
+            title: "About Training Load Trend",
+            intro: "Training Load Trend plots your daily training load score over the last 14 days, color-coded by zone, so you can spot overtraining patterns and recovery windows at a glance.",
+            sections: [
+                ("How training load is calculated", "Each day's score is a 0–100 rating that combines the volume, intensity, and recency of your recent workouts. Recent sessions count more than older ones — stress decays over about 10 days. Your experience level (set via long-press → Configure Settings on the Training Load widget) affects how quickly stress decays and how much load you can absorb before the score climbs."),
+                ("Zones", "Each dot is colored by its zone:\n- Low (1–30, green): well recovered\n- Moderate (31–55, yellow): some accumulated fatigue\n- High (56–80, dark yellow): significant fatigue\n- Peak (81–100, red): high stress, prioritize recovery"),
+                ("The 7-day average line", "The dashed blue line is your 7-day rolling average, smoothing out single-day spikes so you can see the underlying trend. A rising line over a flat dot pattern means your overall load is climbing; a falling line means you're tapering."),
+                ("Empty state", "At least 3 days with at least one workout each in the last 14 days are needed before the chart renders.")
+            ]
+        ),
+        "workoutVolume": ChartInfoCopy(
+            title: "About Workout Volume",
+            intro: "Workout Volume tracks the total weight you've moved per session over time. Each data point is one workout — together they show whether you're progressively overloading.",
+            sections: [
+                ("How volume is calculated", "For every set in a workout, volume is sets × reps × weight. Those values are summed across all exercises in the session to produce a single workout volume number. Bodyweight exercises (logged without a weight) count as if the weight were 1, since they still represent work performed."),
+                ("What's included", "Only Strength Training and HIIT workouts appear on the chart. Cardio, yoga, pilates, and other types don't track exercise sets the same way, so including them would distort the trend."),
+                ("Time range", "Toggle 30, 60, or 90 days. The chart re-renders immediately on switch."),
+                ("Empty state", "At least 2 Strength Training or HIIT workouts with at least one logged exercise set are needed before the chart renders.")
+            ]
+        ),
+        "rpeTrend": ChartInfoCopy(
+            title: "About Effort Trend",
+            intro: "Effort Trend shows your average perceived effort per week, so you can see whether your training intensity is creeping up, holding steady, or trending down.",
+            sections: [
+                ("How it's calculated", "Effort uses a 1–10 scale where 1 is barely a warm-up and 10 is an all-out max effort. Each bar is the average of every effort rating you logged within that calendar week (Monday through Sunday). Workouts you didn't rate aren't counted — they don't pull the average up or down."),
+                ("The reference line", "The dashed line at Effort 7 marks the rough threshold between hard and very hard sessions. Several weeks averaging well above 7 in a row may signal it's time for a deload."),
+                ("Time range", "The 8 most recent calendar weeks, including the current in-progress week."),
+                ("Apple Health import", "If you record a workout on Apple Watch and rate its effort there (iOS 18 or later), that effort score imports into FortiFit automatically when the workout is linked — but only if you haven't already entered an effort rating yourself. Your manually entered ratings always win."),
+                ("Empty state", "At least one full Monday–Sunday week with at least one workout that has a recorded effort rating is needed before the chart renders.")
+            ]
+        ),
+        "workoutTypeBreakdown": ChartInfoCopy(
+            title: "About Workout Type Breakdown",
+            intro: "Workout Type Breakdown shows how your training is distributed across workout types, so you can see whether your routine is balanced or concentrated in one area.",
+            sections: [
+                ("How it's calculated", "Each segment of the donut is the count of workouts of that type within the selected time range, divided by your total workout count. A 50% Strength Training slice means half of all your sessions in the period were Strength Training."),
+                ("Workout types", "Six categories — Strength Training, HIIT, Cardio, Yoga, Pilates, and Other. Each has a fixed color shown in the legend. Workouts imported from Apple Health are mapped to one of these six based on their HealthKit activity type."),
+                ("Time range", "Toggle 30 days, 60 days, 90 days, or All Time. \"All Time\" includes every workout you've ever logged."),
+                ("Empty state", "At least 2 workouts of any type are needed before the chart renders.")
+            ]
+        ),
+        "sessionDuration": ChartInfoCopy(
+            title: "About Session Duration",
+            intro: "Session Duration shows how long your workouts have been on average each week, so you can manage your time and pacing.",
+            sections: [
+                ("How it's calculated", "Each bar is the average duration in minutes of all logged workouts within that calendar week (Monday through Sunday). Workouts you didn't enter a duration for aren't counted — they don't have a number to average."),
+                ("Time range", "The 8 most recent calendar weeks, including the current in-progress week."),
+                ("Apple Health import", "Durations from Apple Watch and other Health-connected apps are imported automatically when you link a workout, so you don't need to re-enter them."),
+                ("Empty state", "At least one full Monday–Sunday week with at least one workout that has a recorded duration is needed before the chart renders.")
+            ]
+        )
+    ]
 }

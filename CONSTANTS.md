@@ -69,6 +69,18 @@ Icons displayed to the left of each option in the long-press context menu on Hom
 
 ---
 
+## Trends Chart Context Menu SF Symbols
+
+Icons displayed to the left of each option in the long-press context menu on Trends chart cards. See SCREENS.md § Trends → Chart Card Context Menu.
+
+| Option | SF Symbol |
+|--------|-----------|
+| See Info | `info.circle` |
+
+"See Info" applies to every chart type. "Reorder Charts" and "Delete Chart" use no leading SF Symbols.
+
+---
+
 ## Workout Detail Summary Icons
 
 Icons rendered to the left of each label in the Summary section of the Workout Detail screen. Also rendered on the Share Image Card summary pills for visual consistency (see § Share Image Card Styling).
@@ -587,6 +599,132 @@ Thresholds: < −10% = Deloading, −10% to +10% = Steady, > +10% = Rising.
 | Effort Trend | 1 full Mon–Sun week with ≥ 1 workout with recorded RPE | "Log workouts with RPE ratings to display effort trends" |
 | Workout Type Breakdown | 2 workouts of any type | "Log more workouts to display your training breakdown" |
 | Session Duration | 1 full Mon–Sun week with ≥ 1 workout with recorded duration | "Log workouts with duration to display session length trends" |
+
+---
+
+## Chart Info Modal Copy
+
+User-facing strings rendered in the Chart Info Modal (see SCREENS.md § Trends → Chart Info Modal). One entry per chart type. Each entry has a title, an intro paragraph, and an ordered list of named sections (each section a heading + body paragraph). Stored in `AppConstants` as a static dictionary keyed by `chartType` — never hardcoded in views. Sections render in the order listed below.
+
+### Strength Tracker (`strengthTracker`)
+
+**Title:** About Strength Tracker
+
+**Intro:** Strength Tracker shows how the heaviest weight you lift for a single exercise changes over time. Pick an exercise from the dropdown to see how your top set has trended in recent sessions.
+
+**How it's calculated:** Each data point on the chart is the heaviest weight you lifted for the selected exercise on that date, taken from the top set across all of that day's matching workouts. If you trained the same exercise twice in one day, only the heavier of the two sets is plotted.
+
+**Time range:** Toggle 30, 60, or 90 days to widen or narrow the view. The chart re-renders immediately on switch.
+
+**What's tracked:** Only sets with a recorded weight count toward the trend. Bodyweight exercises (logged without a weight value) aren't included — they don't have a number to plot. Exercise names are matched case-insensitively, so "Bench Press" and "bench press" share the same line.
+
+**Empty state:** At least 2 workouts containing the selected exercise with a recorded weight are needed before the chart can render. Until then, you'll see a prompt to log more sessions.
+
+### Training Frequency (`trainingFrequency`)
+
+**Title:** About Training Frequency
+
+**Intro:** Training Frequency shows how many workouts you've completed each week over the last 8 weeks, side by side with your weekly target.
+
+**How it's calculated:** Each bar is the count of workouts whose date falls within that calendar week (Monday 12:00 AM through Sunday 11:59 PM). Every workout type counts equally — a yoga session and a strength session each add one to the bar for that week.
+
+**Your target line:** The dashed blue line is your target workouts per week, set on the Weekly Streak widget via long-press → Configure Settings. Bars at or above the line mean you hit your target that week; bars below it mean you didn't.
+
+**Time range:** The 8 most recent calendar weeks, including the current in-progress week. Older weeks roll off as new ones begin.
+
+**Empty state:** You need at least one full Monday–Sunday week with at least one logged workout before the chart renders.
+
+### Personal Records (`personalRecords`)
+
+**Title:** About Personal Records
+
+**Intro:** Personal Records compares your most recent PR for an exercise against the PR before it, so you can see how much you improved on your latest breakthrough.
+
+**What counts as a PR:** A PR is recorded the first time you exceed your previous heaviest weight for a given exercise. The very first time you log an exercise establishes your baseline — that workout isn't a PR by itself. Every subsequent workout that beats your highest weight to date logs a new PR event.
+
+**How records are tracked:** PR events are calculated per exercise name (case-insensitive) and ordered chronologically by workout date. If you log the same exercise on multiple days at the same weight, no new PR is logged — the weight has to exceed the previous record. Bodyweight exercises (logged without a weight) aren't tracked because there's no number to compare.
+
+**What you'll see:** The dropdown lists every exercise that has at least one PR event, sorted alphabetically. Selecting an exercise shows two bars: your previous record on the left and your most recent record on the right, with the date each was set.
+
+**Empty state:** At least one exercise needs at least one PR event before the chart renders. If you've only ever lifted the same weight on a given exercise, no PR exists yet.
+
+### Training Load Trend (`trainingLoadTrend`)
+
+**Title:** About Training Load Trend
+
+**Intro:** Training Load Trend plots your daily training load score over the last 14 days, color-coded by zone, so you can spot overtraining patterns and recovery windows at a glance.
+
+**How training load is calculated:** Each day's score is a 0–100 rating that combines the volume, intensity, and recency of your recent workouts. Recent sessions count more than older ones — stress decays over about 10 days. Your experience level (set via long-press → Configure Settings on the Training Load widget) affects how quickly stress decays and how much load you can absorb before the score climbs.
+
+**Zones:** Each dot is colored by its zone:
+- Low (1–30, green): well recovered
+- Moderate (31–55, yellow): some accumulated fatigue
+- High (56–80, dark yellow): significant fatigue
+- Peak (81–100, red): high stress, prioritize recovery
+
+**The 7-day average line:** The dashed blue line is your 7-day rolling average, smoothing out single-day spikes so you can see the underlying trend. A rising line over a flat dot pattern means your overall load is climbing; a falling line means you're tapering.
+
+**Empty state:** At least 3 days with at least one workout each in the last 14 days are needed before the chart renders.
+
+### Workout Volume (`workoutVolume`)
+
+**Title:** About Workout Volume
+
+**Intro:** Workout Volume tracks the total weight you've moved per session over time. Each data point is one workout — together they show whether you're progressively overloading.
+
+**How volume is calculated:** For every set in a workout, volume is `sets × reps × weight`. Those values are summed across all exercises in the session to produce a single workout volume number. Bodyweight exercises (logged without a weight) count as if the weight were 1, since they still represent work performed.
+
+**What's included:** Only Strength Training and HIIT workouts appear on the chart. Cardio, yoga, pilates, and other types don't track exercise sets the same way, so including them would distort the trend.
+
+**Time range:** Toggle 30, 60, or 90 days. The chart re-renders immediately on switch.
+
+**Empty state:** At least 2 Strength Training or HIIT workouts with at least one logged exercise set are needed before the chart renders.
+
+### Effort Trend (`rpeTrend`)
+
+**Title:** About Effort Trend
+
+**Intro:** Effort Trend shows your average perceived effort per week, so you can see whether your training intensity is creeping up, holding steady, or trending down.
+
+**How it's calculated:** Effort uses a 1–10 scale where 1 is barely a warm-up and 10 is an all-out max effort. Each bar is the average of every effort rating you logged within that calendar week (Monday through Sunday). Workouts you didn't rate aren't counted — they don't pull the average up or down.
+
+**The reference line:** The dashed line at Effort 7 marks the rough threshold between hard and very hard sessions. Several weeks averaging well above 7 in a row may signal it's time for a deload.
+
+**Time range:** The 8 most recent calendar weeks, including the current in-progress week.
+
+**Apple Health import:** If you record a workout on Apple Watch and rate its effort there (iOS 18 or later), that effort score imports into FortiFit automatically when the workout is linked — but only if you haven't already entered an effort rating yourself. Your manually entered ratings always win.
+
+**Empty state:** At least one full Monday–Sunday week with at least one workout that has a recorded effort rating is needed before the chart renders.
+
+### Workout Type Breakdown (`workoutTypeBreakdown`)
+
+**Title:** About Workout Type Breakdown
+
+**Intro:** Workout Type Breakdown shows how your training is distributed across workout types, so you can see whether your routine is balanced or concentrated in one area.
+
+**How it's calculated:** Each segment of the donut is the count of workouts of that type within the selected time range, divided by your total workout count. A 50% Strength Training slice means half of all your sessions in the period were Strength Training.
+
+**Workout types:** Six categories — Strength Training, HIIT, Cardio, Yoga, Pilates, and Other. Each has a fixed color shown in the legend. Workouts imported from Apple Health are mapped to one of these six based on their HealthKit activity type.
+
+**Time range:** Toggle 30 days, 60 days, 90 days, or All Time. "All Time" includes every workout you've ever logged.
+
+**Empty state:** At least 2 workouts of any type are needed before the chart renders.
+
+### Session Duration (`sessionDuration`)
+
+**Title:** About Session Duration
+
+**Intro:** Session Duration shows how long your workouts have been on average each week, so you can manage your time and pacing.
+
+**How it's calculated:** Each bar is the average duration in minutes of all logged workouts within that calendar week (Monday through Sunday). Workouts you didn't enter a duration for aren't counted — they don't have a number to average.
+
+**The target line:** The dashed line is your target workout duration, set via long-press → Configure Settings on the Training Load widget. It's the same value FortiFit uses as a fallback in your training load score when a workout has no duration entered.
+
+**Time range:** The 8 most recent calendar weeks, including the current in-progress week.
+
+**Apple Health import:** Durations from Apple Watch and other Health-connected apps are imported automatically when you link a workout, so you don't need to re-enter them.
+
+**Empty state:** At least one full Monday–Sunday week with at least one workout that has a recorded duration is needed before the chart renders.
 
 ---
 
