@@ -252,6 +252,7 @@ Phases 1 and 2 in HEALTHKIT.md ship together as a single implementation pass. Ca
 | Glyph repositioning to trailing metadata on Home Recent Workouts, Workouts preview rows, Plan logged-only / completed-scheduled cards | SCREENS.md § Home, § Workouts, § Plan |
 | Conditional Exercises header (hidden when `exerciseSets.isEmpty`) | SCREENS.md § Workout Detail |
 | Share Image Card 2-column stat-card grid | SCREENS.md § Workout Detail → Share Image Card; CONSTANTS.md § Share Image Card Styling |
+| Stat card + Metric Detail Sheet color treatment (per-metric icon/value colors, multi-color Effort palette, dynamic Effort value coloring, per-segment Effort sparkline, removed redundant detail-sheet header) | SCREENS.md § Workout Detail → Summary, § Metric Detail Sheet, § Share Image Card; CONSTANTS.md § Stat Card Colors, § Effort Color Mapping |
 | New accessibility identifiers (see TESTING.md § Accessibility Identifiers) | TESTING.md |
 | Unit / integration / UI tests for the above | TESTING.md |
 

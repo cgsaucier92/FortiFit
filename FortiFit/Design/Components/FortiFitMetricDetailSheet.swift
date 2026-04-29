@@ -9,17 +9,19 @@ struct FortiFitMetricDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
 
     private var settings: UserSettings { UserSettings.shared }
+    private var metricColor: Color { AppConstants.statCardColor(for: metric) }
+
+    private var heroIconColor: Color {
+        if metric == .effort, let rpe = workout.rpe {
+            return AppConstants.effortColor(for: rpe)
+        }
+        return metricColor
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Spacer()
-                Text("\(metric.displayLabel) details")
-                    .font(.system(size: 20, weight: .black))
-                    .foregroundStyle(FortiFitColors.primaryText)
-                Spacer()
-            }
-            .overlay(alignment: .trailing) {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 16))
@@ -54,17 +56,17 @@ struct FortiFitMetricDetailSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: metric.sfSymbol)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(heroIconColor)
                 Text(metric.displayLabel)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FortiFitColors.primaryText)
             }
 
             if metric == .effort, let rpe = workout.rpe {
                 Text(AppConstants.effortLabel(for: rpe))
                     .font(.system(size: 32, weight: .black))
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(AppConstants.effortColor(for: rpe))
                 Text("(\(rpe))")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(FortiFitColors.secondaryText)
@@ -72,7 +74,7 @@ struct FortiFitMetricDetailSheet: View {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(heroValueString)
                         .font(.system(size: 32, weight: .black))
-                        .foregroundStyle(FortiFitColors.primaryText)
+                        .foregroundStyle(metricColor)
                     if let unit = heroUnitString {
                         Text(unit)
                             .font(.system(size: 15, weight: .semibold))
@@ -112,13 +114,19 @@ struct FortiFitMetricDetailSheet: View {
         if data.count >= 3 {
             VStack(alignment: .leading, spacing: 8) {
                 Chart {
-                    ForEach(Array(data.enumerated()), id: \.offset) { _, point in
-                        LineMark(
-                            x: .value("Date", point.date),
-                            y: .value("Value", point.value)
-                        )
-                        .foregroundStyle(FortiFitColors.secondaryText)
+                    if metric == .effort {
+                        effortSparklineMarks(data: data)
+                    } else {
+                        ForEach(Array(data.enumerated()), id: \.offset) { _, point in
+                            LineMark(
+                                x: .value("Date", point.date),
+                                y: .value("Value", point.value)
+                            )
+                            .foregroundStyle(metricColor)
+                        }
+                    }
 
+                    ForEach(Array(data.enumerated()), id: \.offset) { _, point in
                         PointMark(
                             x: .value("Date", point.date),
                             y: .value("Value", point.value)
@@ -146,6 +154,29 @@ struct FortiFitMetricDetailSheet: View {
             Text("Not enough data yet — log a few more sessions.")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(FortiFitColors.mutedText)
+        }
+    }
+
+    @ChartContentBuilder
+    private func effortSparklineMarks(data: [(date: Date, value: Double)]) -> some ChartContent {
+        ForEach(0..<(data.count - 1), id: \.self) { i in
+            let p1 = data[i]
+            let p2 = data[i + 1]
+            let segmentColor = AppConstants.effortColor(for: Int(p2.value.rounded()))
+
+            LineMark(
+                x: .value("Date", p1.date),
+                y: .value("Value", p1.value),
+                series: .value("Seg", i)
+            )
+            .foregroundStyle(segmentColor)
+
+            LineMark(
+                x: .value("Date", p2.date),
+                y: .value("Value", p2.value),
+                series: .value("Seg", i)
+            )
+            .foregroundStyle(segmentColor)
         }
     }
 

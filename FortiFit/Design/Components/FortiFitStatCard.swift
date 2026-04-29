@@ -5,6 +5,8 @@ struct FortiFitStatCard: View {
     let label: String
     let value: String
     let unit: String?
+    let iconColor: Color
+    let valueColor: Color
     let accessibilityID: String
     let onTap: () -> Void
 
@@ -13,6 +15,8 @@ struct FortiFitStatCard: View {
         label: String,
         value: String,
         unit: String? = nil,
+        iconColor: Color = FortiFitColors.mutedText,
+        valueColor: Color = FortiFitColors.primaryText,
         accessibilityIdentifier: String,
         onTap: @escaping () -> Void
     ) {
@@ -20,6 +24,8 @@ struct FortiFitStatCard: View {
         self.label = label
         self.value = value
         self.unit = unit
+        self.iconColor = iconColor
+        self.valueColor = valueColor
         self.accessibilityID = accessibilityIdentifier
         self.onTap = onTap
     }
@@ -29,11 +35,11 @@ struct FortiFitStatCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: symbolName)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(FortiFitColors.mutedText)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(iconColor)
                     Text(label)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(FortiFitColors.mutedText)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.primaryText)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .bold))
@@ -43,7 +49,7 @@ struct FortiFitStatCard: View {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value)
                         .font(.system(size: 24, weight: .heavy))
-                        .foregroundStyle(FortiFitColors.primaryText)
+                        .foregroundStyle(valueColor)
                     if let unit {
                         Text(unit)
                             .font(.system(size: 13, weight: .semibold))

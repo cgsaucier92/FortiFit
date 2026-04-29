@@ -559,6 +559,6 @@ Deferred indefinitely. Revisit requires: `NSHealthUpdateUsageDescription`, exten
 - Exact Info.plist copy for `NSHealthShareUsageDescription` (SCREENS.md).
 - Exact SF Symbol names for each Health Data row (CONSTANTS.md).
 - Full `HKWorkoutActivityType` → FortiFit mapping table (CONSTANTS.md — all ~80 entries).
-- Final row grouping and ordering for Summary two-column grid right column (SCREENS.md).
+- ~~Final row grouping and ordering for Summary two-column grid right column~~ — superseded by Phase 8.5 stat-card grid (see SCREENS.md § Workout Detail → Summary, CONSTANTS.md § Stat Card Colors).
 - Source indicator info sheet exact copy (SCREENS.md).
 - Match Prompt Sheet exact layout and copy (SCREENS.md).

@@ -994,22 +994,22 @@ final class WorkoutDetailRedesignSmokeTests: XCTestCase {
     func test_workoutDetail_eachStatCard_opensCorrectMetricSheet() {
         navigateToSeededWorkoutDetail()
 
-        let cardMetricPairs: [(id: String, title: String)] = [
-            ("workoutDetail_summaryCard_effort", "Effort details"),
-            ("workoutDetail_summaryCard_duration", "Duration details"),
-            ("workoutDetail_summaryCard_distance", "Distance details"),
-            ("workoutDetail_summaryCard_avgHR", "Avg HR details"),
-            ("workoutDetail_summaryCard_maxHR", "Max HR details"),
-            ("workoutDetail_summaryCard_activeKcal", "Active kcal details"),
+        let cardMetricPairs: [(id: String, heroLabel: String)] = [
+            ("workoutDetail_summaryCard_effort", "Effort"),
+            ("workoutDetail_summaryCard_duration", "Duration"),
+            ("workoutDetail_summaryCard_distance", "Distance"),
+            ("workoutDetail_summaryCard_avgHR", "Avg HR"),
+            ("workoutDetail_summaryCard_maxHR", "Max HR"),
+            ("workoutDetail_summaryCard_activeKcal", "Active kcal"),
         ]
 
-        for (cardID, expectedTitle) in cardMetricPairs {
+        for (cardID, expectedLabel) in cardMetricPairs {
             let card = app.buttons[cardID]
             if card.waitForExistence(timeout: 2) {
                 card.tap()
                 XCTAssertTrue(
-                    app.staticTexts[expectedTitle].waitForExistence(timeout: 3),
-                    "Sheet title '\(expectedTitle)' should appear after tapping \(cardID)"
+                    app.staticTexts[expectedLabel].waitForExistence(timeout: 3),
+                    "Hero label '\(expectedLabel)' should appear after tapping \(cardID)"
                 )
                 let closeButton = app.buttons["metricDetailSheet_closeButton"]
                 XCTAssertTrue(closeButton.waitForExistence(timeout: 2))

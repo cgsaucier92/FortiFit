@@ -569,8 +569,8 @@ Top-right icons: blue share icon (16px, `square.and.arrow.up`, #3b82f6), muted e
 **Stat card structure (`FortiFitStatCard.swift`):**
 
 - Container: Card Surface `#1a1a1a` background, `#404040` 1px border, 12px corner radius, internal padding (16px horizontal, 14px vertical).
-- Top row: SF symbol (left) + sentence-case micro-label (immediately to the right of the symbol) + right-pointing chevron (`chevron.right`) in the top-right corner. The chevron signals tap affordance and matches the chevron treatment used on workout preview rows. Symbol and label use the same size and color (Muted Text `#737373`, 13px, 700 weight, normal letter-spacing); chevron is Muted Text at the same weight.
-- Below the top row: the metric **value** in heading typography — Primary Text `#e5e5e5`, 24px, 800 weight, sentence case (for label-style values like Effort) or numeric (for everything else). For numeric values, the unit renders inline immediately after the number in smaller muted text (Secondary Text `#a3a3a3`, 13px, 600 weight) — e.g., `142 bpm` where `142` is hero-sized and `bpm` is muted-and-smaller. Value left-aligned with the label.
+- Top row: SF symbol (left) + sentence-case micro-label (immediately to the right of the symbol) + right-pointing chevron (`chevron.right`) in the top-right corner. The chevron signals tap affordance and matches the chevron treatment used on workout preview rows. **Icon** is rendered in the metric's color per CONSTANTS.md § Stat Card Colors (e.g., Duration purple, HR red, calories orange, distance teal, Effort multi-color palette). **Label** is Primary Text `#e5e5e5`, 13px, 700 weight, normal letter-spacing. **Chevron** stays Muted Text `#737373` at the same weight.
+- Below the top row: the metric **value** in heading typography — 24px, 800 weight, sentence case (for label-style values like Effort) or numeric (for everything else), color matches the icon color per CONSTANTS.md § Stat Card Colors. For numeric values, the unit renders inline immediately after the number in smaller muted text (Secondary Text `#a3a3a3`, 13px, 600 weight) — e.g., `142 bpm` where `142` is hero-sized and `bpm` is muted-and-smaller. The unit color stays muted regardless of the value color. Value left-aligned with the label. **Effort value color is dynamic**: maps from `workout.rpe` integer per CONSTANTS.md § Effort Color Mapping (1–4 green, 5–6 yellow, 7–10 red).
 - Tap state: subtle 0.15s opacity dim on press; tap opens the Metric Detail Sheet for that field.
 - Accessibility: each card has its own identifier — see TESTING.md.
 
@@ -636,18 +636,18 @@ Modal sheet opened by tapping any stat card in the Workout Detail Summary grid. 
 
 **Presentation:** iOS modal sheet (sheet presentation, `.medium` detent). Swipe-down to dismiss. Background uses Card Surface `#1a1a1a`. Drag indicator visible at top.
 
-**Header:** Centered title — `[Metric] details` (e.g., `Effort details`, `Duration details`, `Avg HR details`). Primary Text `#e5e5e5`, 20px, 900 weight, sentence case, centered.
+**Header:** No centered title — the hero block (below) serves as the de facto title. Removing the redundant `[Metric] details` heading keeps the sheet content-focused.
 
 **Close button:** Plain `xmark` SF Symbol in the top-right corner — Muted Text `#737373`, 16px, no circular background or border. Tap dismisses the sheet. Accessibility identifier `metricDetailSheet_closeButton` (shared across all metrics).
 
-**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the header. Four blocks rendered top-to-bottom (every block conditionally adapts when data is insufficient — see Empty States below):
+**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the close button. Four blocks rendered top-to-bottom (every block conditionally adapts when data is insufficient — see Empty States below):
 
 **1. Hero block** (mirrors the tapped stat card, scaled up):
 
-- Top row: same SF symbol + sentence-case micro-label as the tapped card (Muted Text, 13px, 700 weight). No chevron in this context.
-- Below: the metric value at hero size — Primary Text `#e5e5e5`, 32px, 900 weight, sentence case for label-style values, numeric for everything else.
-- For **Effort specifically**: hero shows the descriptive label (`Hard`); a smaller muted line below shows the underlying integer in parentheses (`(7)`) — Secondary Text `#a3a3a3`, 15px, 600 weight.
-- For numeric fields: unit renders inline immediately after the number in smaller muted text (e.g., `142 bpm`).
+- Top row: same SF symbol + sentence-case micro-label as the tapped card. **Icon** in the metric's color per CONSTANTS.md § Stat Card Colors (multi-color palette for Effort). **Label** is Primary Text `#e5e5e5`, 13px, 700 weight. No chevron in this context.
+- Below: the metric value at hero size — 32px, 900 weight, sentence case for label-style values, numeric for everything else. **Color matches the icon color** per CONSTANTS.md § Stat Card Colors. **Effort value color is dynamic** per CONSTANTS.md § Effort Color Mapping (1–4 green, 5–6 yellow, 7–10 red).
+- For **Effort specifically**: hero shows the descriptive label (`Hard`) at hero size in the band-mapped color; a smaller line below shows the underlying integer in parentheses (`(7)`) — Secondary Text `#a3a3a3`, 15px, 600 weight, **stays muted regardless of the value color**.
+- For numeric fields: unit renders inline immediately after the number in smaller muted text (e.g., `142 bpm`); the unit stays muted regardless of the value color.
 
 **2. Comparative context block:**
 
@@ -659,7 +659,9 @@ Modal sheet opened by tapping any stat card in the Workout Detail Summary grid. 
 **3. 30-day sparkline block:**
 
 - Swift Charts `LineMark` rendering of this metric across the same Workout Type's last 30 days of sessions. X-axis: dates (no tick labels — date range implied by caption). Y-axis: value range (auto-scaled, no tick labels).
-- This workout's data point is highlighted: filled circle, larger radius (~6pt), Primary Accent Blue color. Other points: Secondary Text color, smaller radius (~3pt).
+- **Line color** is metric-specific per CONSTANTS.md § Stat Card Colors (Duration purple, Distance teal, HR red, calories orange).
+- **Effort sparkline** is the exception: it uses **per-segment color**, where each line segment's color is determined by its endpoint's effort value per CONSTANTS.md § Effort Color Mapping. A 30-day Effort sparkline can therefore show multiple colors as effort varied across sessions. Implementation: render multiple `LineMark` series segmented by effort band, or use Swift Charts' `foregroundStyle(by:)` modifier with a categorical effort-band scale.
+- This workout's data point is highlighted: filled circle, larger radius (~6pt), Primary Accent Blue color (the highlighting color is uniform across all metrics — distinct from the line color so the user can always locate the current session). Other points: Secondary Text color, smaller radius (~3pt).
 - Caption below the chart: muted `Last 30 days · [Workout Type]`.
 - Chart container: Card Surface `#1a1a1a`, `#404040` 1px border, 12px corner radius, 16px internal padding, ~120pt height.
 
@@ -686,11 +688,11 @@ Tapping the share icon renders the workout as a styled PNG image card and presen
 
 **Card content:** workout name, date/time, workout type, **2-column stat-card grid** (mirrors the Workout Detail Summary grid), exercise list (Strength/HIIT only).
 
-**Stat-card grid:** Renders the same fields, in the same order, with the same icons, labels, and value formats as the Workout Detail Summary grid (see § Workout Detail). Differences for the share image:
+**Stat-card grid:** Renders the same fields, in the same order, with the same icons, labels, value formats, **and color treatment** as the Workout Detail Summary grid (see § Workout Detail and CONSTANTS.md § Stat Card Colors). Differences for the share image:
 
 - Static — no chevron, no tap behavior.
 - Smaller card sizing scaled appropriately for the 390pt-wide image.
-- Effort renders as the descriptive label (e.g., `Hard`) per CONSTANTS.md § Effort Label Mapping — same as Workout Detail.
+- Effort renders as the descriptive label (e.g., `Hard`) per CONSTANTS.md § Effort Label Mapping — same as Workout Detail. The Effort icon uses the multi-color palette (green/yellow/red bars) and the Effort value color maps from `workout.rpe` per CONSTANTS.md § Effort Color Mapping — identical behavior to the on-screen card.
 - Cards render only when their underlying value is non-nil. Manual workouts collapse to 2–3 cards.
 
 When `workout.time` is nil, the time component is omitted from the date line.

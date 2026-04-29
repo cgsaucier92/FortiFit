@@ -22,7 +22,7 @@
 | Positive (Green) | `#10b981` | Low load, PR indicators, weekly frequency goal |
 | Alert (Red) | `#ef4444` | Peak load, high-intensity warnings |
 | Chart (Purple) | `#4B2893` | A potential color for chart lines or bars |
-| Chart (Orange) | `#934F28` | A potential color for chart lines or bars |
+| Chart (Orange) | `#FFA600` | A potential color for chart lines or bars |
 | Chart (Teal) |`#289193`| A potential color for chart lines or bars |
 | Chart (Pink) | `#BB2BC0` | A potential color for chart lines or bars |
 | Chart (Light Cyan) | `#8​FE6​F6` | A potential color for chart lines or bars |
@@ -85,7 +85,7 @@ Icons displayed to the left of each option in the long-press context menu on Tre
 
 ## Workout Detail Summary Icons
 
-Icons rendered to the left of each label in the Summary section of the Workout Detail screen. Also rendered on the Share Image Card summary pills for visual consistency (see § Share Image Card Styling).
+Icons rendered on the Workout Detail Summary stat-card grid and the Share Image Card stat-card grid (see SCREENS.md § Workout Detail → Summary and § Share Image Card). Each icon's color is defined in § Stat Card Colors below.
 
 | Field | SF Symbol | Visible On |
 |-------|-----------|-----------|
@@ -93,15 +93,13 @@ Icons rendered to the left of each label in the Summary section of the Workout D
 | Duration | `clock` | All workout types (when recorded) |
 | Distance | `ruler` | Cardio only (when recorded) |
 
-**Rendering (Workout Detail Summary):** Icon is rendered at the same size and color as the summary row label text, with standard spacing between icon and label. See SCREENS.md § Workout Detail.
-
-**Rendering (Share Image Card):** Icon is rendered at the same size and color as the summary pill text, with standard spacing between icon and pill text. See § Share Image Card Styling and SCREENS.md § Share Image Card.
+**Rendering:** Icon size matches the label text size on the stat card. The Effort icon uses SwiftUI's palette rendering mode to color its three bars independently — see § Stat Card Colors and § Effort Color Mapping. All other icons render in a single color per § Stat Card Colors.
 
 ---
 
 ## Workout Detail Health Data Icons
 
-Icons rendered to the left of each row in the **right column of the Summary two-column grid** on Workout Detail (visible only when `workout.healthKitUUID != nil` AND at least one HK measurement field is non-nil). The left column of that grid contains user-entered fields (see § Workout Detail Summary Icons above). See SCREENS.md § Workout Detail for the full layout — specifically the two-column variant of the Summary block.
+Icons rendered on the Workout Detail Summary stat-card grid and the Share Image Card stat-card grid for HK-imported metrics (visible only when the corresponding field on `workout` is non-nil). Each icon's color is defined in § Stat Card Colors below.
 
 | Field | SF Symbol | Visible When |
 |-------|-----------|--------------|
@@ -111,17 +109,58 @@ Icons rendered to the left of each row in the **right column of the Summary two-
 | Total Calories | `flame.circle.fill` | `totalEnergyBurnedKcal != nil` |
 | Elevation Ascended | `mountain.2.fill` | `elevationAscendedMeters != nil` |
 | Exercise Minutes | `timer` | `exerciseMinutes != nil` |
-| Indoor | `building.2.fill` | `indoor == true` (inline badge) |
-| Outdoor | `sun.max.fill` | `indoor == false` (inline badge) |
 
-**Row ordering within the right column** (top to bottom, omitting nil values):
-1. Heart Rate row (Avg HR · Max HR — paired on one row when both present)
-2. Calories row (Active · Total — paired on one row when both present)
-3. Elevation Ascended
-4. Exercise Minutes
-5. Indoor/Outdoor badge
+**Card pairing:** HR and calorie metrics pair side-by-side as separate stat cards on one grid row when both members of the pair are non-nil — see SCREENS.md § Workout Detail → Summary for the field order rules.
 
-**Rendering:** Same size and color as the left-column (user-entered) row labels. Pairs (Avg HR + Max HR; Active kcal + Total kcal) render together within a single right-column row with a `·` separator. Conditional — rows with nil values are omitted entirely, and the right column as a whole does not render if every HK measurement field is nil (Summary falls back to its single-column layout in that case).
+**Indoor/Outdoor:** removed from Summary in Phase 8.5. Not rendered as a stat card.
+
+---
+
+## Stat Card Colors
+
+Colors applied to icons and values on every stat card in the Workout Detail Summary grid, the Metric Detail Sheet hero block, and the Share Image Card stat-card grid. Labels on cards and detail sheets are always Primary Text `#e5e5e5`; chevrons stay Muted Text. The unit text inline with numeric values (`bpm`, `kcal`, `min`, etc.) stays muted regardless of value color.
+
+| Metric | Icon Color | Value Color | Sparkline Color (Detail Sheet) |
+|---|---|---|---|
+| Effort | Multi-color palette: short bar `#10b981`, middle bar `#C4F648`, tall bar `#ef4444` | Dynamic — maps from `workout.rpe` per § Effort Color Mapping | Per-segment color — each segment endpoint maps via § Effort Color Mapping |
+| Duration | `#4B2893` (purple) | `#4B2893` | `#4B2893` |
+| Distance | `#289193` (teal) | `#289193` | `#289193` |
+| Avg HR | `#ef4444` (red) | `#ef4444` | `#ef4444` |
+| Max HR | `#ef4444` (red) | `#ef4444` | `#ef4444` |
+| Active kcal | `#934F28` (orange) | `#934F28` | `#934F28` |
+| Total kcal | `#934F28` (orange) | `#934F28` | `#934F28` |
+| Elevation Ascended | `#934F28` (orange) | `#934F28` | `#934F28` |
+| Exercise Minutes | `#4B2893` (purple) | `#4B2893` | `#4B2893` |
+
+**Notes on the table above:**
+- All hex values reference tokens already defined in § Colors (Positive Green, Caution Yellow, Alert Red, Chart Purple, Chart Orange, Chart Teal). No new tokens introduced.
+- Elevation and Exercise Minutes are not in the user's explicit color spec but inherit sensible defaults — Elevation tracks the calorie family (orange) since it represents "work performed against gravity," and Exercise Minutes tracks the Duration family (purple) since it's a time-based metric. Adjust if a different mapping is preferred.
+- The Effort icon requires SwiftUI's palette rendering: `Image(systemName: "chart.bar.fill").symbolRenderingMode(.palette).foregroundStyle(.green, .yellow, .red)` (using the actual hex tokens). Layer order in `chart.bar.fill` is short → medium → tall, so the foreground style tuple maps to that order naturally; verify visually on first build in case Apple changes the layer order in a future SF Symbols release.
+
+**The current workout's data point on every detail sheet sparkline** is highlighted with Primary Accent Blue `#3b82f6` (filled circle, larger radius) — uniform across all metrics regardless of line color, so users can always locate the current session in the chart.
+
+---
+
+## Effort Color Mapping
+
+Maps the integer 1–10 effort score to a color. Used on the Workout Detail stat card (Effort value), the Metric Detail Sheet hero (Effort value at hero size), the Effort sparkline on the detail sheet (per-segment color), and the Share Image Card (Effort value).
+
+| Score | Band | Color |
+|---|---|---|
+| 1 | Easy | `#10b981` (Positive Green) |
+| 2 | Easy | `#10b981` |
+| 3 | Light | `#10b981` |
+| 4 | Light | `#10b981` |
+| 5 | Moderate | `#C4F648` (Caution Yellow) |
+| 6 | Moderate | `#C4F648` |
+| 7 | Hard | `#ef4444` (Alert Red) |
+| 8 | Hard | `#ef4444` |
+| 9 | All Out | `#ef4444` |
+| 10 | All Out | `#ef4444` |
+
+Three-color collapse of the 5-band Effort Label Mapping (§ Effort Label Mapping above): Easy + Light → green, Moderate → yellow, Hard + All Out → red.
+
+**Helper function** in `AppConstants` (e.g., `static func effortColor(for: Int) → Color`) returns the band color for a given integer. Views should never hardcode the mapping; pull from `AppConstants` everywhere.
 
 ---
 

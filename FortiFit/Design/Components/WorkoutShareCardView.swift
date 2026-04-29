@@ -102,99 +102,142 @@ struct WorkoutShareCardView: View {
         let label: String
         let value: String
         let unit: String?
+        let iconColor: Color
+        let valueColor: Color
     }
 
     private var shareCardStats: [ShareStatData] {
         var cards: [ShareStatData] = []
 
         if let rpe = workout.rpe {
+            let bandColor = AppConstants.effortColor(for: rpe)
             cards.append(ShareStatData(
                 symbol: WorkoutMetric.effort.sfSymbol,
                 label: "Effort",
                 value: AppConstants.effortLabel(for: rpe),
-                unit: nil
+                unit: nil,
+                iconColor: bandColor,
+                valueColor: bandColor
             ))
         }
         if let duration = workout.durationMinutes {
+            let color = AppConstants.statCardColor(for: .duration)
             cards.append(ShareStatData(
                 symbol: WorkoutMetric.duration.sfSymbol,
                 label: "Duration",
                 value: "\(duration)",
-                unit: "min"
+                unit: "min",
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
         if workout.workoutType == "Cardio", let distance = workout.distanceKm {
+            let color = AppConstants.statCardColor(for: .distance)
             if userSettings.useMiles {
                 cards.append(ShareStatData(
                     symbol: WorkoutMetric.distance.sfSymbol,
                     label: "Distance",
                     value: String(format: "%.1f", UnitConversion.kmToMiles(distance)),
-                    unit: "mi"
+                    unit: "mi",
+                    iconColor: color,
+                    valueColor: color,
+    
                 ))
             } else {
                 cards.append(ShareStatData(
                     symbol: WorkoutMetric.distance.sfSymbol,
                     label: "Distance",
                     value: String(format: "%.1f", distance),
-                    unit: "km"
+                    unit: "km",
+                    iconColor: color,
+                    valueColor: color,
+    
                 ))
             }
         }
         if let avg = workout.avgHeartRate {
+            let color = AppConstants.statCardColor(for: .avgHR)
             cards.append(ShareStatData(
                 symbol: WorkoutMetric.avgHR.sfSymbol,
                 label: "Avg HR",
                 value: "\(avg)",
-                unit: "bpm"
+                unit: "bpm",
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
         if let max = workout.maxHeartRate {
+            let color = AppConstants.statCardColor(for: .maxHR)
             cards.append(ShareStatData(
                 symbol: WorkoutMetric.maxHR.sfSymbol,
                 label: "Max HR",
                 value: "\(max)",
-                unit: "bpm"
+                unit: "bpm",
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
         if let active = workout.activeEnergyKcal {
+            let color = AppConstants.statCardColor(for: .activeKcal)
             cards.append(ShareStatData(
                 symbol: WorkoutMetric.activeKcal.sfSymbol,
                 label: "Active kcal",
                 value: "\(Int(active))",
-                unit: "kcal"
+                unit: "kcal",
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
         if let total = workout.totalEnergyBurnedKcal {
+            let color = AppConstants.statCardColor(for: .totalKcal)
             cards.append(ShareStatData(
                 symbol: WorkoutMetric.totalKcal.sfSymbol,
                 label: "Total kcal",
                 value: "\(Int(total))",
-                unit: "kcal"
+                unit: "kcal",
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
         if let elevation = workout.elevationAscendedMeters {
+            let color = AppConstants.statCardColor(for: .elevation)
             if userSettings.useMiles {
                 cards.append(ShareStatData(
                     symbol: WorkoutMetric.elevation.sfSymbol,
                     label: "Elevation",
                     value: "\(Int(elevation * 3.28084))",
-                    unit: "ft"
+                    unit: "ft",
+                    iconColor: color,
+                    valueColor: color,
+    
                 ))
             } else {
                 cards.append(ShareStatData(
                     symbol: WorkoutMetric.elevation.sfSymbol,
                     label: "Elevation",
                     value: "\(Int(elevation))",
-                    unit: "m"
+                    unit: "m",
+                    iconColor: color,
+                    valueColor: color,
+    
                 ))
             }
         }
         if let exerciseMin = workout.exerciseMinutes {
+            let color = AppConstants.statCardColor(for: .exerciseMinutes)
             cards.append(ShareStatData(
                 symbol: WorkoutMetric.exerciseMinutes.sfSymbol,
                 label: "Exercise min",
                 value: "\(exerciseMin)",
-                unit: "min"
+                unit: "min",
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
 
@@ -206,16 +249,16 @@ struct WorkoutShareCardView: View {
             HStack(spacing: 4) {
                 Image(systemName: data.symbol)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .foregroundStyle(data.iconColor)
                 Text(data.label)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .foregroundStyle(FortiFitColors.primaryText)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(data.value)
                     .font(.system(size: 22, weight: .heavy))
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(data.valueColor)
                 if let unit = data.unit {
                     Text(unit)
                         .font(.system(size: 12, weight: .semibold))

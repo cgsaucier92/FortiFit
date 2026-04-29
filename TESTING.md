@@ -253,6 +253,15 @@ All HealthKit-related accessibility identifiers are listed in the "HealthKit:" r
 
 ---
 
+## Color Treatment Tests (Phase 8.5 polish)
+
+The Workout Detail stat-card and Metric Detail Sheet color rules are visual — no new accessibility identifiers, no behavior changes, but two narrow unit-test surfaces:
+
+- **`AppConstants.effortColor(for:)`** — `FortiFitTests` should iterate every integer from 1 through 10 and assert the returned color matches the band defined in CONSTANTS.md § Effort Color Mapping (1–4 green, 5–6 yellow, 7–10 red). Same shape as the existing `effortLabel(for:)` test.
+- **Stat card and detail sheet color application** — UI smoke tests can't reliably assert on colors via XCUI (color queries are flaky and brittle), so color correctness is verified via manual QA on first-build review rather than automated tests. Document any visual regressions in BUGS.md per the standard workflow.
+
+---
+
 ## Prompting Claude Code
 
 When adding new integration tests, this prompt pattern works well:

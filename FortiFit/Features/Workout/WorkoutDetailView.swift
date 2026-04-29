@@ -284,6 +284,8 @@ struct WorkoutDetailView: View {
                             label: card.label,
                             value: card.value,
                             unit: card.unit,
+                            iconColor: card.iconColor,
+                            valueColor: card.valueColor,
                             accessibilityIdentifier: card.identifier,
                             onTap: { activeMetric = card.metric }
                         )
@@ -292,7 +294,11 @@ struct WorkoutDetailView: View {
             }
 
             if (workout.workoutType == "Strength Training" || workout.workoutType == "HIIT") && !workout.exerciseSets.isEmpty {
+                FortiFitDivider()
+                    .padding(.top, FortiFitSpacing.gapSmall)
+
                 FortiFitWidgetHeader(title: "Exercises")
+                    .padding(.top, FortiFitSpacing.gapSmall)
 
                 let grouped = Dictionary(grouping: workout.exerciseSets.sorted { $0.sortOrder < $1.sortOrder }, by: { $0.exerciseName })
                 let sortedNames = grouped.keys.sorted { name1, name2 in
@@ -337,33 +343,103 @@ struct WorkoutDetailView: View {
         let value: String
         let unit: String?
         let identifier: String
+        let iconColor: Color
+        let valueColor: Color
     }
 
     private var summaryCards: [StatCardData] {
         var cards: [StatCardData] = []
 
         if let rpe = workout.rpe {
+            let bandColor = AppConstants.effortColor(for: rpe)
             cards.append(StatCardData(
                 metric: .effort,
                 symbol: WorkoutMetric.effort.sfSymbol,
                 label: "Effort",
                 value: AppConstants.effortLabel(for: rpe),
                 unit: nil,
-                identifier: AccessibilityID.workoutDetail_summaryCard_effort
+                identifier: AccessibilityID.workoutDetail_summaryCard_effort,
+                iconColor: bandColor,
+                valueColor: bandColor
             ))
         }
 
         if let duration = workout.durationMinutes {
+            let color = AppConstants.statCardColor(for: .duration)
             cards.append(StatCardData(
                 metric: .duration,
                 symbol: WorkoutMetric.duration.sfSymbol,
                 label: "Duration",
                 value: "\(duration)",
                 unit: "min",
-                identifier: AccessibilityID.workoutDetail_summaryCard_duration
+                identifier: AccessibilityID.workoutDetail_summaryCard_duration,
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
 
+        if let avg = workout.avgHeartRate {
+            let color = AppConstants.statCardColor(for: .avgHR)
+            cards.append(StatCardData(
+                metric: .avgHR,
+                symbol: WorkoutMetric.avgHR.sfSymbol,
+                label: "Avg HR",
+                value: "\(avg)",
+                unit: "bpm",
+                identifier: AccessibilityID.workoutDetail_summaryCard_avgHR,
+                iconColor: color,
+                valueColor: color,
+
+            ))
+        }
+
+        if let max = workout.maxHeartRate {
+            let color = AppConstants.statCardColor(for: .maxHR)
+            cards.append(StatCardData(
+                metric: .maxHR,
+                symbol: WorkoutMetric.maxHR.sfSymbol,
+                label: "Max HR",
+                value: "\(max)",
+                unit: "bpm",
+                identifier: AccessibilityID.workoutDetail_summaryCard_maxHR,
+                iconColor: color,
+                valueColor: color,
+
+            ))
+        }
+
+        if let active = workout.activeEnergyKcal {
+            let color = AppConstants.statCardColor(for: .activeKcal)
+            cards.append(StatCardData(
+                metric: .activeKcal,
+                symbol: WorkoutMetric.activeKcal.sfSymbol,
+                label: "Active kcal",
+                value: "\(Int(active))",
+                unit: "kcal",
+                identifier: AccessibilityID.workoutDetail_summaryCard_activeKcal,
+                iconColor: color,
+                valueColor: color,
+
+            ))
+        }
+
+        if let total = workout.totalEnergyBurnedKcal {
+            let color = AppConstants.statCardColor(for: .totalKcal)
+            cards.append(StatCardData(
+                metric: .totalKcal,
+                symbol: WorkoutMetric.totalKcal.sfSymbol,
+                label: "Total kcal",
+                value: "\(Int(total))",
+                unit: "kcal",
+                identifier: AccessibilityID.workoutDetail_summaryCard_totalKcal,
+                iconColor: color,
+                valueColor: color,
+
+            ))
+        }
+
+        // Singles (no natural pair) — placed after pairs to avoid gaps
         if workout.workoutType == "Cardio", let distance = workout.distanceKm {
             let displayVal: String
             let displayUnit: String
@@ -374,57 +450,16 @@ struct WorkoutDetailView: View {
                 displayVal = String(format: "%.1f", distance)
                 displayUnit = "km"
             }
+            let color = AppConstants.statCardColor(for: .distance)
             cards.append(StatCardData(
                 metric: .distance,
                 symbol: WorkoutMetric.distance.sfSymbol,
                 label: "Distance",
                 value: displayVal,
                 unit: displayUnit,
-                identifier: AccessibilityID.workoutDetail_summaryCard_distance
-            ))
-        }
-
-        if let avg = workout.avgHeartRate {
-            cards.append(StatCardData(
-                metric: .avgHR,
-                symbol: WorkoutMetric.avgHR.sfSymbol,
-                label: "Avg HR",
-                value: "\(avg)",
-                unit: "bpm",
-                identifier: AccessibilityID.workoutDetail_summaryCard_avgHR
-            ))
-        }
-
-        if let max = workout.maxHeartRate {
-            cards.append(StatCardData(
-                metric: .maxHR,
-                symbol: WorkoutMetric.maxHR.sfSymbol,
-                label: "Max HR",
-                value: "\(max)",
-                unit: "bpm",
-                identifier: AccessibilityID.workoutDetail_summaryCard_maxHR
-            ))
-        }
-
-        if let active = workout.activeEnergyKcal {
-            cards.append(StatCardData(
-                metric: .activeKcal,
-                symbol: WorkoutMetric.activeKcal.sfSymbol,
-                label: "Active kcal",
-                value: "\(Int(active))",
-                unit: "kcal",
-                identifier: AccessibilityID.workoutDetail_summaryCard_activeKcal
-            ))
-        }
-
-        if let total = workout.totalEnergyBurnedKcal {
-            cards.append(StatCardData(
-                metric: .totalKcal,
-                symbol: WorkoutMetric.totalKcal.sfSymbol,
-                label: "Total kcal",
-                value: "\(Int(total))",
-                unit: "kcal",
-                identifier: AccessibilityID.workoutDetail_summaryCard_totalKcal
+                identifier: AccessibilityID.workoutDetail_summaryCard_distance,
+                iconColor: color,
+                valueColor: color
             ))
         }
 
@@ -438,24 +473,32 @@ struct WorkoutDetailView: View {
                 displayVal = "\(Int(elevation))"
                 displayUnit = "m"
             }
+            let color = AppConstants.statCardColor(for: .elevation)
             cards.append(StatCardData(
                 metric: .elevation,
                 symbol: WorkoutMetric.elevation.sfSymbol,
                 label: "Elevation",
                 value: displayVal,
                 unit: displayUnit,
-                identifier: AccessibilityID.workoutDetail_summaryCard_elevation
+                identifier: AccessibilityID.workoutDetail_summaryCard_elevation,
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
 
         if let exerciseMin = workout.exerciseMinutes {
+            let color = AppConstants.statCardColor(for: .exerciseMinutes)
             cards.append(StatCardData(
                 metric: .exerciseMinutes,
                 symbol: WorkoutMetric.exerciseMinutes.sfSymbol,
                 label: "Exercise min",
                 value: "\(exerciseMin)",
                 unit: "min",
-                identifier: AccessibilityID.workoutDetail_summaryCard_exerciseMinutes
+                identifier: AccessibilityID.workoutDetail_summaryCard_exerciseMinutes,
+                iconColor: color,
+                valueColor: color,
+
             ))
         }
 

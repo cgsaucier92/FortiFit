@@ -37,6 +37,35 @@ struct EffortLabelTests {
     }
 }
 
+// MARK: - Effort Color Mapping Tests
+
+struct EffortColorTests {
+
+    @Test func effortColor_returnsCorrectBandForEveryInteger() {
+        let green = FortiFitColors.positive
+        let yellow = FortiFitColors.caution
+        let red = FortiFitColors.alert
+
+        #expect(AppConstants.effortColor(for: 1) == green)
+        #expect(AppConstants.effortColor(for: 2) == green)
+        #expect(AppConstants.effortColor(for: 3) == green)
+        #expect(AppConstants.effortColor(for: 4) == green)
+        #expect(AppConstants.effortColor(for: 5) == yellow)
+        #expect(AppConstants.effortColor(for: 6) == yellow)
+        #expect(AppConstants.effortColor(for: 7) == red)
+        #expect(AppConstants.effortColor(for: 8) == red)
+        #expect(AppConstants.effortColor(for: 9) == red)
+        #expect(AppConstants.effortColor(for: 10) == red)
+    }
+
+    @Test func effortColor_outOfRange_returnsMutedText() {
+        let muted = FortiFitColors.mutedText
+        #expect(AppConstants.effortColor(for: 0) == muted)
+        #expect(AppConstants.effortColor(for: 11) == muted)
+        #expect(AppConstants.effortColor(for: -1) == muted)
+    }
+}
+
 // MARK: - WorkoutMetricService Tests
 
 @MainActor

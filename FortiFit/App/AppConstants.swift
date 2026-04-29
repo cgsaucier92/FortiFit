@@ -65,6 +65,35 @@ enum AppConstants {
         "ExerciseMinutes": "figure.walk"
     ]
 
+    // MARK: - Effort Color Mapping
+
+    static func effortColor(for score: Int) -> Color {
+        switch score {
+        case 1...4: return FortiFitColors.positive
+        case 5, 6: return FortiFitColors.caution
+        case 7...10: return FortiFitColors.alert
+        default: return FortiFitColors.mutedText
+        }
+    }
+
+    // MARK: - Stat Card Colors
+
+    static let statCardPurple = Color(hex: "4B2893")
+    static let statCardTeal = Color(hex: "289193")
+    static let statCardCalorie = Color(hex: "FFA600")
+    static let statCardOrange = Color(hex: "934F28")
+
+    static func statCardColor(for metric: WorkoutMetric) -> Color {
+        switch metric {
+        case .effort: return FortiFitColors.positive
+        case .duration, .exerciseMinutes: return statCardPurple
+        case .distance: return statCardTeal
+        case .avgHR, .maxHR: return FortiFitColors.alert
+        case .activeKcal, .totalKcal: return statCardCalorie
+        case .elevation: return statCardOrange
+        }
+    }
+
     // MARK: - Effort Label Mapping
 
     static func effortLabel(for score: Int) -> String {
