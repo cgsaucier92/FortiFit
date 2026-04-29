@@ -398,7 +398,7 @@ The protocol defines the following operations (exact Swift signatures to be fina
 | `fetchWorkouts(since anchor: HKQueryAnchor?) async throws → (workouts: [HKWorkoutSnapshot], deletedUUIDs: [UUID], newAnchor: HKQueryAnchor)` | Anchored query returning workouts added or modified since the anchor, plus a list of UUIDs for workouts deleted upstream. Drives catch-up-on-launch and live sync. |
 | `observeWorkoutChanges(handler: @escaping () → Void)` | Register an `HKObserverQuery` with `enableBackgroundDelivery`. Handler fires (on a background thread) when HK has new or changed workout data. `HealthKitSyncService` hops to `@MainActor` before acting. |
 | `fetchEffortScore(for hkWorkoutUUID: UUID) async throws → Int?` | Query the user-entered `workoutEffortScore` sample related to an HK workout. Returns nil if no user-entered score exists. Ignores `estimatedWorkoutEffortScore`. iOS 18+ only — gated `if #available(iOS 18, *)`. See HEALTHKIT.md § 8. |
-| `sourceName(for bundleID: String) → String?` | Resolves an `HKSource` bundle ID to a display name (e.g., `com.apple.health.WatchApp` → "Apple Watch"). Used for the Workout Detail source indicator label. Returns nil if resolution fails — caller falls back to "Apple Health." |
+| `sourceName(for bundleID: String) → String` | Resolves an `HKSource` bundle ID to a clean human-readable name. **Never returns a raw bundle ID.** Resolution rules: (1) Apple Watch source bundle → `"Apple Workout"` (rebrand from "Apple Watch"). (2) Other recognized sources → their `HKSource.name` value (e.g., `"Strava"`, `"Peloton"`). (3) Unrecognized / unresolvable bundle IDs → `"another app"` (graceful fallback). Used by the Workout Detail source indicator (inline format `{healthKitActivityType} · {sourceName} [glyph]`) and the Source Indicator Info Sheet body copy (`This workout was imported from Apple Health via {sourceName}.`). The caller never has to handle nil; the fallback string is always serviceable in either rendering surface. See SCREENS.md § Workout Detail → Source Indicator. |
 
 ### HealthKitWorkoutSnapshot
 
@@ -576,6 +576,69 @@ Queue API: `pendingMatches()`, `resolvePending(workoutId: UUID, snapshot: Health
 | `WorkoutMatchRejection.swift` | `Core/Models/` | Persisted rejection records |
 | `WorkoutService.swift` | `Core/Services/` | Entry point for save/update after link |
 | `MatchPromptSheetView.swift` | `Design/Components/` | UI surface (see SCREENS.md § Match Prompt Sheet) |
+
+---
+
+## WorkoutMetricService (WorkoutMetricService.swift)
+
+**Purpose:** Read-only aggregate query layer powering the Workout Detail Metric Detail Sheet (see SCREENS.md § Workout Detail → Metric Detail Sheet). Provides three operations: comparative average, 30-day sparkline data, and personal-best detection — all scoped to a single metric and Workout Type. Stateless. No model changes, no cascade impact.
+
+### WorkoutMetric Enum
+
+```swift
+enum WorkoutMetric {
+    case effort, duration, distance,
+         avgHR, maxHR,
+         activeKcal, totalKcal,
+         elevation, exerciseMinutes
+}
+```
+
+Callers pass the enum case rather than a field name string. Each case maps to a `KeyPath` on `Workout` internally; the service centralizes the field-extraction logic so views stay clean.
+
+### Operations
+
+| Method | Purpose |
+|---|---|
+| `comparativeAverage(for metric: WorkoutMetric, workoutType: String, context: ModelContext) → Double?` | Returns the all-time average of the metric across all logged `Workout` records of `workoutType` where the metric is non-nil. Returns nil when fewer than 3 such workouts exist (the data-sufficiency threshold — see SCREENS.md § Metric Detail Sheet → Empty States). |
+| `sparklineData(for metric: WorkoutMetric, workoutType: String, days: Int = 30, context: ModelContext) → [(date: Date, value: Double)]` | Returns time-series data points for the metric across the last `days` days of same-`workoutType` workouts where the metric is non-nil. Sorted ascending by date. Empty array if fewer than 3 data points exist. |
+| `isPersonalBest(for metric: WorkoutMetric, workout: Workout, context: ModelContext) → Bool` | Returns true when `workout`'s value for `metric` is the maximum across all in-scope same-`workoutType` workouts. Returns false for PR-ineligible metrics regardless of value (see § PR Eligibility below). Returns false when fewer than 2 workouts of that type have the metric set (need at least one comparison point). |
+
+### PR Eligibility
+
+| Metric | PR-Eligible? | Rationale |
+|---|---|---|
+| Distance | ✓ | Longer cardio session is a clear achievement |
+| Active kcal | ✓ | More calories burned = more effort |
+| Total kcal | ✓ | Same as Active |
+| Elevation Ascended | ✓ | More climbing is a clear achievement |
+| Effort | ✗ | High effort is not a goal |
+| Avg HR / Max HR | ✗ | Higher HR is not a goal |
+| Duration | ✗ | Longer is not always better; could distort across workout types |
+| Exercise Minutes | ✗ | Correlated with Duration; same concern |
+
+`isPersonalBest` returns false unconditionally for non-eligible metrics. Caller (the Metric Detail Sheet) never renders the Personal Best chip in those cases.
+
+### Computation Rules
+
+- **All-time scope:** comparative average and PR detection scan all logged `Workout` records of the matching type — no time-window filter (unlike sparkline which is bounded to 30 days).
+- **Nil handling:** records where the metric value is nil are excluded entirely from averages, sparklines, and PR comparisons. Nil data does not pull averages down.
+- **Same-type filter:** all queries filter by `workout.workoutType == workoutType` (exact match, case-sensitive — workout types are AppConstants enum-style strings).
+- **Excludes the current workout from comparisons:** when computing comparative average for the workout being viewed, the current workout's own value is **not** included in the average. The detail sheet's "your typical session" comparison reads against everyone else of the same type, so the user sees how this session relates to their baseline.
+- **Unit handling:** values are returned in storage units (kg, km, meters) — formatting/conversion happens in the view layer per `useLbs` / `useMiles` user settings.
+- **Read-only:** no mutations, no cascades. Pure query service. Safe to call from any actor; SwiftData fetches are main-actor-bound by `ModelContext` convention.
+
+### Cascade Impact
+
+**None.** This service does not modify any data. The detail sheet re-queries on every open, so changes elsewhere (workout edits, deletes) are reflected automatically without invalidation logic.
+
+### File Dependencies
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `WorkoutMetricService.swift` | `Core/Services/` | The service implementation + `WorkoutMetric` enum |
+| `Workout.swift` | `Core/Models/` | Source of truth for queried fields |
+| `FortiFitMetricDetailSheet.swift` | `Design/Components/` | Sole consumer of this service today (see SCREENS.md § Metric Detail Sheet) |
 
 ---
 

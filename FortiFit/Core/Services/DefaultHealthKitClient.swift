@@ -120,8 +120,22 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
         return Int(value.rounded())
     }
 
-    func sourceName(for bundleID: String) -> String? {
-        nil
+    func sourceName(for bundleID: String) -> String {
+        let appleWatchBundlePrefix = "com.apple.health"
+        if bundleID.hasPrefix(appleWatchBundlePrefix) {
+            return "Apple Workout"
+        }
+        let knownSources: [String: String] = [
+            "com.strava": "Strava",
+            "com.fiit.fiit": "Fiit",
+            "com.onepeloton.peloton": "Peloton"
+        ]
+        for (prefix, name) in knownSources {
+            if bundleID.hasPrefix(prefix) {
+                return name
+            }
+        }
+        return "another app"
     }
 
     // MARK: - Helpers

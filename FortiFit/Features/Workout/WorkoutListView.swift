@@ -647,20 +647,15 @@ struct WorkoutListView: View {
     private func workoutPreviewRow(_ workout: Workout) -> some View {
         HStack(alignment: .top, spacing: FortiFitSpacing.gapSmall) {
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    if workout.isHealthKitLinked {
-                        FortiFitHealthGlyph()
-                    }
-                    Text(workout.name)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(FortiFitColors.primaryText)
-                }
+                Text(workout.name)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 Text(workout.date.dayFormatted)
                     .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
 
-                durationSummary(for: workout)
+                durationDistanceSummary(for: workout)
             }
 
             Spacer()
@@ -674,33 +669,43 @@ struct WorkoutListView: View {
         .padding(.vertical, FortiFitSpacing.gapSmall)
     }
 
-    // MARK: - Duration Summary
+    // MARK: - Duration / Distance Summary
 
     @ViewBuilder
-    private func durationSummary(for workout: Workout) -> some View {
-        if workout.workoutType == "Cardio" {
-            let settings = UserSettings.shared
-            let parts: [String] = [
-                workout.durationMinutes.map { "\($0) min" },
-                workout.distanceKm.map { km in
-                    if settings.useMiles {
-                        return String(format: "%.1f mi", UnitConversion.kmToMiles(km))
-                    } else {
-                        return String(format: "%.1f km", km)
-                    }
+    private func durationDistanceSummary(for workout: Workout) -> some View {
+        let text = durationDistanceText(for: workout)
+        if !text.isEmpty || workout.isAppleWatchSourced {
+            HStack(spacing: 4) {
+                if !text.isEmpty {
+                    Text(text)
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(FortiFitColors.mutedText)
                 }
-            ].compactMap { $0 }
-
-            if !parts.isEmpty {
-                Text(parts.joined(separator: " · "))
-                    .font(FortiFitTypography.bodySmall)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                if workout.isAppleWatchSourced {
+                    if !text.isEmpty {
+                        Text("·")
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
+                    }
+                    FortiFitHealthGlyph()
+                }
             }
-        } else if let duration = workout.durationMinutes {
-            Text("\(duration) min")
-                .font(FortiFitTypography.bodySmall)
-                .foregroundStyle(FortiFitColors.mutedText)
         }
+    }
+
+    private func durationDistanceText(for workout: Workout) -> String {
+        let settings = UserSettings.shared
+        let parts: [String] = [
+            workout.durationMinutes.map { "\($0) min" },
+            workout.distanceKm.map { km in
+                if settings.useMiles {
+                    return String(format: "%.1f mi", UnitConversion.kmToMiles(km))
+                } else {
+                    return String(format: "%.1f km", km)
+                }
+            }
+        ].compactMap { $0 }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - Custom Date Range Sheet

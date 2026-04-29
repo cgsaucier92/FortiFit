@@ -349,44 +349,43 @@ Add `SCREENS.md § Match Prompt Sheet` section with layout spec.
 ## 15. UI Surfaces
 
 ### Workout Detail Source Indicator
-Below the Workout Type row: HealthKit-pink heart SF Symbol + `healthKitActivityType` + "from {HKSource.name}".
+Below the Workout Type row, when `workout.healthKitUUID != nil`. Format: `{healthKitActivityType} · {sourceName} [glyph]` — the word "from" is implied by the format and is not rendered. Glyph trails the source name **only when source is Apple Watch**.
 
-- Source name read dynamically via `HKSource.name`. Fallback: "Apple Health."
+- Source name resolved via `HealthKitClient.sourceName(for:)` per SERVICES.md § HealthKitClient. Apple Watch → `Apple Workout`; other recognized sources keep their `HKSource.name`; unresolvable bundle IDs fall back to `another app`. Never displays a raw bundle ID.
+- Trailing glyph: `FortiFitHealthGlyph` (Apple Workout running figure on green) — renders only when source is Apple Watch. Other sources show no trailing glyph.
 - Styled as secondary/muted text using the app's Label treatment (11px, 700 weight, 2px letter-spacing, Muted Text color).
 - Tappable → opens info sheet.
 
+Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator.
+
 ### Source Indicator Info Sheet
-- Brief explainer: "This workout was imported from Apple Health via {source.name}."
+- Body explainer: `This workout was imported from Apple Health via {sourceName}.` `{sourceName}` resolves via `HealthKitClient.sourceName(for:)` — Apple Watch becomes `Apple Workout`, other known sources show their `HKSource.name`, unresolvable bundle IDs fall back to `another app`. Never renders a raw bundle ID.
 - Full `healthKitActivityType` displayed prominently.
+- Source row also uses `{sourceName}` (same resolver).
 - "Unlink from Apple Health" button.
 - Dismiss.
 
-### Workout Detail Summary — Two-Column Grid (HK-Linked)
+Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator Info Sheet.
 
-HK-imported measurement fields render in the **right column** of the Workout Detail Summary block when `workout.healthKitUUID != nil` AND at least one HK measurement field is non-nil. The Summary block's left column retains user-entered fields (RPE, Duration, Distance) in their existing order and style. Manual workouts (or linked workouts with no HK measurement data) render the Summary block as a single column, unchanged from pre-Phase-8.
+### Workout Detail Summary — Stat Card Grid (Phase 8.5)
 
-There is no separate "Health Data" subsection, divider, or header — HK data is integrated into Summary.
+Workout Detail Summary renders as a **2-column grid of bordered, tappable stat cards**, regardless of whether the workout is HK-linked. HK-imported measurement fields (Avg HR, Max HR, Active kcal, Total kcal, Elevation Ascended, Exercise Minutes) render as additional stat cards alongside user-entered fields (Effort, Duration, Distance) — same field structure, same visual treatment. Manual workouts collapse to 2–3 cards naturally; HK-linked workouts can show up to 9.
 
-**Conditional rendering rule:** a row in either column renders ONLY if the underlying value is non-nil. Column shorter than the other simply stops; no empty "—" placeholders.
+**Indoor/Outdoor: removed** from Summary entirely.
 
-**Right-column row ordering** (top to bottom, omitting nil values):
-- Avg HR · Max HR (paired on one row when both present)
-- Active kcal · Total kcal (paired on one row when both present)
-- Elevation Ascended (standalone)
-- Exercise Minutes (standalone)
-- Indoor / Outdoor badge
-
-**SF Symbols** accompany each value — see CONSTANTS.md § Workout Detail Health Data Icons for the full row-to-SF-Symbol mapping.
+Each card is independently tappable and opens the **Metric Detail Sheet** (per-metric comparative average + 30-day sparkline + optional Personal Best chip). The detail sheet's data layer is `WorkoutMetricService` (see SERVICES.md § WorkoutMetricService).
 
 **Units** respect user preferences: `elevationAscendedMeters` displays as meters or feet per the distance unit setting. HR is always bpm. Calories are always kcal.
 
-Full layout spec (including example renderings for each type/state combination) is in SCREENS.md § Workout Detail.
+Full layout spec (including stat-card structure, field order, per-field display values, and Metric Detail Sheet behavior) is in SCREENS.md § Workout Detail → Summary and § Workout Detail → Metric Detail Sheet.
 
-### Peripheral Glyph (Option b)
-Small HealthKit-pink heart glyph on:
+### Peripheral Glyph (Apple Workout)
+The Apple Workout glyph (`FortiFitHealthGlyph` — running figure on green circular background) renders trailing the metadata row on these surfaces, **only when source is Apple Watch**:
 - Recent Workouts list rows (Home)
 - Workout Type card preview rows (Workouts tab)
-- Scheduled Workout cards showing a linked logged workout (Plan tab)
+- Scheduled Workout cards / logged-only cards (Plan tab)
+
+Non-Apple-Watch HK sources (Strava, Peloton, etc.) do not render this glyph on peripheral surfaces — they are visually indistinguishable from manual workouts on those compact surfaces. Future updates may add per-source glyphs.
 
 Visible only when `healthKitUUID != nil`. Full "from {source}" label stays on Workout Detail only.
 

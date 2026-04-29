@@ -19,15 +19,10 @@ struct FortiFitScheduledWorkoutCard: View {
         FortiFitCard(borderColor: cardBorderColor) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                 // Workout name
-                HStack(spacing: 6) {
-                    if isCompletedHealthKitLinked && scheduledWorkout.status == "completed" {
-                        FortiFitHealthGlyph()
-                    }
-                    Text(scheduledWorkout.workoutName)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(nameColor)
-                        .strikethrough(scheduledWorkout.status == "skipped")
-                }
+                Text(scheduledWorkout.workoutName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(nameColor)
+                    .strikethrough(scheduledWorkout.status == "skipped")
 
                 // Workout type pill
                 HStack(spacing: 0) {
@@ -52,7 +47,7 @@ struct FortiFitScheduledWorkoutCard: View {
                         .foregroundStyle(FortiFitColors.mutedText)
                 }
 
-                // Duration & time
+                // Duration & time + trailing glyph
                 HStack(spacing: FortiFitSpacing.elementSpacing) {
                     if let duration = scheduledWorkout.durationMinutes {
                         Text("\(duration) min")
@@ -63,6 +58,12 @@ struct FortiFitScheduledWorkoutCard: View {
                         Text(time.timeFormatted)
                             .font(FortiFitTypography.bodySmall)
                             .foregroundStyle(FortiFitColors.mutedText)
+                    }
+                    if isCompletedHealthKitLinked && scheduledWorkout.status == "completed" {
+                        Text("·")
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
+                        FortiFitHealthGlyph()
                     }
                 }
 
@@ -175,14 +176,9 @@ struct FortiFitLoggedWorkoutCard: View {
         FortiFitCard(borderColor: FortiFitColors.positive) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                 // Workout name
-                HStack(spacing: 6) {
-                    if workout.isHealthKitLinked {
-                        FortiFitHealthGlyph()
-                    }
-                    Text(workout.name)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(FortiFitColors.primaryText)
-                }
+                Text(workout.name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 // Workout type pill + LOGGED affordance
                 HStack(spacing: 0) {
@@ -197,11 +193,23 @@ struct FortiFitLoggedWorkoutCard: View {
                         .foregroundStyle(FortiFitColors.mutedText)
                 }
 
-                // Duration (if available)
-                if let duration = workout.durationMinutes {
-                    Text("\(duration) min")
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(FortiFitColors.mutedText)
+                // Metadata row: duration + trailing glyph
+                let hasDuration = workout.durationMinutes != nil
+                let hasGlyph = workout.isAppleWatchSourced
+                if hasDuration || hasGlyph {
+                    HStack(spacing: FortiFitSpacing.elementSpacing) {
+                        if let duration = workout.durationMinutes {
+                            Text("\(duration) min")
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.mutedText)
+                        }
+                        if hasGlyph {
+                            Text("·")
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.mutedText)
+                            FortiFitHealthGlyph()
+                        }
+                    }
                 }
 
                 // Completed indicator

@@ -84,6 +84,19 @@ enum AccessibilityID {
     static let workoutDetailHealthSourceIndicator = "workoutDetail_healthSourceIndicator"
     static let workoutDetailHealthUnlinkButton = "workoutDetail_healthUnlinkButton"
 
+    // MARK: - Workout Detail Summary Stat Cards
+
+    static let workoutDetail_summaryCard_effort = "workoutDetail_summaryCard_effort"
+    static let workoutDetail_summaryCard_duration = "workoutDetail_summaryCard_duration"
+    static let workoutDetail_summaryCard_distance = "workoutDetail_summaryCard_distance"
+    static let workoutDetail_summaryCard_avgHR = "workoutDetail_summaryCard_avgHR"
+    static let workoutDetail_summaryCard_maxHR = "workoutDetail_summaryCard_maxHR"
+    static let workoutDetail_summaryCard_activeKcal = "workoutDetail_summaryCard_activeKcal"
+    static let workoutDetail_summaryCard_totalKcal = "workoutDetail_summaryCard_totalKcal"
+    static let workoutDetail_summaryCard_elevation = "workoutDetail_summaryCard_elevation"
+    static let workoutDetail_summaryCard_exerciseMinutes = "workoutDetail_summaryCard_exerciseMinutes"
+    static let metricDetailSheet_closeButton = "metricDetailSheet_closeButton"
+
     // MARK: - Workout List
 
     static let workoutsEllipsisMenu = "workoutsEllipsisMenu"

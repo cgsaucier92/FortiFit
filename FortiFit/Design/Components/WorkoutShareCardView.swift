@@ -8,15 +8,10 @@ struct WorkoutShareCardView: View {
         workout.workoutType == "Strength Training" || workout.workoutType == "HIIT"
     }
 
-    private var isCardioOrSprints: Bool {
-        workout.workoutType == "Cardio"
-    }
-
     private var sortedExerciseSets: [ExerciseSet] {
         workout.exerciseSets.sorted { $0.sortOrder < $1.sortOrder }
     }
 
-    /// Groups exercises by name, preserving sort order, and returns (name, sets) tuples.
     private var groupedExercises: [(name: String, sets: [ExerciseSet])] {
         let sorted = sortedExerciseSets
         let grouped = Dictionary(grouping: sorted, by: { $0.exerciseName })
@@ -41,7 +36,6 @@ struct WorkoutShareCardView: View {
                 .lineLimit(2)
                 .truncationMode(.tail)
 
-            // Signature divider
             FortiFitDivider()
 
             // Date/time line
@@ -54,9 +48,14 @@ struct WorkoutShareCardView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(FortiFitColors.secondaryText)
 
-            // Summary pills
-            if hasSummaryPills {
-                summaryPillsRow
+            // Stat-card grid
+            let cards = shareCardStats
+            if !cards.isEmpty {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(cards, id: \.label) { card in
+                        shareStatCard(card)
+                    }
+                }
             }
 
             // Exercises section (Strength/HIIT only)
@@ -96,49 +95,141 @@ struct WorkoutShareCardView: View {
         return dateStr
     }
 
-    // MARK: - Summary Pills
+    // MARK: - Share Stat Card Data
 
-    private var hasSummaryPills: Bool {
-        workout.rpe != nil || workout.durationMinutes != nil || (isCardioOrSprints && workout.distanceKm != nil)
+    private struct ShareStatData {
+        let symbol: String
+        let label: String
+        let value: String
+        let unit: String?
     }
 
-    private var summaryPillsRow: some View {
-        HStack(spacing: 8) {
-            if let rpe = workout.rpe {
-                summaryPill(label: "EFFORT", value: "\(rpe)", field: "RPE")
-            }
-            if let duration = workout.durationMinutes {
-                summaryPill(label: "DURATION", value: "\(duration) min", field: "Duration")
-            }
-            if isCardioOrSprints, let distance = workout.distanceKm {
-                summaryPill(label: "DISTANCE", value: UnitConversion.displayDistance(distance, useMiles: userSettings.useMiles), field: "Distance")
+    private var shareCardStats: [ShareStatData] {
+        var cards: [ShareStatData] = []
+
+        if let rpe = workout.rpe {
+            cards.append(ShareStatData(
+                symbol: WorkoutMetric.effort.sfSymbol,
+                label: "Effort",
+                value: AppConstants.effortLabel(for: rpe),
+                unit: nil
+            ))
+        }
+        if let duration = workout.durationMinutes {
+            cards.append(ShareStatData(
+                symbol: WorkoutMetric.duration.sfSymbol,
+                label: "Duration",
+                value: "\(duration)",
+                unit: "min"
+            ))
+        }
+        if workout.workoutType == "Cardio", let distance = workout.distanceKm {
+            if userSettings.useMiles {
+                cards.append(ShareStatData(
+                    symbol: WorkoutMetric.distance.sfSymbol,
+                    label: "Distance",
+                    value: String(format: "%.1f", UnitConversion.kmToMiles(distance)),
+                    unit: "mi"
+                ))
+            } else {
+                cards.append(ShareStatData(
+                    symbol: WorkoutMetric.distance.sfSymbol,
+                    label: "Distance",
+                    value: String(format: "%.1f", distance),
+                    unit: "km"
+                ))
             }
         }
+        if let avg = workout.avgHeartRate {
+            cards.append(ShareStatData(
+                symbol: WorkoutMetric.avgHR.sfSymbol,
+                label: "Avg HR",
+                value: "\(avg)",
+                unit: "bpm"
+            ))
+        }
+        if let max = workout.maxHeartRate {
+            cards.append(ShareStatData(
+                symbol: WorkoutMetric.maxHR.sfSymbol,
+                label: "Max HR",
+                value: "\(max)",
+                unit: "bpm"
+            ))
+        }
+        if let active = workout.activeEnergyKcal {
+            cards.append(ShareStatData(
+                symbol: WorkoutMetric.activeKcal.sfSymbol,
+                label: "Active kcal",
+                value: "\(Int(active))",
+                unit: "kcal"
+            ))
+        }
+        if let total = workout.totalEnergyBurnedKcal {
+            cards.append(ShareStatData(
+                symbol: WorkoutMetric.totalKcal.sfSymbol,
+                label: "Total kcal",
+                value: "\(Int(total))",
+                unit: "kcal"
+            ))
+        }
+        if let elevation = workout.elevationAscendedMeters {
+            if userSettings.useMiles {
+                cards.append(ShareStatData(
+                    symbol: WorkoutMetric.elevation.sfSymbol,
+                    label: "Elevation",
+                    value: "\(Int(elevation * 3.28084))",
+                    unit: "ft"
+                ))
+            } else {
+                cards.append(ShareStatData(
+                    symbol: WorkoutMetric.elevation.sfSymbol,
+                    label: "Elevation",
+                    value: "\(Int(elevation))",
+                    unit: "m"
+                ))
+            }
+        }
+        if let exerciseMin = workout.exerciseMinutes {
+            cards.append(ShareStatData(
+                symbol: WorkoutMetric.exerciseMinutes.sfSymbol,
+                label: "Exercise min",
+                value: "\(exerciseMin)",
+                unit: "min"
+            ))
+        }
+
+        return cards
     }
 
-    private func summaryPill(label: String, value: String, field: String) -> some View {
-        VStack(spacing: 2) {
+    private func shareStatCard(_ data: ShareStatData) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                if let symbolName = AppConstants.summaryFieldSymbols[field] {
-                    Image(systemName: symbolName)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(FortiFitColors.mutedText)
-                }
-                Text(label)
-                    .font(.system(size: 11, weight: .bold))
+                Image(systemName: data.symbol)
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(FortiFitColors.mutedText)
-                    .kerning(1)
+                Text(data.label)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(FortiFitColors.mutedText)
             }
-            Text(value)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(FortiFitColors.primaryText)
+
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(data.value)
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(FortiFitColors.primaryText)
+                if let unit = data.unit {
+                    Text(unit)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.secondaryText)
+                }
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(FortiFitColors.elevatedSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(FortiFitColors.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(FortiFitColors.border, lineWidth: 1)
         )
     }
@@ -147,7 +238,6 @@ struct WorkoutShareCardView: View {
 
     private var exercisesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Section divider
             Rectangle()
                 .fill(FortiFitColors.border)
                 .frame(height: 1)

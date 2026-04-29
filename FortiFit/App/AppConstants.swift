@@ -54,10 +54,29 @@ enum AppConstants {
 
     // MARK: - Workout Detail Summary Icons
     static let summaryFieldSymbols: [String: String] = [
-        "RPE": "heart.gauge.open",
+        "RPE": "chart.bar.fill",
         "Duration": "clock",
-        "Distance": "ruler"
+        "Distance": "ruler",
+        "AvgHR": "heart.fill",
+        "MaxHR": "heart.fill",
+        "ActiveKcal": "flame.fill",
+        "TotalKcal": "flame",
+        "Elevation": "arrow.up.right",
+        "ExerciseMinutes": "figure.walk"
     ]
+
+    // MARK: - Effort Label Mapping
+
+    static func effortLabel(for score: Int) -> String {
+        switch score {
+        case 1, 2: return "Easy"
+        case 3, 4: return "Light"
+        case 5, 6: return "Moderate"
+        case 7, 8: return "Hard"
+        case 9, 10: return "All Out"
+        default: return "Unknown"
+        }
+    }
 
     // MARK: - Goal Card Header Labels
 

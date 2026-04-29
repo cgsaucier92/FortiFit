@@ -860,14 +860,14 @@ final class HealthKitSmokeTests: XCTestCase {
 
     // MARK: - Smoke HK-6: Health Glyph on Home Screen
 
-    /// HK-linked workout shows the pink heart glyph next to its name on the Home screen.
+    /// HK-linked Apple Watch workout shows the health glyph trailing the date row on the Home screen.
     func test_hkLinkedWorkout_showsHealthGlyphOnHome() {
         // Wait for seed to complete on Home
         let seedLabel = app.staticTexts["HK Smoke Test Run"]
         XCTAssertTrue(seedLabel.waitForExistence(timeout: 5), "Seeded HK workout should appear on Home")
 
         let glyphImage = app.images["healthGlyph"]
-        XCTAssertTrue(glyphImage.exists, "Heart glyph should be visible next to HK-linked workout name on Home")
+        XCTAssertTrue(glyphImage.exists, "Health glyph should be visible trailing the date row for Apple Watch workout on Home")
     }
 }
 
@@ -950,6 +950,324 @@ final class MatchPromptSmokeTests: XCTestCase {
         XCTAssertFalse(
             app.staticTexts["Possible Match"].waitForExistence(timeout: 2),
             "Match Prompt Sheet should dismiss after Keep Separate"
+        )
+    }
+}
+
+// MARK: - Workout Detail Redesign Smoke Tests (Seeded HK Data)
+
+/// Tests for the Phase 8.5 stat-card grid, effort label rendering,
+/// source indicator format, and glyph positioning.
+final class WorkoutDetailRedesignSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state", "--seed-hk-workout"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    private func navigateToSeededWorkoutDetail() {
+        let seedLabel = app.staticTexts["HK Smoke Test Run"]
+        XCTAssertTrue(seedLabel.waitForExistence(timeout: 5), "Seeded HK workout should appear on Home")
+
+        app.tabBars.buttons["WORKOUTS"].tap()
+        let typeCard = app.buttons["workoutTypeCard_Cardio"]
+        XCTAssertTrue(typeCard.waitForExistence(timeout: 3))
+        typeCard.tap()
+
+        let workoutRow = app.staticTexts["HK Smoke Test Run"]
+        XCTAssertTrue(workoutRow.waitForExistence(timeout: 3))
+        workoutRow.tap()
+    }
+
+    // MARK: - Stat Card Grid
+
+    /// Each visible stat card opens the correct metric detail sheet.
+    func test_workoutDetail_eachStatCard_opensCorrectMetricSheet() {
+        navigateToSeededWorkoutDetail()
+
+        let cardMetricPairs: [(id: String, title: String)] = [
+            ("workoutDetail_summaryCard_effort", "Effort details"),
+            ("workoutDetail_summaryCard_duration", "Duration details"),
+            ("workoutDetail_summaryCard_distance", "Distance details"),
+            ("workoutDetail_summaryCard_avgHR", "Avg HR details"),
+            ("workoutDetail_summaryCard_maxHR", "Max HR details"),
+            ("workoutDetail_summaryCard_activeKcal", "Active kcal details"),
+        ]
+
+        for (cardID, expectedTitle) in cardMetricPairs {
+            let card = app.buttons[cardID]
+            if card.waitForExistence(timeout: 2) {
+                card.tap()
+                XCTAssertTrue(
+                    app.staticTexts[expectedTitle].waitForExistence(timeout: 3),
+                    "Sheet title '\(expectedTitle)' should appear after tapping \(cardID)"
+                )
+                let closeButton = app.buttons["metricDetailSheet_closeButton"]
+                XCTAssertTrue(closeButton.waitForExistence(timeout: 2))
+                closeButton.tap()
+                // Wait for sheet to dismiss
+                _ = app.buttons[cardID].waitForExistence(timeout: 2)
+            }
+        }
+    }
+
+    // MARK: - Effort Label
+
+    /// Effort stat card shows descriptive label (e.g. "Hard"), not the integer "7".
+    func test_workoutDetail_effortRendersDescriptiveLabel_notInteger() {
+        navigateToSeededWorkoutDetail()
+
+        let effortCard = app.buttons["workoutDetail_summaryCard_effort"]
+        XCTAssertTrue(effortCard.waitForExistence(timeout: 3), "Effort card should exist")
+
+        XCTAssertTrue(
+            effortCard.staticTexts["Hard"].exists,
+            "Effort card should display 'Hard' (RPE 7 maps to Hard band)"
+        )
+
+        let cardTexts = effortCard.staticTexts.allElementsBoundByIndex.map { $0.label }
+        let rawIntegerVisible = cardTexts.contains("7")
+        XCTAssertFalse(rawIntegerVisible, "Effort card should NOT show the raw integer '7'")
+    }
+
+    // MARK: - Source Indicator
+
+    /// Apple Watch source renders as "Apple Workout" with trailing glyph.
+    func test_workoutDetail_appleWatchSource_rendersAppleWorkoutLabel_withTrailingGlyph() {
+        navigateToSeededWorkoutDetail()
+
+        let indicator = app.buttons["workoutDetail_healthSourceIndicator"]
+        XCTAssertTrue(indicator.waitForExistence(timeout: 3))
+
+        XCTAssertTrue(
+            indicator.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Apple Workout")).firstMatch.exists,
+            "Source indicator should contain 'Apple Workout'"
+        )
+    }
+
+    // MARK: - Glyph on Workouts Tab
+
+    /// Apple Watch workout shows glyph trailing the date row on the Workouts tab.
+    func test_workoutsTab_appleWatchWorkout_showsGlyphTrailing_inDateRow() {
+        let seedLabel = app.staticTexts["HK Smoke Test Run"]
+        XCTAssertTrue(seedLabel.waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["WORKOUTS"].tap()
+        let typeCard = app.buttons["workoutTypeCard_Cardio"]
+        XCTAssertTrue(typeCard.waitForExistence(timeout: 3))
+        typeCard.tap()
+
+        let glyphImage = app.images["healthGlyph"]
+        XCTAssertTrue(glyphImage.waitForExistence(timeout: 3), "Health glyph should be visible on the Workouts preview row for Apple Watch workout")
+    }
+}
+
+// MARK: - Exercises Header Hidden Smoke Tests
+
+/// Tests that the Exercises header is hidden when no exercises are present.
+final class ExercisesHeaderSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    /// Log a Strength workout without exercises; verify no "Exercises" header appears.
+    func test_workoutDetail_exercisesHeaderHidden_whenNoExerciseSets() {
+        app.tabBars.buttons["HOME"].tap()
+        app.buttons["logWorkoutCTA"].tap()
+
+        let nameField = app.textFields["workoutNameInput"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.tap()
+        nameField.typeText("No Exercises Workout")
+
+        app.buttons["saveWorkoutButton"].tap()
+
+        let workoutLabel = app.staticTexts["No Exercises Workout"]
+        XCTAssertTrue(workoutLabel.waitForExistence(timeout: 3))
+        workoutLabel.tap()
+
+        XCTAssertFalse(
+            app.staticTexts["Exercises"].waitForExistence(timeout: 2),
+            "Exercises header should not appear when workout has no exercise sets"
+        )
+    }
+}
+
+// MARK: - Effort Dropdown Format Smoke Tests
+
+/// Tests that the Log Workout effort dropdown shows "Label (Number)" format.
+final class EffortDropdownSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    /// Effort dropdown options use "Label (Number)" format.
+    func test_logWorkout_effortDropdown_rendersLabelAndNumberFormat() {
+        app.tabBars.buttons["HOME"].tap()
+        app.buttons["logWorkoutCTA"].tap()
+
+        let nameField = app.textFields["workoutNameInput"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+
+        // Scroll down to find the effort section — tap "Select effort" placeholder
+        let effortPlaceholder = app.staticTexts["Select effort"]
+        XCTAssertTrue(effortPlaceholder.waitForExistence(timeout: 3), "Effort dropdown placeholder should be visible")
+        effortPlaceholder.tap()
+
+        // After expanding, check that option labels use "Label (Number)" format
+        XCTAssertTrue(
+            app.staticTexts["Easy (1)"].waitForExistence(timeout: 2),
+            "Effort option 'Easy (1)' should be visible"
+        )
+        XCTAssertTrue(app.staticTexts["Hard (7)"].exists, "Effort option 'Hard (7)' should be visible")
+        XCTAssertTrue(app.staticTexts["All Out (10)"].exists, "Effort option 'All Out (10)' should be visible")
+    }
+}
+
+// MARK: - Strava Source Smoke Tests (Seeded Strava Data)
+
+/// Tests for Strava-sourced workouts: no glyph, correct source name.
+final class StravaSourceSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state", "--seed-hk-strava-workout"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    private func navigateToSeededStravaWorkoutDetail() {
+        let seedLabel = app.staticTexts["HK Strava Ride"]
+        XCTAssertTrue(seedLabel.waitForExistence(timeout: 5), "Seeded Strava workout should appear on Home")
+
+        app.tabBars.buttons["WORKOUTS"].tap()
+        let typeCard = app.buttons["workoutTypeCard_Cardio"]
+        XCTAssertTrue(typeCard.waitForExistence(timeout: 3))
+        typeCard.tap()
+
+        let workoutRow = app.staticTexts["HK Strava Ride"]
+        XCTAssertTrue(workoutRow.waitForExistence(timeout: 3))
+        workoutRow.tap()
+    }
+
+    /// Strava-sourced workout shows "Strava" in source indicator, no glyph.
+    func test_workoutDetail_stravaSource_rendersStravaLabel_withoutGlyph() {
+        navigateToSeededStravaWorkoutDetail()
+
+        let indicator = app.buttons["workoutDetail_healthSourceIndicator"]
+        XCTAssertTrue(indicator.waitForExistence(timeout: 3))
+
+        XCTAssertTrue(
+            indicator.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Strava")).firstMatch.exists,
+            "Source indicator should contain 'Strava'"
+        )
+
+        XCTAssertFalse(
+            app.images["healthGlyph"].exists,
+            "Health glyph should NOT appear for Strava-sourced workout"
+        )
+    }
+
+    /// Strava workout on the Workouts tab shows no glyph on the preview row.
+    func test_workoutsTab_stravaWorkout_showsNoGlyph() {
+        let seedLabel = app.staticTexts["HK Strava Ride"]
+        XCTAssertTrue(seedLabel.waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["WORKOUTS"].tap()
+        let typeCard = app.buttons["workoutTypeCard_Cardio"]
+        XCTAssertTrue(typeCard.waitForExistence(timeout: 3))
+        typeCard.tap()
+
+        XCTAssertFalse(
+            app.images["healthGlyph"].exists,
+            "Health glyph should NOT appear on Workouts preview row for Strava workout"
+        )
+    }
+}
+
+// MARK: - Unknown Source Smoke Tests (Seeded Unknown Source Data)
+
+/// Tests that unknown/unresolvable source bundle IDs render as "another app", never raw bundle IDs.
+final class UnknownSourceSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state", "--seed-hk-unknown-workout"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    /// Source indicator info sheet shows "another app", never a raw bundle ID.
+    func test_sourceIndicatorInfoSheet_neverShowsRawBundleID() {
+        let seedLabel = app.staticTexts["HK Unknown Source Workout"]
+        XCTAssertTrue(seedLabel.waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["WORKOUTS"].tap()
+        let typeCard = app.buttons["workoutTypeCard_Cardio"]
+        XCTAssertTrue(typeCard.waitForExistence(timeout: 3))
+        typeCard.tap()
+
+        let workoutRow = app.staticTexts["HK Unknown Source Workout"]
+        XCTAssertTrue(workoutRow.waitForExistence(timeout: 3))
+        workoutRow.tap()
+
+        let indicator = app.buttons["workoutDetail_healthSourceIndicator"]
+        XCTAssertTrue(indicator.waitForExistence(timeout: 3))
+        indicator.tap()
+
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "another app")).firstMatch.waitForExistence(timeout: 3),
+            "Info sheet should show 'another app' for unresolvable source"
+        )
+
+        XCTAssertFalse(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "com.unknowndev")).firstMatch.exists,
+            "Raw bundle ID 'com.unknowndev' should never appear in the UI"
         )
     }
 }

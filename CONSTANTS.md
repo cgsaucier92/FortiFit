@@ -62,10 +62,12 @@ Icons displayed to the left of each option in the long-press context menu on Hom
 
 | Widget | Option | SF Symbol |
 |--------|--------|-----------|
+| Training Load | See Info | `info.circle` |
+| Power Level | See Info | `info.circle` |
 | Training Load | Configure Settings | `gear` |
 | Weekly Streak | Configure Settings | `gear` |
 
-"Configure Settings" is conditional — rendered only on configurable widgets (Training Load, Weekly Streak). "Reorder Widgets" and "Delete Widget" use no leading SF Symbols.
+"See Info" is conditional — rendered only on Training Load and Power Level widgets. "Configure Settings" is conditional — rendered only on configurable widgets (Training Load, Weekly Streak). "Reorder Widgets" and "Delete Widget" use no leading SF Symbols.
 
 ---
 
@@ -87,7 +89,7 @@ Icons rendered to the left of each label in the Summary section of the Workout D
 
 | Field | SF Symbol | Visible On |
 |-------|-----------|-----------|
-| Effort | `heart.gauge.open` | All workout types (when rated) |
+| Effort | `chart.bar.fill` | All workout types (when rated) |
 | Duration | `clock` | All workout types (when recorded) |
 | Distance | `ruler` | Cardio only (when recorded) |
 
@@ -353,7 +355,35 @@ All alias targets must exist in the Exercise Dictionary.
 
 ## Effort Scale
 
-Integers 1 through 10.
+Integers 1 through 10. Stored on `workout.rpe`; display layer renders the descriptive label per § Effort Label Mapping below.
+
+---
+
+## Effort Label Mapping
+
+Maps the integer 1–10 effort score to a descriptive label. Used on the Workout Detail stat-card grid (label-only display, no number), the Metric Detail Sheet hero block (label + integer in parens), the Log Workout dropdown (`Label (Number)` format per option), the Share Image Card stat-card grid (label-only), and the Match Prompt Sheet FortiFit-side card metadata (`Effort: Label (Number)`).
+
+| Score | Label |
+|---|---|
+| 1 | Easy |
+| 2 | Easy |
+| 3 | Light |
+| 4 | Light |
+| 5 | Moderate |
+| 6 | Moderate |
+| 7 | Hard |
+| 8 | Hard |
+| 9 | All Out |
+| 10 | All Out |
+
+Five bands × two integers each. Mirrors Apple's `workoutEffortScore` band convention.
+
+**Surfaces that stay numeric (do NOT use this mapping):**
+- Effort Trend chart on Trends — y-axis is 1–10 for chart precision; weekly average can be a decimal that doesn't map cleanly to a label (e.g., 5.4). Reference line at 7 may be annotated `Hard threshold` if desired.
+- Workouts tab Filter By → Effort range — power-user surface; integer min/max stepper retained for granular filtering.
+- Training Load algorithm and all other algorithmic consumers — they read `workout.rpe` as an integer directly; the label is purely a display concern.
+
+**Strings live in `AppConstants`** — never hardcode in views. Helper function (e.g., `AppConstants.effortLabel(for: Int) → String`) returns the label for a given integer.
 
 ---
 
@@ -728,6 +758,55 @@ User-facing strings rendered in the Chart Info Modal (see SCREENS.md § Trends �
 
 ---
 
+## Widget Info Modal Copy
+
+User-facing strings rendered in the See Info Modal (see SCREENS.md § Standard Patterns → See Info Modal) when invoked from a Home widget's long-press → "See Info". Mirrors the structure of § Chart Info Modal Copy. One entry per configurable widget (Training Load, Power Level). Stored in `AppConstants` as a static dictionary keyed by `widgetType`. Sections render in the order listed below.
+
+### Training Load (`trainingLoad`)
+
+**Title:** About Training Load
+
+**Intro:** Training Load is a 0–100 score that summarizes how much training stress you've accumulated over the past 10 days. The zone label and advisory beneath it suggest whether to push, ease off, or rest today.
+
+**How it's calculated:** Each workout you've logged in the last 10 days contributes a stress value based on your Effort rating for that session, how long it lasted, the workout type, and the volume you put in (sets × reps for Strength and HIIT). Recent sessions count more than older ones — stress decays over about 10 days.
+
+**Your experience level:** Set via long-press → Configure Settings on the widget. Beginner, Intermediate, and Advanced each have a different recovery rate and stress capacity. Higher experience means stress decays faster and you can absorb more training before the score climbs into peak territory.
+
+**Consecutive training days:** Stacking training days back-to-back adds a small multiplier to your score, up to 32% extra at five or more consecutive days. Take a rest day and the multiplier resets.
+
+**Same-day floor:** If you've already trained today, the score won't drop low enough to suggest "train hard" — there's a built-in floor based on what you logged today that lifts on its own tomorrow.
+
+**Zones:**
+- Low (1–30, green): well recovered
+- Moderate (31–55, yellow): some accumulated fatigue
+- High (56–80, dark yellow): significant fatigue
+- Peak (81–100, red): high stress, prioritize recovery
+
+**What's not counted:** Workouts logged with no exercises, no Effort rating, and no duration are skipped — they're treated as placeholder entries with no meaningful stress to add.
+
+**Empty state:** If you haven't logged a workout in the last 10 days, the score sits at 0 (Resting) and the advisory shows "No recent training stress."
+
+### Power Level (`powerLevel`)
+
+**Title:** About Power Level
+
+**Intro:** Power Level shows whether your strength training volume is rising, holding steady, or trending down compared to where you were a month ago. It answers "am I progressing?" at a glance.
+
+**How it's calculated:** FortiFit averages your workout volume across the last 30 days and compares it to your average across the prior 30 days. Volume per workout is sets × reps × weight, summed across every exercise in the session.
+
+**What workouts count:** Only Strength Training and HIIT workouts. Cardio, yoga, pilates, and other types don't track exercise sets, so they don't contribute to a volume comparison.
+
+**Bodyweight exercises:** Sets logged without a weight value count as if the weight were 1, since they still represent work performed. This keeps bodyweight volume from disappearing entirely from the comparison.
+
+**Status thresholds:**
+- Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days
+- Steady (—, blue): within 10% in either direction — your volume is holding consistent
+- Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days
+
+**Empty state:** If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.
+
+---
+
 ## Share Image Card Styling
 
 Visual tokens for the styled PNG image produced by `WorkoutShareService` (see `SCREENS.md` § Workout Detail → Share Image Card and `SERVICES.md` § WorkoutShareService).
@@ -735,17 +814,20 @@ Visual tokens for the styled PNG image produced by `WorkoutShareService` (see `S
 | Element | Value |
 |---------|-------|
 | Background | `#0a0a0a` (app background) |
-| Card border | 1px `#404040`, 12px corner radius |
+| Outer card border | 1px `#404040`, 12px corner radius |
 | Inner padding | 20px |
 | Header | "✦ FitNavi" in `#3b82f6`, 11px, 700 weight, uppercase, 2px spacing |
 | Workout name | `#e5e5e5`, 20px, 900 weight |
 | Date/time | `#737373`, 13px, 600 weight |
 | Workout type | `#a3a3a3`, 13px, 600 weight |
-| Summary pills | `#2d2d2d` background, `#404040` border, 8px corner radius. Label: `#737373` 11px uppercase 700w. Value: `#e5e5e5` 15px 700w |
-| Summary pill icons | SF Symbols per § Workout Detail Summary Icons, rendered at same size and color as the pill label text, with standard spacing between icon and label |
+| Stat card grid | 2-column grid of bordered stat cards mirroring the Workout Detail Summary grid (see SCREENS.md § Workout Detail → Summary). Cards render only when their underlying value is non-nil; grid wraps left-to-right, top-to-bottom. No tap behavior (static image). |
+| Stat card container | `#1a1a1a` background, `#404040` 1px border, 12px corner radius, 14px horizontal × 12px vertical internal padding |
+| Stat card label row | SF symbol + sentence-case label, both Muted Text `#737373`, 12px, 700 weight. No chevron in the share-image variant — there's no tap target. |
+| Stat card value | Primary Text `#e5e5e5`, 22px, 800 weight, sentence case for label-style values (Effort), numeric for everything else with inline muted unit (`#a3a3a3`, 12px, 600 weight) |
+| Stat card icons | SF Symbols per § Workout Detail Summary Icons (Effort uses `chart.bar.fill`) and § Workout Detail Health Data Icons. Rendered at same size and color as the label text. |
+| Effort label rendering | Descriptive label only (e.g., `Hard`) per § Effort Label Mapping — no number shown on the share image |
 | Exercise name | `#e5e5e5`, 15px, 700 weight |
 | Set detail | `#a3a3a3`, 13px, 600 weight. Format: `{sets} × {reps} @ {weight} {unit}` or `{sets} × {reps} (BW)` |
-| Distance | Same style as set detail |
 | Section dividers | `#404040` thin line with muted header text |
 | Footer | "✦ FitNavi" in `#3b82f6`, 11px, 700 weight, uppercase, 2px spacing, centered |
 | Image width | 390pt |

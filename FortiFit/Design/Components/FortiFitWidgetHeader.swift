@@ -16,7 +16,6 @@ struct FortiFitWidgetHeader: View {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(FortiFitColors.mutedText)
-                    .rotationEffect(.degrees(90))
             }
         }
     }

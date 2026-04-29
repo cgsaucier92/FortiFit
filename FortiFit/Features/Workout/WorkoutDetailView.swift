@@ -16,6 +16,7 @@ struct WorkoutDetailView: View {
     @State private var showShowOnPlanToast = false
     @State private var showHealthSourceInfoSheet = false
     @State private var headerHeight: CGFloat = 0
+    @State private var activeMetric: WorkoutMetric?
 
     private var settings: UserSettings { UserSettings.shared }
 
@@ -32,12 +33,14 @@ struct WorkoutDetailView: View {
                         .foregroundStyle(FortiFitColors.mutedText)
 
                     if workout.isHealthKitLinked, let activityType = workout.healthKitActivityType {
+                        let resolvedSource = resolvedSourceName
                         Button {
                             showHealthSourceInfoSheet = true
                         } label: {
                             FortiFitHealthSourceIndicator(
                                 activityType: activityType,
-                                sourceName: nil
+                                sourceName: resolvedSource,
+                                showGlyph: workout.isAppleWatchSourced
                             )
                         }
                         .accessibilityIdentifier(AccessibilityID.workoutDetailHealthSourceIndicator)
@@ -45,14 +48,8 @@ struct WorkoutDetailView: View {
 
                     FortiFitDivider()
 
-                    // Content based on workout type
-                    if workout.workoutType == "Strength Training" || workout.workoutType == "HIIT" {
-                        strengthDetailSection
-                    } else if workout.workoutType == "Cardio" {
-                        cardioDetailSection
-                    } else {
-                        yogaDetailSection
-                    }
+                    // Summary stat-card grid + Exercises
+                    summarySection
 
                     FortiFitDivider()
 
@@ -252,11 +249,14 @@ struct WorkoutDetailView: View {
         .sheet(isPresented: $showHealthSourceInfoSheet) {
             FortiFitHealthSourceInfoSheet(
                 workout: workout,
-                sourceName: nil,
+                sourceName: resolvedSourceName,
                 onUnlink: {
                     WorkoutService.unlink(workout, context: modelContext)
                 }
             )
+        }
+        .sheet(item: $activeMetric) { metric in
+            FortiFitMetricDetailSheet(workout: workout, metric: metric)
         }
         .onChange(of: viewModel.showShareError) { _, newValue in
             if newValue {
@@ -269,45 +269,56 @@ struct WorkoutDetailView: View {
         }
     }
 
-    // MARK: - Strength Detail
+    // MARK: - Unified Summary (stat-card grid + exercises)
 
-    private var strengthDetailSection: some View {
+    private var summarySection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            let items = SummaryItemBuilder.items(for: workout)
-            if !items.isEmpty {
+            let cards = summaryCards
+            if !cards.isEmpty {
                 FortiFitWidgetHeader(title: "Summary")
 
-                FortiFitCard(borderColor: FortiFitColors.border) {
-                    FortiFitSummaryGrid(items: items)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(cards, id: \.identifier) { card in
+                        FortiFitStatCard(
+                            symbolName: card.symbol,
+                            label: card.label,
+                            value: card.value,
+                            unit: card.unit,
+                            accessibilityIdentifier: card.identifier,
+                            onTap: { activeMetric = card.metric }
+                        )
+                    }
                 }
             }
 
-            FortiFitWidgetHeader(title: "Exercises")
+            if (workout.workoutType == "Strength Training" || workout.workoutType == "HIIT") && !workout.exerciseSets.isEmpty {
+                FortiFitWidgetHeader(title: "Exercises")
 
-            let grouped = Dictionary(grouping: workout.exerciseSets.sorted { $0.sortOrder < $1.sortOrder }, by: { $0.exerciseName })
-            let sortedNames = grouped.keys.sorted { name1, name2 in
-                let order1 = grouped[name1]?.first?.sortOrder ?? 0
-                let order2 = grouped[name2]?.first?.sortOrder ?? 0
-                return order1 < order2
-            }
+                let grouped = Dictionary(grouping: workout.exerciseSets.sorted { $0.sortOrder < $1.sortOrder }, by: { $0.exerciseName })
+                let sortedNames = grouped.keys.sorted { name1, name2 in
+                    let order1 = grouped[name1]?.first?.sortOrder ?? 0
+                    let order2 = grouped[name2]?.first?.sortOrder ?? 0
+                    return order1 < order2
+                }
 
-            ForEach(sortedNames, id: \.self) { exerciseName in
-                if let sets = grouped[exerciseName] {
-                    FortiFitCard(borderColor: FortiFitColors.border) {
-                        VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                            Text(exerciseName)
-                                .font(FortiFitTypography.dataValue)
-                                .foregroundStyle(FortiFitColors.primaryText)
+                ForEach(sortedNames, id: \.self) { exerciseName in
+                    if let sets = grouped[exerciseName] {
+                        FortiFitCard(borderColor: FortiFitColors.border) {
+                            VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                                Text(exerciseName)
+                                    .font(FortiFitTypography.dataValue)
+                                    .foregroundStyle(FortiFitColors.primaryText)
 
-                            ForEach(sets) { exerciseSet in
-                                HStack {
-                                    Text("\(exerciseSet.sets) sets × \(exerciseSet.reps) reps")
-                                        .font(FortiFitTypography.bodySmall)
-                                        .foregroundStyle(FortiFitColors.secondaryText)
-                                    Spacer()
-                                    Text(UnitConversion.displayWeight(exerciseSet.weightKg, useLbs: settings.useLbs))
-                                        .font(FortiFitTypography.dataValue)
-                                        .foregroundStyle(FortiFitColors.primaryAccent)
+                                ForEach(sets) { exerciseSet in
+                                    HStack {
+                                        Text("\(exerciseSet.sets) sets × \(exerciseSet.reps) reps")
+                                            .font(FortiFitTypography.bodySmall)
+                                            .foregroundStyle(FortiFitColors.secondaryText)
+                                        Spacer()
+                                        Text(UnitConversion.displayWeight(exerciseSet.weightKg, useLbs: settings.useLbs))
+                                            .font(FortiFitTypography.dataValue)
+                                            .foregroundStyle(FortiFitColors.primaryAccent)
+                                    }
                                 }
                             }
                         }
@@ -317,42 +328,154 @@ struct WorkoutDetailView: View {
         }
     }
 
-    // MARK: - Cardio Detail
+    // MARK: - Summary Card Data
 
-    private var cardioDetailSection: some View {
-        VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            FortiFitWidgetHeader(title: "Summary")
-
-            let items = SummaryItemBuilder.items(for: workout)
-            FortiFitCard(borderColor: FortiFitColors.border) {
-                if items.isEmpty {
-                    Text(workout.workoutType)
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(FortiFitColors.secondaryText)
-                } else {
-                    FortiFitSummaryGrid(items: items)
-                }
-            }
-        }
+    private struct StatCardData {
+        let metric: WorkoutMetric
+        let symbol: String
+        let label: String
+        let value: String
+        let unit: String?
+        let identifier: String
     }
 
-    // MARK: - Yoga Detail
+    private var summaryCards: [StatCardData] {
+        var cards: [StatCardData] = []
 
-    private var yogaDetailSection: some View {
-        VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            FortiFitWidgetHeader(title: "Summary")
-
-            let items = SummaryItemBuilder.items(for: workout)
-            FortiFitCard(borderColor: FortiFitColors.border) {
-                if items.isEmpty {
-                    Text(workout.workoutType)
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(FortiFitColors.secondaryText)
-                } else {
-                    FortiFitSummaryGrid(items: items)
-                }
-            }
+        if let rpe = workout.rpe {
+            cards.append(StatCardData(
+                metric: .effort,
+                symbol: WorkoutMetric.effort.sfSymbol,
+                label: "Effort",
+                value: AppConstants.effortLabel(for: rpe),
+                unit: nil,
+                identifier: AccessibilityID.workoutDetail_summaryCard_effort
+            ))
         }
+
+        if let duration = workout.durationMinutes {
+            cards.append(StatCardData(
+                metric: .duration,
+                symbol: WorkoutMetric.duration.sfSymbol,
+                label: "Duration",
+                value: "\(duration)",
+                unit: "min",
+                identifier: AccessibilityID.workoutDetail_summaryCard_duration
+            ))
+        }
+
+        if workout.workoutType == "Cardio", let distance = workout.distanceKm {
+            let displayVal: String
+            let displayUnit: String
+            if settings.useMiles {
+                displayVal = String(format: "%.1f", UnitConversion.kmToMiles(distance))
+                displayUnit = "mi"
+            } else {
+                displayVal = String(format: "%.1f", distance)
+                displayUnit = "km"
+            }
+            cards.append(StatCardData(
+                metric: .distance,
+                symbol: WorkoutMetric.distance.sfSymbol,
+                label: "Distance",
+                value: displayVal,
+                unit: displayUnit,
+                identifier: AccessibilityID.workoutDetail_summaryCard_distance
+            ))
+        }
+
+        if let avg = workout.avgHeartRate {
+            cards.append(StatCardData(
+                metric: .avgHR,
+                symbol: WorkoutMetric.avgHR.sfSymbol,
+                label: "Avg HR",
+                value: "\(avg)",
+                unit: "bpm",
+                identifier: AccessibilityID.workoutDetail_summaryCard_avgHR
+            ))
+        }
+
+        if let max = workout.maxHeartRate {
+            cards.append(StatCardData(
+                metric: .maxHR,
+                symbol: WorkoutMetric.maxHR.sfSymbol,
+                label: "Max HR",
+                value: "\(max)",
+                unit: "bpm",
+                identifier: AccessibilityID.workoutDetail_summaryCard_maxHR
+            ))
+        }
+
+        if let active = workout.activeEnergyKcal {
+            cards.append(StatCardData(
+                metric: .activeKcal,
+                symbol: WorkoutMetric.activeKcal.sfSymbol,
+                label: "Active kcal",
+                value: "\(Int(active))",
+                unit: "kcal",
+                identifier: AccessibilityID.workoutDetail_summaryCard_activeKcal
+            ))
+        }
+
+        if let total = workout.totalEnergyBurnedKcal {
+            cards.append(StatCardData(
+                metric: .totalKcal,
+                symbol: WorkoutMetric.totalKcal.sfSymbol,
+                label: "Total kcal",
+                value: "\(Int(total))",
+                unit: "kcal",
+                identifier: AccessibilityID.workoutDetail_summaryCard_totalKcal
+            ))
+        }
+
+        if let elevation = workout.elevationAscendedMeters {
+            let displayVal: String
+            let displayUnit: String
+            if settings.useMiles {
+                displayVal = "\(Int(elevation * 3.28084))"
+                displayUnit = "ft"
+            } else {
+                displayVal = "\(Int(elevation))"
+                displayUnit = "m"
+            }
+            cards.append(StatCardData(
+                metric: .elevation,
+                symbol: WorkoutMetric.elevation.sfSymbol,
+                label: "Elevation",
+                value: displayVal,
+                unit: displayUnit,
+                identifier: AccessibilityID.workoutDetail_summaryCard_elevation
+            ))
+        }
+
+        if let exerciseMin = workout.exerciseMinutes {
+            cards.append(StatCardData(
+                metric: .exerciseMinutes,
+                symbol: WorkoutMetric.exerciseMinutes.sfSymbol,
+                label: "Exercise min",
+                value: "\(exerciseMin)",
+                unit: "min",
+                identifier: AccessibilityID.workoutDetail_summaryCard_exerciseMinutes
+            ))
+        }
+
+        return cards
+    }
+
+    // MARK: - Source Name Resolution
+
+    private var resolvedSourceName: String {
+        guard let bundleID = workout.healthKitSourceBundleID else { return "another app" }
+        if bundleID.hasPrefix("com.apple.health") { return "Apple Workout" }
+        let knownSources: [String: String] = [
+            "com.strava": "Strava",
+            "com.fiit.fiit": "Fiit",
+            "com.onepeloton.peloton": "Peloton"
+        ]
+        for (prefix, name) in knownSources {
+            if bundleID.hasPrefix(prefix) { return name }
+        }
+        return "another app"
     }
 
     // MARK: - Notes Section

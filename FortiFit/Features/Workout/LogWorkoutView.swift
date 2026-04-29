@@ -66,14 +66,21 @@ struct LogWorkoutView: View {
                         )
                     }
                     FortiFitSelect(
-                        options: AppConstants.rpeScale.map { String($0) },
+                        options: AppConstants.rpeScale.map { "\(AppConstants.effortLabel(for: $0)) (\($0))" },
                         selected: Binding(
-                            get: { viewModel.selectedRPE.map { String($0) } ?? "" },
-                            set: { viewModel.selectedRPE = Int($0) }
+                            get: {
+                                guard let rpe = viewModel.selectedRPE else { return "" }
+                                return "\(AppConstants.effortLabel(for: rpe)) (\(rpe))"
+                            },
+                            set: { newValue in
+                                if let match = newValue.firstMatch(of: /\((\d+)\)/) {
+                                    viewModel.selectedRPE = Int(match.1)
+                                }
+                            }
                         ),
-                        placeholder: "1–10"
+                        placeholder: "Select effort"
                     )
-                    .frame(width: 120, alignment: .leading)
+                    .frame(width: 180, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Duration (all workout types)
@@ -209,7 +216,7 @@ struct LogWorkoutView: View {
             if let workout = viewModel.editingWorkout {
                 FortiFitHealthSourceInfoSheet(
                     workout: workout,
-                    sourceName: workout.healthKitSourceBundleID
+                    sourceName: LogWorkoutView.resolveSourceName(bundleID: workout.healthKitSourceBundleID)
                 ) {
                     WorkoutService.unlink(workout, context: modelContext)
                 }
@@ -399,6 +406,22 @@ struct LogWorkoutView: View {
                 healthKitHelperText(identifier: AccessibilityID.logWorkoutDistanceReadOnlyHelper)
             }
         }
+    }
+
+    // MARK: - Source Name Resolution
+
+    static func resolveSourceName(bundleID: String?) -> String {
+        guard let bundleID else { return "another app" }
+        if bundleID.hasPrefix("com.apple.health") { return "Apple Workout" }
+        let knownSources: [String: String] = [
+            "com.strava": "Strava",
+            "com.fiit.fiit": "Fiit",
+            "com.onepeloton.peloton": "Peloton"
+        ]
+        for (prefix, name) in knownSources {
+            if bundleID.hasPrefix(prefix) { return name }
+        }
+        return "another app"
     }
 }
 

@@ -490,7 +490,7 @@ final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
     var deletedUUIDsToReturn: [UUID] = []
     var anchorToReturn: Data? = nil
     var effortScoreToReturn: Int? = nil
-    var sourceNameToReturn: String? = "Apple Watch"
+    var sourceNameToReturn: String = "Apple Workout"
     var authorizationRequested = false
 
     func requestAuthorization() async throws {
@@ -513,7 +513,7 @@ final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
         effortScoreToReturn
     }
 
-    func sourceName(for bundleID: String) -> String? {
+    func sourceName(for bundleID: String) -> String {
         sourceNameToReturn
     }
 }

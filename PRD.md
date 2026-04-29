@@ -32,7 +32,7 @@ A holistic health app that helps users track and understand the interaction betw
 - **Typography:** Heavy and commanding. Headings (screen, modal, and section): 800–900 weight, sentence case, normal letter-spacing. Widget headers: 13px, 900 weight, blue, uppercase, 2px spacing. Labels (status badges, micro-labels, pills, metadata tags): exclusively uppercase, 11px, 700 weight, 2px spacing, muted. Body: 13–15px, 600–700 weight. No thin/light weights.
 - **Spacing & Density:** Moderately dense. Screen padding: 20px horizontal, 24px top. Cards: 16px internal padding, 10–14px vertical gaps.
 - **Decorative Motif:** Thin border line interrupted by a centered blue ✦ diamond. Acts as section separator app-wide.
-- **Contextual Hints:** 16x16 circular "?" tooltip buttons next to complex widgets (Training Load, Effort, Power Level), positioned close to the widget title (left-aligned with small padding). Configurable widgets (Training Load, Weekly Streak) expose their settings modal via long-press → "Configure Settings" — see SCREENS.md § Home Screen → Widget Context Menu.
+- **Contextual Hints:** 16x16 circular "?" tooltip button next to the Effort input on Log Workout, positioned close to the label (left-aligned with small padding). Configurable widgets (Training Load, Weekly Streak) expose their settings modal via long-press → "Configure Settings" — see SCREENS.md § Home Screen → Widget Context Menu. Training Load and Power Level widgets, plus every Trends chart, expose their in-depth explanation via long-press → "See Info" — see SCREENS.md § Standard Patterns → See Info Modal.
 - **Inspiration:** Data density of Strong, premium dark aesthetic of Oura Ring, earned-achievement tone of Strava.
 
 ### Interaction Style
@@ -102,7 +102,8 @@ FortiFit/
 │   │   ├── ExerciseSuggestionService.swift  # Autocomplete (see SERVICES.md)
 │   │   ├── HealthKitClient.swift         # HealthKit protocol + DefaultHealthKitClient (see HEALTHKIT.md § 4, SERVICES.md § HealthKitClient)
 │   │   ├── HealthKitSyncService.swift    # HK import, anchor persistence, cascade triggering (see HEALTHKIT.md § 9, SERVICES.md § HealthKitSyncService)
-│   │   └── WorkoutMatcher.swift          # Bidirectional HK dedup (see HEALTHKIT.md § 12, SERVICES.md § WorkoutMatcher)
+│   │   ├── WorkoutMatcher.swift          # Bidirectional HK dedup (see HEALTHKIT.md § 12, SERVICES.md § WorkoutMatcher)
+│   │   └── WorkoutMetricService.swift    # Comparative averages, sparkline data, PR detection for Workout Detail Metric Detail Sheet (see SERVICES.md § WorkoutMetricService)
 │   └── Utilities/
 │       ├── Extensions/                # Date+, Double+, Color+
 │       ├── ShareSheet.swift           # UIActivityViewController wrapper
@@ -163,7 +164,9 @@ FortiFit/
 │   │   ├── FortiFitHealthSourceIndicator.swift  # HK-pink heart + activity type + source name on Workout Detail (see HEALTHKIT.md § 15)
 │   │   ├── FortiFitHealthSourceInfoSheet.swift  # Tap sheet with explainer + Unlink button (see HEALTHKIT.md § 15)
 │   │   ├── FortiFitHealthDataSubsection.swift   # Workout Detail Health Data rows (HR, calories, elevation, etc.) with conditional rendering (see HEALTHKIT.md § 15)
-│   │   ├── FortiFitHealthGlyph.swift             # Small HK-pink heart glyph for peripheral surfaces (Home Recent, Workouts preview, Plan cards) (see HEALTHKIT.md § 15)
+│   │   ├── FortiFitHealthGlyph.swift             # Apple Workout glyph (running figure on green) for peripheral surfaces — Apple-Watch-source-only (see SCREENS.md § Standard Patterns → Peripheral Apple Workout Glyph)
+│   │   ├── FortiFitStatCard.swift                # Bordered stat card (icon + label + big value + chevron) used in Workout Detail Summary grid (see SCREENS.md § Workout Detail → Summary)
+│   │   ├── FortiFitMetricDetailSheet.swift       # Per-metric detail sheet (hero, comparative context, 30-day sparkline, optional PR chip) opened by tapping a stat card (see SCREENS.md § Workout Detail → Metric Detail Sheet)
 │   │   └── MatchPromptSheetView.swift           # Sheet-on-foreground dedup prompt (see HEALTHKIT.md § 13, SCREENS.md § Match Prompt Sheet)
 │   ├── Theme/
 │   │   ├── Colors.swift
@@ -190,6 +193,7 @@ Home → Add Widget Menu (ellipsis → "Add Widget" → overlay)
 Home → Widget Edit Mode (long-press widget → "x" delete, drag reorder)
 Home → Training Load Settings Modal (long-press Training Load widget → "Configure Settings")
 Home → Weekly Streak Settings Modal (long-press Weekly Streak widget → "Configure Settings")
+Home → Widget Info Modal (long-press Training Load or Power Level widget → "See Info")
 Home → Complete Planned Workout (Today's Plan widget → compact confirmation sheet)
 
 Workouts → Log Workout ("+ LOG")
@@ -214,6 +218,7 @@ Template Import → Save Template (deep link → import prompt → confirm)
 Workout Detail → Edit Workout (edit icon → pre-populated Log Workout)
 Workout Detail → Delete Workout (trash icon → confirm)
 Workout Detail → Save as Template (ellipsis, Strength/HIIT only)
+Workout Detail → Metric Detail Sheet (tap any stat card in Summary grid)
 
 Log Workout → Ellipsis → Use Template / Save as Template (new-workout mode only)
 
@@ -422,11 +427,11 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 
 | Screen | Purpose | Key Elements |
 |--------|---------|-------------|
-| Home | Central hub with customizable widgets | Training Load widget (long-press → "Configure Settings" → modal), Workout Info widget, Week Streak widget (long-press → "Configure Settings" → modal), Power Level widget (optional), "+ Log Workout" CTA, Recent Workouts list (5 most recent, HK glyph on imported rows), ellipsis menu for Add Widget, long-press edit mode for widget management |
-| Workouts | Training log organized by type | Expandable Workout Type cards, preview rows (newest-first, HK glyph on imported rows), swipe-to-delete on preview rows, bulk delete workout type via context menu, pagination (30 per page), search (>20 workouts), sort/filter via context menu, template management via ellipsis |
-| Plan | Schedule workouts in advance using templates | Day-by-day scrollable week strip with month indicator, month grid toggle, blue filled circle selected day, scheduled workout cards per day (HK glyph on cards linked to imported workouts), "Complete Planned Workout" flow with compact confirmation sheet, recurrence (weekly/biweekly), skip/restore, date resolution logic, Today's Plan HomeWidget, ellipsis → Saved Templates |
-| Log Workout | Form for new/edit workout | Name, DatePicker (.dateAndTime), type dropdown, Effort, duration. Adapts by type: Strength/HIIT → exercise cards with autocomplete; Cardio → distance; Yoga/Pilates → duration only. Edit mode: pre-populated, type locked, trash icon for delete. Ellipsis for templates (new mode only). When `healthKitUUID != nil`: `durationMinutes`, `distanceKm`, and `date` are disabled with "Linked to Apple Health · tap to unlink" helper text (see HEALTHKIT.md § 15). |
-| Workout Detail | Exercise breakdown for a session | Name, date, time, type, Effort, duration, exercises/distance, session notes. Share icon (renders workout as PNG image card → iOS share sheet), edit icon, trash icon, ellipsis (Strength/HIIT: save as template; when linked: "Unlink from Apple Health"). When `healthKitUUID != nil`: source indicator (HK-pink heart + `healthKitActivityType` + "from {HKSource.name}") below Workout Type row, tappable to open info sheet; "Health Data" subsection below summary rows with conditional HR/calorie/elevation/exercise-minutes/indoor rows (see HEALTHKIT.md § 15). |
+| Home | Central hub with customizable widgets | Training Load widget (long-press → "See Info" → modal; long-press → "Configure Settings" → modal), Workout Info widget, Week Streak widget (long-press → "Configure Settings" → modal), Power Level widget (long-press → "See Info" → modal; optional), "+ Log Workout" CTA, Recent Workouts list (5 most recent, Apple Workout glyph trailing on date row for Apple-Watch-sourced workouts only), ellipsis menu for Add Widget, long-press edit mode for widget management |
+| Workouts | Training log organized by type | Expandable Workout Type cards, preview rows (newest-first, Apple Workout glyph trailing on date row for Apple-Watch-sourced workouts only), swipe-to-delete on preview rows, bulk delete workout type via context menu, pagination (30 per page), search (>20 workouts), sort/filter via context menu, template management via ellipsis |
+| Plan | Schedule workouts in advance using templates | Day-by-day scrollable week strip with month indicator, month grid toggle, blue filled circle selected day, scheduled workout cards per day (Apple Workout glyph trailing on metadata row for Apple-Watch-sourced linked workouts only), "Complete Planned Workout" flow with compact confirmation sheet, recurrence (weekly/biweekly), skip/restore, date resolution logic, Today's Plan HomeWidget, ellipsis → Saved Templates |
+| Log Workout | Form for new/edit workout | Name, DatePicker (.dateAndTime), type dropdown, Effort dropdown (renders `Label (Number)` per CONSTANTS.md § Effort Label Mapping), duration. Adapts by type: Strength/HIIT → exercise cards with autocomplete; Cardio → distance; Yoga/Pilates → duration only. Edit mode: pre-populated, type locked, trash icon for delete. Ellipsis for templates (new mode only). When `healthKitUUID != nil`: `durationMinutes`, `distanceKm`, and `date` are disabled with "Linked to Apple Health · tap to unlink" helper text (see HEALTHKIT.md § 15). |
+| Workout Detail | Exercise breakdown for a session | Name, date, time, type, Summary block (2-column grid of bordered tappable stat cards — Effort/Duration/Distance plus HR/calories/elevation/exercise minutes when present; tap any card → Metric Detail Sheet with comparative average, 30-day sparkline, optional Personal Best chip), conditional Exercises section (hidden when no ExerciseSets), session notes. Share icon (renders workout as PNG image card with the same stat-card grid → iOS share sheet), edit icon, trash icon, ellipsis (Strength/HIIT: save as template; when linked: "Unlink from Apple Health"). When `healthKitUUID != nil`: source indicator (`{healthKitActivityType} · {sourceName} [glyph]` — glyph trailing only for Apple Watch source; sourceName resolves Apple Watch → Apple Workout) below Workout Type row, tappable to open info sheet (see HEALTHKIT.md § 15, SERVICES.md § HealthKitClient → sourceName resolution). |
 | Create Template | Build reusable workout structure | Name, type (Strength/HIIT only), duration, exercise cards. No date/Effort/distance. Edit mode: trash icon + ellipsis (Share Template via QR). |
 | Saved Templates | Manage and share templates | "+" button for new template, list (newest-first), tap to edit, long-press context menu (Share Template via QR, Schedule This Template, Delete Template). |
 | Template Import | Save a template from QR code | Deep link import prompt with template preview, duplicate auto-rename, Cancel/Save. |

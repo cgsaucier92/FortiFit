@@ -235,7 +235,6 @@ struct HomeView: View {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(FortiFitColors.mutedText)
-                    .rotationEffect(.degrees(90))
                     .padding(.trailing, FortiFitSpacing.cardPadding)
             }
         }
@@ -756,25 +755,27 @@ struct HomeView: View {
     private func recentWorkoutRow(_ workout: Workout) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    if workout.isHealthKitLinked {
-                        FortiFitHealthGlyph()
-                    }
-                    Text(workout.name)
-                        .font(FortiFitTypography.dataValue)
-                        .foregroundStyle(FortiFitColors.primaryText)
-                }
+                Text(workout.name)
+                    .font(FortiFitTypography.dataValue)
+                    .foregroundStyle(FortiFitColors.primaryText)
+
+                Text(workout.date.dayFormatted)
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(FortiFitColors.mutedText)
 
                 HStack(spacing: FortiFitSpacing.elementSpacing) {
-                    Text(workout.date.dayFormatted)
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(FortiFitColors.mutedText)
-
-                    if workout.workoutType == "Strength Training" || workout.workoutType == "HIIT" {
-                        let count = Set(workout.exerciseSets.map { $0.exerciseName }).count
-                        Text("· \(count) exercise\(count == 1 ? "" : "s")")
+                    if let duration = workout.durationMinutes {
+                        Text("\(duration) min")
                             .font(FortiFitTypography.bodySmall)
                             .foregroundStyle(FortiFitColors.mutedText)
+                    }
+                    if workout.isAppleWatchSourced {
+                        if workout.durationMinutes != nil {
+                            Text("·")
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.mutedText)
+                        }
+                        FortiFitHealthGlyph()
                     }
                 }
             }

@@ -156,7 +156,7 @@ At the end of each development session, before closing or pausing work:
 | Progress bar animations (0.4s) | PRD.md § Interaction Style |
 | Save button transitions (0.2s) | PRD.md § Interaction Style |
 | Empty states (all screens, per-chart) | SCREENS.md (States tables per screen), CONSTANTS.md § Chart Thresholds |
-| Hint tooltips ("?" on Training Load, Effort, Power Level) | PRD.md § Design Language (Contextual Hints) |
+| Hint tooltip ("?" on Effort input only — Training Load and Power Level deep explanations now via long-press → "See Info"; see SCREENS.md § Standard Patterns → See Info Modal) | PRD.md § Design Language (Contextual Hints) |
 | Goal drag-and-drop | SCREENS.md § Goals |
 | PR auto-detection | SERVICES.md § Goal Auto-Update |
 | Edge cases (missing data, zero targets, BW, long names, backdated workouts, edit/delete cascading) | SERVICES.md § Deletion Cascading Behavior; add integration tests in `FortiFitIntegrationTests` |
@@ -233,6 +233,27 @@ Phases 1 and 2 in HEALTHKIT.md ship together as a single implementation pass. Ca
 | Authorization flow + Info.plist `NSHealthShareUsageDescription` | HEALTHKIT.md § 17 Authorization |
 | New accessibility identifiers (see HEALTHKIT.md § 19 for list) | HEALTHKIT.md § 19 Testing Strategy; TESTING.md |
 | Unit / integration / UI tests for the above | HEALTHKIT.md § 19 Testing Strategy |
+
+### Phase 8.5: Workout Detail Summary Redesign + Source Indicator Polish
+**Goal:** Workout Detail Summary becomes a 2-column grid of bordered, tappable stat cards. Each card opens a Metric Detail Sheet with comparative average + 30-day sparkline + optional Personal Best chip. Effort renders as a descriptive label (Easy/Light/Moderate/Hard/All Out). Apple Watch source name renames to "Apple Workout"; the source indicator drops "from", trails the glyph, and Apple Workout glyph is scoped to Apple Watch sources only on all peripheral surfaces.
+
+| Feature | Where to find spec |
+|---------|-------------------|
+| `FortiFitStatCard` component (icon + label + value + chevron, bordered, tappable) | SCREENS.md § Workout Detail → Summary; PRD.md § Project Structure |
+| `FortiFitMetricDetailSheet` component (hero + comparative + sparkline + PR chip) | SCREENS.md § Workout Detail → Metric Detail Sheet; PRD.md § Project Structure |
+| `WorkoutMetricService` (comparativeAverage, sparklineData, isPersonalBest) | SERVICES.md § WorkoutMetricService |
+| Effort SF Symbol swap (`heart.gauge.open` → `chart.bar.fill`) | CONSTANTS.md § Workout Detail Summary Icons |
+| Effort Label Mapping (1–10 → Easy/Light/Moderate/Hard/All Out) | CONSTANTS.md § Effort Label Mapping |
+| Effort dropdown format `Label (Number)` in Log Workout | SCREENS.md § Log Workout |
+| Effort label propagation (Match Prompt Sheet, Share Image Card) | SCREENS.md § Match Prompt Sheet; § Share Image Card |
+| Source indicator format change (drop "from", trailing glyph, Apple Workout rename) | SCREENS.md § Workout Detail → Source Indicator |
+| `HealthKitClient.sourceName(for:)` returns clean string with "another app" fallback (never raw bundle ID) | SERVICES.md § HealthKitClient |
+| Apple Workout glyph scoped to Apple Watch source only (peripheral surfaces) | SCREENS.md § Standard Patterns → Peripheral Apple Workout Glyph |
+| Glyph repositioning to trailing metadata on Home Recent Workouts, Workouts preview rows, Plan logged-only / completed-scheduled cards | SCREENS.md § Home, § Workouts, § Plan |
+| Conditional Exercises header (hidden when `exerciseSets.isEmpty`) | SCREENS.md § Workout Detail |
+| Share Image Card 2-column stat-card grid | SCREENS.md § Workout Detail → Share Image Card; CONSTANTS.md § Share Image Card Styling |
+| New accessibility identifiers (see TESTING.md § Accessibility Identifiers) | TESTING.md |
+| Unit / integration / UI tests for the above | TESTING.md |
 
 ### Phase 9: Launch Prep
 **Goal:** Ready for TestFlight or App Store.

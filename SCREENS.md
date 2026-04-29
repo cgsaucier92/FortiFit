@@ -45,16 +45,48 @@ Each screen specifies only its seed defaults, card definitions, and any deviatio
 - FortiFitDivider in the header is **per-screen**: kept on form/detail screens (Log Workout, Create Template, Schedule Workout), removed on list/tab screens (Home, Workouts, Plan, Trends, Goals, Saved Templates, Add Goal, Workout Detail).
 - Empty states use `.padding(.top, headerHeight)` so they sit below the floating header.
 
-**Peripheral HealthKit Glyph:** A small HealthKit-pink heart SF Symbol (`heart.fill`, color: HealthKit Pink `#FF2D55` — see CONSTANTS.md § Colors) rendered inline with workout titles on compact surfaces to indicate the workout was imported from Apple Health (i.e., `workout.healthKitUUID != nil`). Used on:
+**Peripheral Apple Workout Glyph:** A small inline glyph rendered alongside workout metadata on compact surfaces to indicate the workout was recorded via Apple's Workout app on Apple Watch. Component: `FortiFitHealthGlyph.swift` (see PRD.md § Project Structure → Design/Components/) — implementation already encapsulates the visual treatment.
+
+**Rendering scope (Apple Watch source only):** the glyph renders **only when** `workout.healthKitUUID != nil` AND `workout.healthKitSourceBundleID` resolves to Apple Watch's source bundle (i.e., `HealthKitClient.sourceName(for:)` returns `Apple Workout`). HK-imported workouts from other sources (Strava, Peloton, etc.) do **not** render this glyph on peripheral surfaces. Future per-source glyphs may be added later — for now, non-Apple-Watch HK workouts look identical to manual workouts on these compact surfaces.
+
+**Position:** Trailing metadata on the workout's date row, separated by ` · ` from the date. The glyph is always the last token on the date row. Duration and distance (if present) render on a separate third row below the date row — they are never on the same row as the glyph.
+
+Examples:
+- `Apr 23, 2026 · [glyph]` (date row with glyph)
+- `45 min` (third row — duration)
+- `Apr 23, 2026` (date row without glyph, manual workout)
+
+**Used on (per the scope rule above):**
 - Home → Recent Workouts list rows
 - Workouts tab → Expanded Workout Preview Rows
-- Plan tab → Logged-only workout cards and completed scheduled workout cards linked to an imported Workout
+- Plan tab → Logged-only workout cards and completed scheduled workout cards linked to an Apple Watch–sourced Workout
 
-**Rendering:** 12px glyph (slightly smaller than surrounding body text to read as metadata rather than competing with the title), centered vertically with the workout name baseline, 6px right padding before the name. Glyph is always rendered in HealthKit Pink regardless of surrounding text color — the color is the signal.
+**Not used on:** Workout Detail (which uses the full Source Indicator row instead — see § Workout Detail), Log Workout (which uses disabled fields + helper text instead — see § Log Workout § Edit Mode — HealthKit-Linked Workouts), Trends, Goals, any widget body. The peripheral glyph is scoped exclusively to compact workout-metadata surfaces.
 
-**Not used on:** Workout Detail (which uses the full Source Indicator row instead — see § Workout Detail), Log Workout (which uses disabled fields + helper text instead — see § Log Workout § Edit Mode — HealthKit-Linked Workouts), Trends, Goals, any widget body. The glyph is scoped exclusively to workout-title surfaces where space is tight.
+**See Info Modal:** Shared modal sheet that explains a single feature (a chart, a widget, etc.) in user-friendly depth. Opened via a long-press context-menu item labeled "See Info" with SF Symbol `info.circle`. Used by Trends chart cards (Strength Tracker, Training Frequency, etc.) and by Home widgets (Training Load, Power Level). Reuses one component across both surfaces.
 
-Component: `FortiFitHealthGlyph.swift` (see PRD.md § Project Structure → Design/Components/).
+**Component:** `FortiFitSeeInfoModal.swift` (see PRD.md § Project Structure → Design/Components/). Takes a generic content struct (`title: String`, `intro: String`, `sections: [(heading: String, body: String)]`). Caller supplies the content from the appropriate per-surface lookup in CONSTANTS.md.
+
+**Presentation:** iOS modal sheet (sheet presentation, `.large` detent). Swipe-down to dismiss. Background uses Card Surface `#1a1a1a`.
+
+**Header:** Centered title — "About [Subject]" (e.g., "About Strength Tracker", "About Training Load"). Primary Text `#e5e5e5`, 20px, 900 weight, sentence case, centered. Title style matches the Match Prompt Sheet header (see § Match Prompt Sheet).
+
+**Close button:** Top-right corner, 24x24pt circular, `#2d2d2d` bg, `#404040` border, muted `×`. Same close-button pattern used by the Saved Templates QR Modal and Settings widget modals. Accessibility identifier `seeInfoModal_closeButton` (shared across all uses of this modal).
+
+**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the header. Content rendered top-to-bottom:
+
+1. **Intro paragraph** — first paragraph below the title. Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned, normal line height. No section heading above it.
+2. **Sections** — each section is a heading + body paragraph(s):
+   - Section heading: Primary Text `#e5e5e5`, 15px, 800 weight, sentence case, left-aligned, normal letter-spacing. 24px top margin (separates sections), 8px bottom margin before its body. Follows the standard heading typography rule (see PRD.md § 2 Design Language → Typography).
+   - Body: Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned. Normal paragraph spacing.
+   - Body may include a markdown-style bulleted list when the source copy provides one (e.g., zone breakdowns, status thresholds). Each bullet renders as a row in a `VStack` with a leading `•` glyph and 8pt left indent. Bullet text inherits body styling. Bullets are detected in the source string by line prefix `- ` and rendered by the component — keep parsing logic in the component, not in the constants.
+3. **Footer:** none. Sheet ends after the last section's body, with standard bottom safe-area padding.
+
+**Content sources:** all visible strings are read from `AppConstants` — never hardcoded in views. Each surface that opens this modal has its own copy section in CONSTANTS.md:
+- **Trends chart cards** → CONSTANTS.md § Chart Info Modal Copy
+- **Home widgets** → CONSTANTS.md § Widget Info Modal Copy
+
+**Accessibility:** modal title is announced first by VoiceOver, followed by intro and section headings/bodies in order. Close button reads "Close, button". Section headings traverse as headers (`accessibilityAddTraits(.isHeader)`).
 
 ---
 
@@ -66,7 +98,7 @@ Component: `FortiFitHealthGlyph.swift` (see PRD.md § Project Structure → Desi
 Per § Standard Patterns: Sortable Card System, backed by `HomeWidget` records. Default seed order (first launch only): **Training Load, Workout Info, Weekly Streak**. Home's edit mode is a variant of the standard — see § Widget Edit Mode below.
 
 ### Layout
-Top: Left: blue ellipsis icon (functional — opens Home ellipsis menu). Right: blue gear icon (→ Settings). ✦ divider. Widget cards render vertically by `sortOrder`. Full-width blue-outlined "+ Log Workout" button below last widget. "Recent Workouts" header, then list of 5 most recent (name, date, exercise count, chevron). Imported workouts (where `healthKitUUID != nil`) display a small HealthKit-pink heart glyph (see § Peripheral HealthKit Glyph under Standard Patterns) to the left of the workout name. Recent Workouts list and "+ Log Workout" are unaffected by widget customization.
+Top: Left: blue ellipsis icon (functional — opens Home ellipsis menu). Right: blue gear icon (→ Settings). ✦ divider. Widget cards render vertically by `sortOrder`. Full-width blue-outlined "+ Log Workout" button below last widget. "Recent Workouts" header, then list of 5 most recent workouts. Each row has three lines: (1) workout name, (2) date with trailing Apple Workout glyph when Apple-Watch-sourced (see § Standard Patterns → Peripheral Apple Workout Glyph) — e.g., `Apr 23, 2026 · [glyph]`, (3) duration if recorded (e.g., `45 min`). Trailing chevron (>). Other HK sources and manual workouts render no peripheral glyph. Duration row is omitted when not set. Recent Workouts list and "+ Log Workout" are unaffected by widget customization.
 
 ### Home Ellipsis Menu
 One option: **"Add Widgets"** with SF Symbol `plus.rectangle.on.rectangle` to the left → opens Add Widgets Menu overlay.
@@ -75,13 +107,21 @@ One option: **"Add Widgets"** with SF Symbol `plus.rectangle.on.rectangle` to th
 Per § Standard Patterns: Sortable Card System → Add Menu.
 
 ### Widget Context Menu (Long Press)
-Long-pressing any widget card (uses Standard Long-Press Tease) opens a context menu. Items render top-to-bottom in the order below; "Configure Settings" is conditional and appears only on configurable widgets (Training Load, Weekly Streak).
+Long-pressing any widget card (uses Standard Long-Press Tease) opens a context menu. Items render top-to-bottom in the order below. "See Info" and "Configure Settings" are conditional — they only appear on the widgets noted.
 
-**"Configure Settings":** SF Symbol `gear` to the left of the label (see CONSTANTS.md § Widget Context Menu SF Symbols). Visible only on Training Load and Weekly Streak widgets — opens that widget's existing settings modal (Training Load Settings Modal or Weekly Streak Settings Modal — see § Widget Definitions). Not rendered on Workout Info, Power Level, or Today's Plan widgets.
+**"See Info":** SF Symbol `info.circle` to the left of the label (see CONSTANTS.md § Widget Context Menu SF Symbols). Visible only on Training Load and Power Level widgets — opens the See Info Modal (see § Standard Patterns) populated from CONSTANTS.md § Widget Info Modal Copy for that widget. Not rendered on Workout Info, Weekly Streak, or Today's Plan widgets.
+
+**"Configure Settings":** SF Symbol `gear` to the left of the label. Visible only on Training Load and Weekly Streak widgets — opens that widget's existing settings modal (Training Load Settings Modal or Weekly Streak Settings Modal — see § Widget Definitions). Not rendered on Workout Info, Power Level, or Today's Plan widgets.
 
 **"Reorder Widgets":** Enters Widget Edit Mode (see below). Always visible regardless of widget count.
 
 **"Delete Widget":** Standard delete confirmation for the long-pressed widget. Removes the `HomeWidget` record, removes the card, re-indexes remaining `sortOrder`. No underlying workout data affected.
+
+**Resulting menus by widget type:**
+- **Training Load:** See Info → Configure Settings → Reorder Widgets → Delete Widget (4 items)
+- **Power Level:** See Info → Reorder Widgets → Delete Widget (3 items)
+- **Weekly Streak:** Configure Settings → Reorder Widgets → Delete Widget (3 items)
+- **Workout Info, Today's Plan:** Reorder Widgets → Delete Widget (2 items)
 
 ### Widget Edit Mode
 Entered via the context menu's "Reorder Widgets" item. Unlike the standard reorder pattern, Home combines delete + drag in a single edit mode:
@@ -93,7 +133,7 @@ Entered via the context menu's "Reorder Widgets" item. Unlike the standard reord
 
 ### Widget Definitions
 
-**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header + "?" tooltip positioned close to the title (left-aligned with small padding). Tapping "?" opens the standard Training Load explanation. Settings access via long-press → **"Configure Settings"** (see § Widget Context Menu) opens the **Training Load Settings Modal** (see below). Zone label (e.g., "Moderate"), gradient progress bar (LOW→HIGH), context-aware advisory text below. Advisory shows readiness variant (no workout today) or post-training variant (trained today). See `CONSTANTS.md` for advisory text table and `SERVICES.md` for algorithm. Score updates in real time on workout log/edit/delete.
+**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header. In-depth explanation accessible via long-press → **"See Info"** (see § Widget Context Menu) opens the See Info Modal (see § Standard Patterns) populated from CONSTANTS.md § Widget Info Modal Copy. Settings access via long-press → **"Configure Settings"** opens the **Training Load Settings Modal** (see below). Zone label (e.g., "Moderate"), gradient progress bar (LOW→HIGH), context-aware advisory text below. Advisory shows readiness variant (no workout today) or post-training variant (trained today). See `CONSTANTS.md` for advisory text table and `SERVICES.md` for algorithm. Score updates in real time on workout log/edit/delete.
 
 **Training Load Settings Modal:** Centered modal with dimmed background. "Configure Training Load" heading + "?" tooltip (explains experience affects decay rate and stress capacity). Training Experience card (3-position slider: Beginner/Intermediate/Advanced). Target Workout Duration card (slider 0–300 min) — fallback duration for Training Load algorithm. All changes take effect immediately. Experience level change recalculates Training Load. Dismiss via close button or outside tap.
 
@@ -103,7 +143,7 @@ Entered via the context menu's "Reorder Widgets" item. Unlike the standard reord
 
 **Weekly Streak Settings Modal:** Centered modal with dimmed background. "Configure Streak Widget" heading. Target Workouts per Week card (slider 0–99). Used exclusively by Streak algorithm. All changes take effect immediately. Target workouts change recalculates streak retroactively. Dismiss via close button or outside tap.
 
-**Power Level** (`powerLevel`): Blue-bordered card. "Power Level" header + "?" tooltip positioned close to the title (left-aligned with small padding, matching Training Load layout). Status label (Deloading/Steady/Rising), directional indicator (↓/—/↑ with status-specific color), contextual message (muted italic). See `CONSTANTS.md` for messages, `SERVICES.md` for algorithm.
+**Power Level** (`powerLevel`): Blue-bordered card. "Power Level" header. In-depth explanation accessible via long-press → **"See Info"** (see § Widget Context Menu) opens the See Info Modal (see § Standard Patterns) populated from CONSTANTS.md § Widget Info Modal Copy. Status label (Deloading/Steady/Rising), directional indicator (↓/—/↑ with status-specific color), contextual message (muted italic). See `CONSTANTS.md` for messages, `SERVICES.md` for algorithm.
 
 **Today's Plan** (`todaysPlan`): "Today's Plan" header. Card interior is split into two columns — workout info on the left, calendar square on the right.
 
@@ -143,9 +183,9 @@ Two options: **"CREATE WORKOUT TEMPLATE"** with SF Symbol `square.and.pencil` to
 
 ### Expanded Workout Preview Rows
 Sorted newest-first (or by active sort). Each row separated by #404040 border:
-- **Workout Name** — 16px semibold. If `healthKitUUID != nil`, precede the name with a small HealthKit-pink heart glyph (see § Peripheral HealthKit Glyph under Standard Patterns).
-- **Date** — muted text.
-- **Duration** — muted text, Strength/HIIT only when recorded.
+- **Row 1 — Workout Name** — 16px semibold.
+- **Row 2 — Date row** — muted text. Format: `{date} · {Apple Workout glyph if Apple-Watch-sourced}`. The glyph is the trailing token when present, per § Standard Patterns → Peripheral Apple Workout Glyph (renders only when source is Apple Watch).
+- **Row 3 — Duration / Distance** (optional) — muted text. Format: `{duration} min` and/or `{distance} {unit}`, `·`-separated when both are present. Row is omitted entirely when neither duration nor distance is set.
 - Trailing chevron (>).
 
 Tap row → Workout Detail. Swipe left → red "Delete" → standard delete confirmation → cascade delete, PR recalc, Workout Type card count update. Deleting last workout of a type removes the card and its WorkoutTypeOrder record.
@@ -198,7 +238,7 @@ Long-press card header to open.
 
 Workout Name input. Single SwiftUI `DatePicker` with `.dateAndTime` components — date defaults to today, constrained to today or earlier; any time selectable; format follows iOS locale (12/24-hour). Date stored on `workout.date`, time on `workout.time`.
 
-Workout Type dropdown (6 types). Post-Workout Effort dropdown (1–10) + "?" tooltip. Duration field (minutes, optional) — shown for all types, below Effort.
+Workout Type dropdown (6 types). Post-Workout Effort dropdown + "?" tooltip — each option renders as `[Label] ([Number])` (e.g., `Easy (1)`, `Easy (2)`, `Light (3)`, `Light (4)`, `Moderate (5)`, `Moderate (6)`, `Hard (7)`, `Hard (8)`, `All Out (9)`, `All Out (10)`) per CONSTANTS.md § Effort Label Mapping. The integer is stored on `workout.rpe`; the label is display-only. Duration field (minutes, optional) — shown for all types, below Effort.
 
 **Type-specific fields below duration:**
 - **Strength Training / HIIT:** Exercise cards (name input with autocomplete, sets/reps/weight table, + ADD ROW, remove). "+ Add Exercise" button. Each table row = one ExerciseSet.
@@ -378,16 +418,16 @@ Below the calendar. Renders one card per scheduled or logged workout on the sele
 
 **Logged-only workout card:**
 Rendered for each `Workout` that surfaces per § Logged-Only Workout Surfacing. Visually identical to a completed scheduled workout card (grey fill, green border, green checkmark, muted "COMPLETED" label). Fields:
-- Workout name (primary text, 16px semibold). If `workout.healthKitUUID != nil`, precede the name with a small HealthKit-pink heart glyph (see § Peripheral HealthKit Glyph under Standard Patterns).
+- Workout name (primary text, 16px semibold). No leading glyph — Apple Workout glyph (when applicable) renders trailing on the metadata row below.
 - Workout type pill (muted, uppercase, 11px) followed by ` · LOGGED SESSION` metadata to the right of the pill (11px, 700 weight, uppercase, muted text — matches pill label styling but sits outside the pill boundary). `· LOGGED SESSION` is the source affordance and appears **only** on logged-only cards, not on completed scheduled cards.
-- Duration (muted, if `workout.durationMinutes` is set; omitted if nil).
+- Metadata row: duration (when `workout.durationMinutes` is set) and Apple Workout glyph (when source is Apple Watch — see § Standard Patterns → Peripheral Apple Workout Glyph), separated by ` · `. Glyph is the trailing token. Either or both may be omitted; row is hidden entirely when both are absent.
 - Muted "COMPLETED" label with green checkmark in place of any action button.
 
 Days with no scheduled or logged-only workouts show no content in the detail area. The "+" button in the Plan header is the sole entry point for scheduling.
 
 **Overdue planned workouts** (scheduled date in the past, status still "planned"): Card shows a muted "OVERDUE" badge (11px, 700 weight, uppercase, muted text) below the workout type pill.
 
-**Completed scheduled workouts:** Card visually marked with green checkmark and muted styling. Next to the workout type name is `· PLANNED SESSION`. "Complete Planned Workout" button replaced with muted "COMPLETED" label. `· PLANNED SESSION` is the source affordance and appears **only** on scheduled-only cards, not on completed logged cards. If the completed workout's `healthKitUUID != nil`, precede the workout name with the HealthKit-pink heart glyph as on logged-only cards.
+**Completed scheduled workouts:** Card visually marked with green checkmark and muted styling. Next to the workout type name is `· PLANNED SESSION`. "Complete Planned Workout" button replaced with muted "COMPLETED" label. `· PLANNED SESSION` is the source affordance and appears **only** on scheduled-only cards, not on completed logged cards. If the linked `Workout` was Apple-Watch-sourced, the Apple Workout glyph renders trailing on the same metadata row as duration, per § Standard Patterns → Peripheral Apple Workout Glyph (same rules as logged-only cards).
 
 **Skipped workouts:** Card visually dimmed (muted text, strikethrough on workout name, muted border). Button replaced with muted "SKIPPED" label.
 
@@ -500,12 +540,19 @@ When a user edits or deletes a recurring workout, prompt: **"This workout only"*
 ### Layout
 ← BACK. "Workout" label, name (blue), date, time, workout type (muted, e.g., "Mar 17, 2026 · 2:35 PM · Strength Training"). When time is nil (pre-feature workout), omit time component.
 
-**Source indicator (HK-linked workouts only):** Rendered on its own row directly below the workout type row when `workout.healthKitUUID != nil`. Contains: HealthKit-pink heart SF Symbol (`heart.fill`, HealthKit Pink color from CONSTANTS.md § Colors), `workout.healthKitActivityType` friendly string, and "from {HKSource.name}" suffix — all on a single row, styled as secondary/muted text using the app's Label treatment (11px, 700 weight, 2px letter-spacing, Muted Text color). Source name is resolved dynamically at render time via `HealthKitClient.sourceName(for:)` (see SERVICES.md § HealthKitClient). Falls back to "Apple Health" if resolution fails.
+**Source indicator (HK-linked workouts only):** Rendered on its own row directly below the workout type row when `workout.healthKitUUID != nil`. Format: `{healthKitActivityType} · {sourceName} [glyph]` — activity type and source name separated by ` · `, with the Apple Workout glyph trailing as the last token **only when the source is Apple Watch**. The word "from" is implied by the format and is not rendered. Styled as secondary/muted text using the app's Label treatment (11px, 700 weight, 2px letter-spacing, Muted Text color).
+
+Source name is resolved dynamically at render time via `HealthKitClient.sourceName(for:)` (see SERVICES.md § HealthKitClient → sourceName resolution). Resolution rule:
+- Apple Watch source bundle ID → `Apple Workout`
+- Other known sources → their `HKSource.name` (e.g., `Strava`, `Peloton`)
+- Unknown / unresolvable → `another app` (graceful fallback — never displays a raw bundle ID)
+
+**Trailing glyph:** the Apple Workout glyph (component `FortiFitHealthGlyph.swift` — running figure on green circular background) renders trailing the source name **only when source is Apple Watch**. Other sources render with no trailing glyph; users distinguish them by the source name alone. Future updates may add per-source glyphs (Strava, Peloton, etc.) — when that happens, the same trailing-glyph slot is used.
 
 Example renderings:
-- `❤ Traditional Strength Training · from Apple Watch`
-- `❤ Outdoor Run · from Strava`
-- `❤ Cycling · from Peloton`
+- `Traditional Strength Training · Apple Workout [glyph]` (Apple Watch source)
+- `Outdoor Run · Strava` (Strava source — no glyph)
+- `Cycling · Peloton` (Peloton source — no glyph)
 
 The row is tappable — tapping anywhere on the row opens the **Source Indicator Info Sheet** (see below). Row has accessibility identifier `workoutDetail_healthSourceIndicator` (see TESTING.md).
 
@@ -517,51 +564,47 @@ Top-right icons: blue share icon (16px, `square.and.arrow.up`, #3b82f6), muted e
 - **"Show on Plan"** with SF Symbol `calendar.badge.plus` to the left → flips `workout.hiddenFromPlan` from `true` to `false`. No confirmation alert (non-destructive, trivially reversible). Toast: "Showing on Plan." (~2s auto-dismiss). Visible only when `workout.hiddenFromPlan == true`. Applies to all workout types — if this is the only applicable item (e.g., a hidden Cardio workout), the ellipsis icon appears with just this single option. When both items apply (a hidden Strength/HIIT workout), "Show on Plan" is rendered immediately below "Save as workout template".
 - **"Unlink from Apple Health"** with SF Symbol `link.badge.minus` to the left → confirmation alert: "Unlink this workout from Apple Health? Imported values (duration, distance, heart rate, etc.) will be retained as editable fields. Cancel / Unlink." On confirm: applies § HealthKit Unlink (clears `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`; retains numeric values; bumps `lastModifiedDate`; no cascade). Toast: "Unlinked from Apple Health." (~2s). Visible only when `workout.healthKitUUID != nil`. Renders below all other items in the menu. See HEALTHKIT.md § 14 and SERVICES.md § HealthKit Unlink.
 
-✦ divider. "Summary" header. Content varies by type AND by whether the workout is HK-linked. Each summary field is rendered with a leading SF Symbol to the left of the label (see CONSTANTS.md § Workout Detail Summary Icons for user-entered fields, CONSTANTS.md § Workout Detail Health Data Icons for HK-imported fields). Icons are rendered at the same size and color as the summary row label text, with standard spacing between icon and label.
+✦ divider. "Summary" header (sentence case). Below the header, the Summary block renders as a **2-column grid of bordered stat cards** — one card per non-nil metric. Each card is independently tappable and opens the **Metric Detail Sheet** (see § Metric Detail Sheet below).
 
-**Layout depends on HK-linked state:**
+**Stat card structure (`FortiFitStatCard.swift`):**
 
-**Manual workout (or linked workout with no HK measurement data):** Single-column vertical list, unchanged from pre-Phase-8 behavior. Renders user-entered fields only (Effort → `heart.gauge.open`, Duration → `clock`, Distance → `ruler`).
+- Container: Card Surface `#1a1a1a` background, `#404040` 1px border, 12px corner radius, internal padding (16px horizontal, 14px vertical).
+- Top row: SF symbol (left) + sentence-case micro-label (immediately to the right of the symbol) + right-pointing chevron (`chevron.right`) in the top-right corner. The chevron signals tap affordance and matches the chevron treatment used on workout preview rows. Symbol and label use the same size and color (Muted Text `#737373`, 13px, 700 weight, normal letter-spacing); chevron is Muted Text at the same weight.
+- Below the top row: the metric **value** in heading typography — Primary Text `#e5e5e5`, 24px, 800 weight, sentence case (for label-style values like Effort) or numeric (for everything else). For numeric values, the unit renders inline immediately after the number in smaller muted text (Secondary Text `#a3a3a3`, 13px, 600 weight) — e.g., `142 bpm` where `142` is hero-sized and `bpm` is muted-and-smaller. Value left-aligned with the label.
+- Tap state: subtle 0.15s opacity dim on press; tap opens the Metric Detail Sheet for that field.
+- Accessibility: each card has its own identifier — see TESTING.md.
 
-**HK-linked workout with at least one HK measurement field non-nil:** Two-column grid. Left column holds user-entered fields (Effort, Duration, Distance) in the same order and style as the single-column variant. Right column holds HK-imported fields in the order defined in CONSTANTS.md § Workout Detail Health Data Icons. Both columns are conditionally rendered — a row in either column appears only when its underlying value is non-nil. No empty "—" placeholders.
+**Field order (top to bottom, left to right in the 2-column grid):**
 
-The two columns are visually separated by standard inter-column spacing (no vertical divider line between them). Columns have equal width. If one column has more rows than the other, the shorter column simply stops; the longer column continues. The overall Summary block ends at the last non-nil row in either column.
+1. Effort
+2. Duration
+3. Distance (Cardio only)
+4. Avg HR · Max HR (each its own card; render side-by-side on one row when both are non-nil)
+5. Active kcal · Total kcal (each its own card; render side-by-side when both non-nil)
+6. Elevation Ascended
+7. Exercise Minutes
 
-Example layouts (illustrative — actual row content per the conditional rules):
+**Visibility rule:** each card renders only when its underlying value is non-nil. Pairs (Avg HR + Max HR; Active + Total) gracefully collapse to a single card if only one of the pair is set. The grid wraps left-to-right, top-to-bottom — no empty placeholders, no fixed row count. Manual workouts naturally collapse to 2–3 cards (Effort + Duration, plus Distance for Cardio); HK-linked workouts can show up to 9 cards.
 
-*Manual Strength workout (Effort + Duration set):*
-```
-Summary
-  ❤ Effort 7
-  ⏱ Duration 45 min
-```
+**Per-field display values:**
 
-*HK-linked Outdoor Run (full measurement data):*
-```
-Summary
-  ❤ Effort 6             · Total 612 kcal 
-  ⏱ Duration 32 min  🔥 Active 487 kcal 
-  📏 Distance 5.2 km  ⛰ Elevation 240 ft
-  ❤ Avg HR 142 bpm     ❤ Max HR 168 bpm              
-    
-```
+| Field | Label | Value Display |
+|---|---|---|
+| Effort | Effort | Descriptive label per CONSTANTS.md § Effort Label Mapping (e.g., `Hard`). The underlying integer is preserved on `workout.rpe` but not displayed on the card. |
+| Duration | Duration | `45 min` (number + inline muted unit) |
+| Distance | Distance | `5.2 km` or `3.2 mi` per `useMiles` |
+| Avg HR | Avg HR | `142 bpm` |
+| Max HR | Max HR | `168 bpm` |
+| Active kcal | Active kcal | `487 kcal` |
+| Total kcal | Total kcal | `612 kcal` |
+| Elevation Ascended | Elevation | `240 ft` or `73 m` per `useMiles` |
+| Exercise Minutes | Exercise min | `32 min` |
 
-*HK-linked Pilates (HR only, no Effort entered yet):*
-```
-Summary
-  ⏱ Duration 35 min  ❤ Avg HR 108 bpm
-                     
-```
+**Indoor/Outdoor:** removed entirely from Summary.
 
-Type-specific row visibility (left column):
-- **Strength/HIIT:** Effort if rated, Duration if entered.
-- **Cardio:** Effort if rated, Duration, Distance (km or mi per useMiles).
-- **Yoga/Pilates:** Effort if rated, Duration.
-- **Other:** Effort if rated, Duration. (The Other category is primarily used for HK imports; users rarely log Other workouts manually.)
+**Icons:** see CONSTANTS.md § Workout Detail Summary Icons (Effort symbol updated from `heart.gauge.open` to `chart.bar.fill`) and § Workout Detail Health Data Icons (HK-imported field icons unchanged).
 
-HK row visibility (right column) follows CONSTANTS.md § Workout Detail Health Data Icons — each row renders only when its underlying HK field is non-nil.
-
-**After Summary (for Strength/HIIT only):** "Exercises" header, exercise list (name, sets, weight). Appears below the Summary block regardless of whether the two-column or single-column variant was used.
+**After Summary (for Strength/HIIT only, conditional):** "Exercises" header (sentence case) + exercise list (name, sets, weight). The header and list are **hidden entirely** when `workout.exerciseSets.isEmpty`. Applies regardless of how the workout was created (manual or HK-imported with empty sets). Header reappears as soon as the user adds an exercise via Edit Workout.
 
 ✦ divider. "Session Notes" header + edit icon. Note card or textarea when editing + SAVE button.
 
@@ -574,38 +617,89 @@ Opened via:
 Rendered as an iOS modal sheet (sheet presentation, swipe-down to dismiss).
 
 **Layout:**
-- **Header:** Centered HealthKit-pink heart SF Symbol (`heart.fill`, 32pt).
+- **Header:** Centered HealthKit-pink heart SF Symbol (`heart.fill`, 32pt). Header icon stays as the heart symbol — it's the system-level Apple Health brand mark, not the per-workout source glyph.
 - **Title:** "Imported from Apple Health" (primary text, 18px semibold, centered).
-- **Body paragraph:** "This workout was imported from {HKSource.name}. Measured values like duration, distance, heart rate, and calories are sourced from Apple Health and cannot be edited here." (secondary text, 14px, centered, with standard paragraph spacing).
+- **Body paragraph:** "This workout was imported from Apple Health via {sourceName}. Measured values like duration, distance, heart rate, and calories are sourced from Apple Health and cannot be edited here." (secondary text, 14px, centered, with standard paragraph spacing). `{sourceName}` resolves via `HealthKitClient.sourceName(for:)` per the rules in § Source indicator above — Apple Watch becomes `Apple Workout`, other known sources show their friendly names, unresolvable sources fall back to `another app`. **Never renders raw bundle IDs.**
 - **Activity type row:** "Activity Type: {workout.healthKitActivityType}" (muted label + primary text value, left-aligned).
-- **Source row:** "Source: {HKSource.name}" (muted label + primary text value, left-aligned).
+- **Source row:** "Source: {sourceName}" (muted label + primary text value, left-aligned). Same resolution as the body paragraph.
 - **Imported date row:** "Imported: {formatted workout.dateCreated or equivalent}" (muted label + primary text value, left-aligned) — if captured. If not captured, omit this row.
 - **Primary action:** Full-width red "Unlink from Apple Health" button (Alert Red color, #ef4444). Tapping triggers the same confirmation flow as the ellipsis menu's Unlink item (see Ellipsis Menu above). Accessibility identifier: `workoutDetail_healthUnlinkButton`.
 - **Secondary action:** "Done" button (blue outline, full-width, bottom). Dismisses the sheet without action.
 
 **Dismiss:** Swipe down, tap outside the sheet, or tap "Done."
 
+### Metric Detail Sheet
+
+Modal sheet opened by tapping any stat card in the Workout Detail Summary grid. Provides per-metric context — value display, comparative average against the user's typical session of the same Workout Type, 30-day sparkline, and an optional Personal Best chip.
+
+**Component:** `FortiFitMetricDetailSheet.swift` (see PRD.md § Project Structure → Design/Components/). Takes the tapped `Workout` and a `WorkoutMetric` enum case (see SERVICES.md § WorkoutMetricService). Pulls all aggregate data from `WorkoutMetricService` — never queries SwiftData directly.
+
+**Presentation:** iOS modal sheet (sheet presentation, `.medium` detent). Swipe-down to dismiss. Background uses Card Surface `#1a1a1a`. Drag indicator visible at top.
+
+**Header:** Centered title — `[Metric] details` (e.g., `Effort details`, `Duration details`, `Avg HR details`). Primary Text `#e5e5e5`, 20px, 900 weight, sentence case, centered.
+
+**Close button:** Plain `xmark` SF Symbol in the top-right corner — Muted Text `#737373`, 16px, no circular background or border. Tap dismisses the sheet. Accessibility identifier `metricDetailSheet_closeButton` (shared across all metrics).
+
+**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the header. Four blocks rendered top-to-bottom (every block conditionally adapts when data is insufficient — see Empty States below):
+
+**1. Hero block** (mirrors the tapped stat card, scaled up):
+
+- Top row: same SF symbol + sentence-case micro-label as the tapped card (Muted Text, 13px, 700 weight). No chevron in this context.
+- Below: the metric value at hero size — Primary Text `#e5e5e5`, 32px, 900 weight, sentence case for label-style values, numeric for everything else.
+- For **Effort specifically**: hero shows the descriptive label (`Hard`); a smaller muted line below shows the underlying integer in parentheses (`(7)`) — Secondary Text `#a3a3a3`, 15px, 600 weight.
+- For numeric fields: unit renders inline immediately after the number in smaller muted text (e.g., `142 bpm`).
+
+**2. Comparative context block:**
+
+- Two lines in body typography (Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned).
+- Line 1: `Your typical [Workout Type] session — [comparison value]` (e.g., `Your typical Strength Training session — Moderate (5.4)` for Effort, `Your typical Strength Training session — 52 min` for Duration).
+- Line 2: a delta line describing how this workout compares — `Harder than typical`, `+12 min vs typical`, `+4 bpm vs typical`, `5 fewer kcal than typical`, etc. Color is Muted Text by default; uses Primary Accent Blue for positive-direction deltas (only on PR-eligible metrics — see § 4 below) when the workout is the highest-ever.
+- **Comparison window:** all-time across all logged workouts of the same Workout Type with the relevant metric set. Computed by `WorkoutMetricService.comparativeAverage(for:workoutType:)`.
+
+**3. 30-day sparkline block:**
+
+- Swift Charts `LineMark` rendering of this metric across the same Workout Type's last 30 days of sessions. X-axis: dates (no tick labels — date range implied by caption). Y-axis: value range (auto-scaled, no tick labels).
+- This workout's data point is highlighted: filled circle, larger radius (~6pt), Primary Accent Blue color. Other points: Secondary Text color, smaller radius (~3pt).
+- Caption below the chart: muted `Last 30 days · [Workout Type]`.
+- Chart container: Card Surface `#1a1a1a`, `#404040` 1px border, 12px corner radius, 16px internal padding, ~120pt height.
+
+**4. Personal Best chip (conditional):**
+
+- Renders only when `WorkoutMetricService.isPersonalBest(for:workout:)` returns true for the metric.
+- Inline pill: Primary Accent Blue (`#3b82f6`) at 15% opacity background, Primary Accent Blue text. 12px corner radius. Padding 8px horizontal, 4px vertical.
+- Copy: `Personal best for [Workout Type]`. Primary Accent Blue, 11px, 700 weight, sentence case.
+- Positioned below the sparkline block with 16px top margin.
+
+**PR-eligible metrics:** Distance, Active Calories, Total Calories, Elevation Ascended. The chip never renders for Effort, Avg HR, Max HR, Duration, or Exercise Minutes — `isPersonalBest` returns false for those by service contract.
+
+**Empty / insufficient data states (per block):**
+
+- **Comparative context:** when fewer than 3 logged workouts of the same Workout Type have the metric set (excluding this workout), replace both lines with muted `Not enough data yet — log a few more sessions.`
+- **30-day sparkline:** when fewer than 3 data points are available across the last 30 days, replace the chart with the same muted message and hide the chart container.
+- **Personal Best chip:** simply not rendered when `isPersonalBest` is false. No empty placeholder.
+
+**Accessibility:** sheet title is announced first by VoiceOver, followed by hero block, comparative context lines, sparkline (with summary trait), and the PR chip if present. Close button reads "Close, button". The chevron on the originating stat card has `accessibilityHint("Opens metric details")`.
+
 ### Share Image Card
 
 Tapping the share icon renders the workout as a styled PNG image card and presents the iOS share sheet (`UIActivityViewController`). The image is a self-contained card using FitNavi's design tokens, designed to be legible as a standalone image outside the app.
 
-**Card content (type-adaptive):**
+**Card content:** workout name, date/time, workout type, **2-column stat-card grid** (mirrors the Workout Detail Summary grid), exercise list (Strength/HIIT only).
 
-| Workout Type | Content Shown |
-|---|---|
-| Strength Training / HIIT | Workout name, date/time, workout type, summary pills (Effort if rated, duration if recorded), exercise list (name, sets × reps @ weight per unit preference; "BW" for nil weight) |
-| Cardio / Sprints | Workout name, date/time, workout type, summary pills (Effort if rated, duration if recorded, distance in km/mi per useMiles if recorded) |
-| Yoga / Pilates | Workout name, date/time, workout type, summary pills (Effort if rated, duration if recorded) |
+**Stat-card grid:** Renders the same fields, in the same order, with the same icons, labels, and value formats as the Workout Detail Summary grid (see § Workout Detail). Differences for the share image:
 
-Summary pills with nil values are omitted entirely (no empty pill shown). When `workout.time` is nil, the time component is omitted from the date line.
+- Static — no chevron, no tap behavior.
+- Smaller card sizing scaled appropriately for the 390pt-wide image.
+- Effort renders as the descriptive label (e.g., `Hard`) per CONSTANTS.md § Effort Label Mapping — same as Workout Detail.
+- Cards render only when their underlying value is non-nil. Manual workouts collapse to 2–3 cards.
 
-**Summary pill icons:** Each summary pill renders with a leading SF Symbol matching the corresponding field on the Workout Detail screen — Effort → `heart.gauge.open`, Duration → `clock`, Distance → `ruler` (Cardio/Sprints only). See CONSTANTS.md § Workout Detail Summary Icons and § Share Image Card Styling.
+When `workout.time` is nil, the time component is omitted from the date line.
 
 **Exercise cap:** Maximum 10 exercises displayed. If the workout has more than 10, the first 10 are shown followed by a muted "+X more exercises" line (e.g., "+3 more exercises").
 
 **Excluded from image:** Session notes, navigation chrome (back button, icon tray).
 
-**Card styling:** See `CONSTANTS.md` § Share Image Card Styling for the full token table (background, border, padding, header/footer, workout name, date, summary pills, exercise rows, dividers, image dimensions).
+**Card styling:** See `CONSTANTS.md` § Share Image Card Styling for the full token table (background, border, padding, header/footer, workout name, date, stat cards, exercise rows, dividers, image dimensions).
 
 **Rendering:** SwiftUI `ImageRenderer` at @3x scale. If rendering fails, show a brief toast: "Couldn't generate image. Try again." (auto-dismiss ~2s, matching existing toast pattern).
 
@@ -613,7 +707,7 @@ Summary pills with nil values are omitted entirely (no empty pill shown). When `
 
 | Scenario | Behavior |
 |----------|----------|
-| All optional fields nil (no Effort, no duration, no distance) | No summary pills rendered; card shows name, date, type, and exercises (if any) |
+| All optional fields nil (no Effort, no duration, no distance) | No stat cards rendered; image shows name, date, type, and exercises (if any) |
 | Workout has >10 exercises | First 10 shown + "+X more exercises" in muted text |
 | Exercise with nil weight (bodyweight) | Displays as `{sets} × {reps} (BW)` |
 | Very long workout name | Truncated with ellipsis at 2 lines max |
@@ -642,7 +736,7 @@ Per § Standard Patterns: Sortable Card System → Add Menu. Component: `FortiFi
 ### Chart Card Context Menu (Long Press)
 Activated by long-pressing any chart card (uses Standard Long-Press Tease). Items render top-to-bottom in this order — all three apply to every chart type:
 
-**"See Info":** SF Symbol `info.circle` to the left of the label (see CONSTANTS.md § Trends Chart Context Menu SF Symbols). Opens the **Chart Info Modal** (see below) for that chart, populated from CONSTANTS.md § Chart Info Modal Copy.
+**"See Info":** SF Symbol `info.circle` to the left of the label (see CONSTANTS.md § Trends Chart Context Menu SF Symbols). Opens the See Info Modal (see § Standard Patterns) for that chart, populated from CONSTANTS.md § Chart Info Modal Copy.
 
 **"Reorder Charts":** Enters Standard Reorder Edit Mode. Always visible regardless of chart count.
 
@@ -652,29 +746,7 @@ Activated by long-pressing any chart card (uses Standard Long-Press Tease). Item
 Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `TrendsChart.sortOrder`.
 
 ### Chart Info Modal
-
-Modal sheet explaining how a single chart works. Opened via the chart card's long-press → "See Info". Distinct sheet per chart, populated from CONSTANTS.md § Chart Info Modal Copy.
-
-**Presentation:** iOS modal sheet (sheet presentation, `.large` detent). Swipe-down to dismiss. Background uses Card Surface `#1a1a1a`.
-
-**Header:** Centered title — "About [Chart Display Name]" (e.g., "About Strength Tracker"). Primary Text `#e5e5e5`, 20px, 900 weight, sentence case, centered. Title style matches the Match Prompt Sheet header (see § Match Prompt Sheet).
-
-**Close button:** Top-right corner, 24x24pt circular, `#2d2d2d` bg, `#404040` border, muted `×`. Same close-button pattern used by the Saved Templates QR Modal and Settings widget modals. Accessibility identifier `trendsChart_infoModal_closeButton`.
-
-**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the header. Content rendered top-to-bottom:
-
-1. **Intro paragraph** — first paragraph below the title. Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned, normal line height. No section heading above it.
-2. **Sections** — each section is a heading + body paragraph(s):
-   - Section heading: Primary Text `#e5e5e5`, 15px, 800 weight, sentence case, left-aligned, normal letter-spacing. 24px top margin (separates sections), 8px bottom margin before its body. Follows the standard heading typography rule (see PRD.md § 2 Design Language → Typography).
-   - Body: Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned. Normal paragraph spacing.
-   - Body may include a markdown-style bulleted list when the source copy provides one (see Training Load Trend's Zones section in CONSTANTS.md). Each bullet renders as a row in a `VStack` with a leading `•` glyph and 8pt left indent. Bullet text inherits body styling.
-3. **Footer:** none. Sheet ends after the last section's body, with standard bottom safe-area padding.
-
-**Content source:** every visible string is read from CONSTANTS.md § Chart Info Modal Copy via `AppConstants` — never hardcoded in views. The modal renders the title, intro, and sections array in order.
-
-**Empty / unknown chart fallback:** the modal is only invoked from a chart card's context menu, so chart type is always known. No fallback content needed.
-
-**Accessibility:** modal title is announced first by VoiceOver, followed by intro and section headings/bodies in order. Close button reads "Close, button". Section headings traverse as headers (`accessibilityAddTraits(.isHeader)`).
+Per § Standard Patterns: See Info Modal. Content source: CONSTANTS.md § Chart Info Modal Copy. Title format: "About [Chart Display Name]" (e.g., "About Strength Tracker").
 
 ### Chart Definitions
 
@@ -749,7 +821,7 @@ Y-axis: weight (kg or lbs per `useLbs`). X-axis: two category labels — "Previo
 | Empty | All charts show empty state messages |
 | Partial | Charts meeting threshold render; others show empty message |
 | Populated | All charts with full data and controls |
-| Reorder edit mode | line.3.horizontal SF symbol drag handles rotated 90 degrees vertically visible on all chart cards; cards draggable; context menu disabled; tap outside to exit |
+| Reorder edit mode | line.3.horizontal SF symbol drag handles visible on all chart cards; cards draggable; context menu disabled; tap outside to exit |
 | All Charts Removed | Centered muted message: "Tap the menu to add charts to your Trends screen." Ellipsis remains accessible. |
 
 ---

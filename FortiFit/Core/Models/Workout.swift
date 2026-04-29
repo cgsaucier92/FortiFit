@@ -34,6 +34,12 @@ final class Workout {
         healthKitUUID != nil
     }
 
+    var isAppleWatchSourced: Bool {
+        guard healthKitUUID != nil,
+              let bundleID = healthKitSourceBundleID else { return false }
+        return bundleID.hasPrefix("com.apple.health")
+    }
+
     init(
         id: UUID = UUID(),
         name: String,

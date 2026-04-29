@@ -83,6 +83,12 @@ struct FortiFitApp: App {
                     if CommandLine.arguments.contains("--seed-hk-workout") {
                         seedHealthKitLinkedWorkout(context: context)
                     }
+                    if CommandLine.arguments.contains("--seed-hk-strava-workout") {
+                        seedStravaLinkedWorkout(context: context)
+                    }
+                    if CommandLine.arguments.contains("--seed-hk-unknown-workout") {
+                        seedUnknownSourceWorkout(context: context)
+                    }
                     if CommandLine.arguments.contains("--seed-hk-pending-match") {
                         seedPendingMatch(context: context)
                         presentNextPendingMatch()
@@ -180,6 +186,7 @@ struct FortiFitApp: App {
             name: "HK Smoke Test Run",
             date: Date(),
             workoutType: "Cardio",
+            rpe: 7,
             durationMinutes: 35,
             distanceKm: 5.2,
             healthKitUUID: UUID(),
@@ -188,6 +195,44 @@ struct FortiFitApp: App {
             avgHeartRate: 155,
             maxHeartRate: 178,
             activeEnergyKcal: 420
+        )
+        context.insert(workout)
+        WorkoutTypeOrderService.ensureOrderExists(for: "Cardio", context: context)
+        try? context.save()
+    }
+
+    private func seedStravaLinkedWorkout(context: ModelContext) {
+        let workout = Workout(
+            name: "HK Strava Ride",
+            date: Date(),
+            workoutType: "Cardio",
+            durationMinutes: 60,
+            distanceKm: 25.0,
+            healthKitUUID: UUID(),
+            healthKitSourceBundleID: "com.strava.run",
+            healthKitActivityType: "Cycling",
+            avgHeartRate: 145,
+            maxHeartRate: 172,
+            activeEnergyKcal: 580
+        )
+        context.insert(workout)
+        WorkoutTypeOrderService.ensureOrderExists(for: "Cardio", context: context)
+        try? context.save()
+    }
+
+    private func seedUnknownSourceWorkout(context: ModelContext) {
+        let workout = Workout(
+            name: "HK Unknown Source Workout",
+            date: Date(),
+            workoutType: "Cardio",
+            durationMinutes: 40,
+            distanceKm: 6.0,
+            healthKitUUID: UUID(),
+            healthKitSourceBundleID: "com.unknowndev.randomfitness",
+            healthKitActivityType: "Running",
+            avgHeartRate: 138,
+            maxHeartRate: 162,
+            activeEnergyKcal: 350
         )
         context.insert(workout)
         WorkoutTypeOrderService.ensureOrderExists(for: "Cardio", context: context)

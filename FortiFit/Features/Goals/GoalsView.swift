@@ -39,7 +39,6 @@ struct GoalsView: View {
                                                 Image(systemName: "line.3.horizontal")
                                                     .font(.system(size: 20, weight: .semibold))
                                                     .foregroundStyle(FortiFitColors.mutedText)
-                                                    .rotationEffect(.degrees(90))
                                                     .padding(.trailing, FortiFitSpacing.cardPadding)
                                             }
                                     } else {

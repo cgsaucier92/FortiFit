@@ -34,5 +34,5 @@ protocol HealthKitClient: Sendable {
     func observeWorkoutChanges(handler: @escaping @Sendable () -> Void)
     func observeEffortScoreChanges(handler: @escaping @Sendable () -> Void)
     func fetchEffortScore(for hkWorkoutUUID: UUID) async throws -> Int?
-    func sourceName(for bundleID: String) -> String?
+    func sourceName(for bundleID: String) -> String
 }
