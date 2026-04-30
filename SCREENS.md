@@ -540,7 +540,7 @@ When a user edits or deletes a recurring workout, prompt: **"This workout only"*
 ### Layout
 ← BACK. "Workout" label, name (blue), date, time, workout type (muted, e.g., "Mar 17, 2026 · 2:35 PM · Strength Training"). When time is nil (pre-feature workout), omit time component.
 
-**Source indicator (HK-linked workouts only):** Rendered on its own row directly below the workout type row when `workout.healthKitUUID != nil`. Format: `{healthKitActivityType} · {sourceName} [glyph]` — activity type and source name separated by ` · `, with the Apple Workout glyph trailing as the last token **only when the source is Apple Watch**. The word "from" is implied by the format and is not rendered. Styled as secondary/muted text using the app's Label treatment (11px, 700 weight, 2px letter-spacing, Muted Text color).
+**Source indicator (HK-linked workouts only):** Rendered on its own row directly below the workout type row when `workout.healthKitUUID != nil`. Format: `{sourceName} [glyph]` — source name only, no activity type prefix. The Apple Workout glyph trails as the last token **only when the source is Apple Watch**. Styled as secondary/muted text using the app's Label treatment (14px, 700 weight, 2px letter-spacing, Muted Text color).
 
 Source name is resolved dynamically at render time via `HealthKitClient.sourceName(for:)` (see SERVICES.md § HealthKitClient → sourceName resolution). Resolution rule:
 - Apple Watch source bundle ID → `Apple Workout`
@@ -550,9 +550,9 @@ Source name is resolved dynamically at render time via `HealthKitClient.sourceNa
 **Trailing glyph:** the Apple Workout glyph (component `FortiFitHealthGlyph.swift` — running figure on green circular background) renders trailing the source name **only when source is Apple Watch**. Other sources render with no trailing glyph; users distinguish them by the source name alone. Future updates may add per-source glyphs (Strava, Peloton, etc.) — when that happens, the same trailing-glyph slot is used.
 
 Example renderings:
-- `Traditional Strength Training · Apple Workout [glyph]` (Apple Watch source)
-- `Outdoor Run · Strava` (Strava source — no glyph)
-- `Cycling · Peloton` (Peloton source — no glyph)
+- `Apple Workout [glyph]` (Apple Watch source)
+- `Strava` (Strava source — no glyph)
+- `Peloton` (Peloton source — no glyph)
 
 The row is tappable — tapping anywhere on the row opens the **Source Indicator Info Sheet** (see below). Row has accessibility identifier `workoutDetail_healthSourceIndicator` (see TESTING.md).
 

@@ -33,6 +33,8 @@ enum AccessibilityID {
     static let workoutNameInput = "workoutNameInput"
     static let workoutTypeDropdown = "workoutTypeDropdown"
     static let workoutTypeOptionPrefix = "workoutTypeOption"
+    static let effortDropdown = "effortDropdown"
+    static let effortOptionPrefix = "effortOption"
     static let addExerciseButton = "addExerciseButton"
     static let saveWorkoutButton = "saveWorkoutButton"
     static let durationInput = "durationInput"

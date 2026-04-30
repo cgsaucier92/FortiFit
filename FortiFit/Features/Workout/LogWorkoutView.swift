@@ -55,13 +55,15 @@ struct LogWorkoutView: View {
                         accessibilityIdentifier: AccessibilityID.workoutTypeDropdown,
                         optionIdentifierPrefix: AccessibilityID.workoutTypeOptionPrefix
                     )
+                    .frame(width: 220, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .disabled(viewModel.isEditMode)
 
                     // RPE
                     HStack(spacing: FortiFitSpacing.elementSpacing) {
                         FortiFitLabel("Effort", color: FortiFitColors.primaryText)
                         FortiFitHintTooltip(
-                            message: "Rate of Perceived Exertion (1–10). How hard did the workout feel overall? 1 = very easy, 10 = maximal effort",
+                            message: "Rate of Perceived Exertion (1–10). How hard did the workout feel overall? 1 = easy, 10 = all out",
                             isVisible: $showRPETooltip
                         )
                     }
@@ -78,7 +80,9 @@ struct LogWorkoutView: View {
                                 }
                             }
                         ),
-                        placeholder: "Select effort"
+                        placeholder: "Select effort",
+                        accessibilityIdentifier: AccessibilityID.effortDropdown,
+                        optionIdentifierPrefix: AccessibilityID.effortOptionPrefix
                     )
                     .frame(width: 180, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)

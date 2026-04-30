@@ -234,7 +234,7 @@ struct AddGoalView: View {
                     )
             }
 
-            Text("This goal tracks your weekly workout target. To change the target, long-press the Weekly Streak widget on the Home screen and tap Configure Settings.")
+            Text("This goal tracks your weekly workout target. To change the target, long-press the Weekly Streak widget on the DASHBOARD screen and tap Configure Settings.")
                 .font(FortiFitTypography.note)
                 .italic()
                 .foregroundStyle(FortiFitColors.mutedText)

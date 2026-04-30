@@ -264,9 +264,9 @@ enum AppConstants {
     // MARK: - Chart Data Thresholds
 
     static let chartEmptyMessages: [String: String] = [
-        "strengthTracker": "Log more workouts to display strength trends.",
+        "strengthTracker": "Log more exercises to display strength trends.",
         "trainingFrequency": "Complete your first full week to see frequency trends.",
-        "personalRecords": "Log more workouts to display personal records.",
+        "personalRecords": "Log more exercises to display personal records.",
         "trainingLoadTrend": "Log more workouts to display load trends.",
         "workoutVolume": "Log more Strength or HIIT workouts to display volume trends.",
         "rpeTrend": "Log workouts with effort ratings to display effort trends.",

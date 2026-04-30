@@ -349,7 +349,7 @@ Add `SCREENS.md § Match Prompt Sheet` section with layout spec.
 ## 15. UI Surfaces
 
 ### Workout Detail Source Indicator
-Below the Workout Type row, when `workout.healthKitUUID != nil`. Format: `{healthKitActivityType} · {sourceName} [glyph]` — the word "from" is implied by the format and is not rendered. Glyph trails the source name **only when source is Apple Watch**.
+Below the Workout Type row, when `workout.healthKitUUID != nil`. Format: `{sourceName} [glyph]` — source name only, no activity type prefix. Glyph trails the source name **only when source is Apple Watch**.
 
 - Source name resolved via `HealthKitClient.sourceName(for:)` per SERVICES.md § HealthKitClient. Apple Watch → `Apple Workout`; other recognized sources keep their `HKSource.name`; unresolvable bundle IDs fall back to `another app`. Never displays a raw bundle ID.
 - Trailing glyph: `FortiFitHealthGlyph` (Apple Workout running figure on green) — renders only when source is Apple Watch. Other sources show no trailing glyph.

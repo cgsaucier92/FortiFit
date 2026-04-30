@@ -10,7 +10,7 @@ struct CompletePlanView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: FortiFitSpacing.gapLarge) {
+        VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
             // Header
             HStack {
                 HStack(spacing: 6) {
@@ -72,7 +72,7 @@ struct CompletePlanView: View {
             // Duration input
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                 Text("Duration")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .bold))
                     .kerning(2)
                     .foregroundStyle(FortiFitColors.primaryText)
 
@@ -81,11 +81,13 @@ struct CompletePlanView: View {
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
+                        .frame(width: 120)
                     Text("min")
                         .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             // Save button
             FortiFitButton("Save Workout", style: .primary) {

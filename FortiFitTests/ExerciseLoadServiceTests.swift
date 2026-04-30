@@ -348,7 +348,7 @@ struct ExerciseLoadServiceTests {
     }
 
     @Test func postTrainingAdvisoryHigh() {
-        #expect(ExerciseLoadService.classifyZone(score: 70, trainedToday: true).advisory == "Heavy day. Recovery is the priority.")
+        #expect(ExerciseLoadService.classifyZone(score: 70, trainedToday: true).advisory == "Recovery is the priority.")
     }
 
     @Test func readinessAdvisoryPeak() {

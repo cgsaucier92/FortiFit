@@ -32,13 +32,12 @@ struct WorkoutDetailView: View {
                         .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
 
-                    if workout.isHealthKitLinked, let activityType = workout.healthKitActivityType {
+                    if workout.isHealthKitLinked {
                         let resolvedSource = resolvedSourceName
                         Button {
                             showHealthSourceInfoSheet = true
                         } label: {
                             FortiFitHealthSourceIndicator(
-                                activityType: activityType,
                                 sourceName: resolvedSource,
                                 showGlyph: workout.isAppleWatchSourced
                             )

@@ -46,6 +46,8 @@ struct HomeView: View {
                             }
 
                             // Log Workout CTA
+                            FortiFitDivider()
+
                             FortiFitButton("Log Workout", style: .outline) {
                                 #if os(iOS)
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()

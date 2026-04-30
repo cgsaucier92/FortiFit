@@ -12,6 +12,8 @@ private struct DashedLine: Shape {
     }
 }
 
+
+
 struct FortiFitProgressView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = ProgressViewModel()
@@ -224,7 +226,7 @@ struct FortiFitProgressView: View {
                 FortiFitWidgetHeader(title: "Strength Tracker")
 
                 if viewModel.availableExercises.isEmpty {
-                    emptyChartMessage("Log more workouts to display strength trends.")
+                    emptyChartMessage("Log more exercises to display strength trends.")
                 } else {
                     FortiFitSelect(
                         options: viewModel.availableExercises,
@@ -288,7 +290,7 @@ struct FortiFitProgressView: View {
                                 .foregroundStyle(FortiFitColors.secondaryText)
                         }
                     } else {
-                        emptyChartMessage("Log more workouts to display strength trends.")
+                        emptyChartMessage("Log more exercises to display strength trends.")
                     }
                 }
             }
@@ -348,7 +350,7 @@ struct FortiFitProgressView: View {
                 FortiFitWidgetHeader(title: "Personal Records")
 
                 if !viewModel.hasPRData {
-                    emptyChartMessage("Log more workouts to display personal records.")
+                    emptyChartMessage("Log more exercises to display personal records.")
                 } else {
                     let prExercises = viewModel.exercisesWithPRs()
 
@@ -651,6 +653,7 @@ struct FortiFitProgressView: View {
                 if !viewModel.hasTypeBreakdownData {
                     emptyChartMessage("Log more workouts to display your training breakdown.")
                 } else {
+                    let total = viewModel.typeBreakdownData.reduce(0) { $0 + $1.count }
                     Chart(viewModel.typeBreakdownData) { entry in
                         SectorMark(
                             angle: .value("Count", entry.count),
@@ -659,9 +662,11 @@ struct FortiFitProgressView: View {
                         )
                         .foregroundStyle(AppConstants.workoutTypeChartColors[entry.workoutType] ?? FortiFitColors.primaryAccent)
                         .annotation(position: .overlay) {
-                            Text("\(entry.count)")
-                                .font(FortiFitTypography.bodySmall)
-                                .foregroundStyle(FortiFitColors.primaryText)
+                            if total > 0, Double(entry.count) / Double(total) >= 0.08 {
+                                Text("\(entry.count)")
+                                    .font(FortiFitTypography.bodySmall)
+                                    .foregroundStyle(FortiFitColors.primaryText)
+                            }
                         }
                     }
                     .frame(height: 200)

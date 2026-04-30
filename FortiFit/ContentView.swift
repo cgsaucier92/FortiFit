@@ -15,7 +15,7 @@ struct ContentView: View {
             HomeView(selectedTab: selectedTab)
                 .tabItem {
                     Image(systemName: "square.grid.2x2")
-                    Text("HOME")
+                    Text("DASHBOARD")
                 }
                 .tag(0)
                 .accessibilityIdentifier(AccessibilityID.tabBarHome)

@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct FortiFitHealthSourceIndicator: View {
-    let activityType: String
     let sourceName: String?
     var showGlyph: Bool = false
 
@@ -11,14 +10,14 @@ struct FortiFitHealthSourceIndicator: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("\(activityType) · \(displaySourceName)")
-                .font(.system(size: 11, weight: .bold))
+            Text(displaySourceName)
+                .font(.system(size: 14, weight: .semibold))
                 .kerning(2)
                 .foregroundStyle(FortiFitColors.mutedText)
             if showGlyph {
                 FortiFitHealthGlyph()
             }
         }
-        .accessibilityIdentifier(AccessibilityID.workoutDetailHealthSourceIndicator)
+        .accessibilityElement(children: .combine)
     }
 }

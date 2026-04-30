@@ -1140,18 +1140,18 @@ final class EffortDropdownSmokeTests: XCTestCase {
         let nameField = app.textFields["workoutNameInput"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 2))
 
-        // Scroll down to find the effort section — tap "Select effort" placeholder
-        let effortPlaceholder = app.staticTexts["Select effort"]
-        XCTAssertTrue(effortPlaceholder.waitForExistence(timeout: 3), "Effort dropdown placeholder should be visible")
-        effortPlaceholder.tap()
+        // Tap the effort dropdown trigger button by its accessibility identifier
+        let effortDropdown = app.buttons["effortDropdown"]
+        XCTAssertTrue(effortDropdown.waitForExistence(timeout: 3), "Effort dropdown should be visible")
+        effortDropdown.tap()
 
         // After expanding, check that option labels use "Label (Number)" format
         XCTAssertTrue(
-            app.staticTexts["Easy (1)"].waitForExistence(timeout: 2),
+            app.buttons["effortOption_Easy(1)"].waitForExistence(timeout: 2),
             "Effort option 'Easy (1)' should be visible"
         )
-        XCTAssertTrue(app.staticTexts["Hard (7)"].exists, "Effort option 'Hard (7)' should be visible")
-        XCTAssertTrue(app.staticTexts["All Out (10)"].exists, "Effort option 'All Out (10)' should be visible")
+        XCTAssertTrue(app.buttons["effortOption_Hard(7)"].exists, "Effort option 'Hard (7)' should be visible")
+        XCTAssertTrue(app.buttons["effortOption_AllOut(10)"].exists, "Effort option 'All Out (10)' should be visible")
     }
 }
 
@@ -1196,7 +1196,7 @@ final class StravaSourceSmokeTests: XCTestCase {
         XCTAssertTrue(indicator.waitForExistence(timeout: 3))
 
         XCTAssertTrue(
-            indicator.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Strava")).firstMatch.exists,
+            indicator.label.localizedCaseInsensitiveContains("Strava"),
             "Source indicator should contain 'Strava'"
         )
 
