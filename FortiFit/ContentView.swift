@@ -38,7 +38,7 @@ struct ContentView: View {
 
             FortiFitProgressView(selectedTab: selectedTab)
                 .tabItem {
-                    Image(systemName: "chart.bar.fill")
+                    Image(systemName: "chart.line.uptrend.xyaxis")
                     Text("TRENDS")
                 }
                 .tag(3)

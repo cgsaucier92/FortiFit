@@ -41,6 +41,8 @@ struct CreateTemplateView: View {
                     .keyboardType(.numberPad)
                     #endif
 
+                FortiFitDivider()
+
                 // Exercises
                 exercisesSection
 
@@ -110,7 +112,6 @@ struct CreateTemplateView: View {
                     }
                 }
 
-                FortiFitDivider()
             }
         }
         }

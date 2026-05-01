@@ -29,6 +29,16 @@ struct WorkoutTemplateService {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    static func templates(matching workoutType: String, context: ModelContext) -> [WorkoutTemplate] {
+        let descriptor = FetchDescriptor<WorkoutTemplate>(
+            predicate: #Predicate<WorkoutTemplate> { template in
+                template.workoutType == workoutType
+            },
+            sortBy: [SortDescriptor(\.dateCreated, order: .reverse)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
     // MARK: - Create
 
     @discardableResult
@@ -117,6 +127,32 @@ struct WorkoutTemplateService {
     static func delete(_ template: WorkoutTemplate, context: ModelContext) {
         context.delete(template)
         try? context.save()
+    }
+
+    // MARK: - Snapshot (data copy for pre-populating Log Workout form)
+
+    // MARK: - Apply to Existing Workout (Edit Mode)
+
+    static func applyToExistingWorkout(template: WorkoutTemplate, workout: Workout) {
+        let baseSortOrder = (workout.exerciseSets.map(\.sortOrder).max() ?? -1) + 1
+        for (offset, templateSet) in template.exerciseSets.sorted(by: { $0.sortOrder < $1.sortOrder }).enumerated() {
+            let new = ExerciseSet(
+                exerciseName: templateSet.exerciseName,
+                sets: templateSet.sets,
+                reps: templateSet.reps,
+                weightKg: templateSet.weightKg,
+                sortOrder: baseSortOrder + offset
+            )
+            workout.exerciseSets.append(new)
+        }
+
+        if workout.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            workout.name = template.name
+        }
+
+        if workout.healthKitUUID == nil && workout.durationMinutes == nil {
+            workout.durationMinutes = template.durationMinutes
+        }
     }
 
     // MARK: - Snapshot (data copy for pre-populating Log Workout form)

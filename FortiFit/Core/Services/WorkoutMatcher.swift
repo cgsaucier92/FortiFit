@@ -111,7 +111,7 @@ final class WorkoutMatcher {
                 try? context.save()
             }
         case .keepSeparate:
-            let rejection = WorkoutMatchRejection(healthKitUUID: snapshot.uuid, workoutId: workoutId)
+            let rejection = WorkoutMatchRejection(healthKitUUID: snapshot.uuid, workoutId: workoutId, reason: .keepSeparate)
             context.insert(rejection)
             try? context.save()
         case .decideLater:

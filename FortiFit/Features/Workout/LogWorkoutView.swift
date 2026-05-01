@@ -7,7 +7,9 @@ struct LogWorkoutView: View {
     @Bindable var viewModel: WorkoutViewModel
     @State private var showRPETooltip = false
     @State private var showDeleteAlert = false
-    @State private var showHealthSourceInfoSheet = false
+    @State private var showHKPopover_date = false
+    @State private var showHKPopover_duration = false
+    @State private var showHKPopover_distance = false
     var onDeleteWorkout: (() -> Void)?
     @State private var headerHeight: CGFloat = 0
 
@@ -28,7 +30,7 @@ struct LogWorkoutView: View {
                         .accessibilityIdentifier(AccessibilityID.workoutNameInput)
 
                     // Date & Start Time Picker
-                    FortiFitLabel("Date & Start Time", color: FortiFitColors.primaryText)
+                    hkFieldLabel("Date & Start Time", field: .date, popoverShown: $showHKPopover_date)
                     DatePicker(
                         "",
                         selection: $viewModel.workoutDate,
@@ -41,10 +43,6 @@ struct LogWorkoutView: View {
                     .colorScheme(.dark)
                     .disabled(viewModel.isHealthKitLinked)
                     .opacity(viewModel.isHealthKitLinked ? 0.5 : 1)
-
-                    if viewModel.isHealthKitLinked {
-                        healthKitHelperText(identifier: AccessibilityID.logWorkoutDateReadOnlyHelper)
-                    }
 
                     // Workout Type
                     FortiFitLabel("Workout Type", color: FortiFitColors.primaryText)
@@ -88,7 +86,7 @@ struct LogWorkoutView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Duration (all workout types)
-                    FortiFitLabel("Duration (minutes)", color: FortiFitColors.primaryText)
+                    hkFieldLabel("Duration (minutes)", field: .duration, popoverShown: $showHKPopover_duration)
                     FortiFitInput(placeholder: "Optional", text: $viewModel.durationMinutes)
                         .accessibilityIdentifier(AccessibilityID.durationInput)
                         #if os(iOS)
@@ -99,9 +97,7 @@ struct LogWorkoutView: View {
                         .frame(width: 120, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if viewModel.isHealthKitLinked {
-                        healthKitHelperText(identifier: AccessibilityID.logWorkoutDurationReadOnlyHelper)
-                    }
+                    FortiFitDivider()
 
                     // Type-specific fields
                     if viewModel.isStrengthOrHIIT {
@@ -142,25 +138,29 @@ struct LogWorkoutView: View {
                         FortiFitBackButton { dismiss() }
                         Spacer()
                         if viewModel.isEditMode {
-                            Button {
-                                showDeleteAlert = true
-                            } label: {
-                                Image(systemName: AppConstants.deleteIcon)
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(FortiFitColors.primaryAccent)
-                                    .frame(width: FortiFitSpacing.minTouchTarget, height: FortiFitSpacing.minTouchTarget)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
-                                            .fill(.clear)
-                                            .stroke(FortiFitColors.primaryAccent, lineWidth: 1)
-                                    )
+                            HStack(spacing: FortiFitSpacing.elementSpacing) {
+                                Button {
+                                    showDeleteAlert = true
+                                } label: {
+                                    Image(systemName: AppConstants.deleteIcon)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(FortiFitColors.primaryAccent)
+                                        .frame(width: FortiFitSpacing.minTouchTarget, height: FortiFitSpacing.minTouchTarget)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
+                                                .fill(.clear)
+                                                .stroke(FortiFitColors.primaryAccent, lineWidth: 1)
+                                        )
+                                }
+                                if viewModel.isStrengthOrHIIT {
+                                    editModeEllipsisMenu
+                                }
                             }
                         } else {
                             ellipsisMenu
                         }
                     }
 
-                    FortiFitDivider()
                 }
             }
         }
@@ -216,16 +216,6 @@ struct LogWorkoutView: View {
         } message: {
             Text("Enter a name for this template.")
         }
-        .sheet(isPresented: $showHealthSourceInfoSheet) {
-            if let workout = viewModel.editingWorkout {
-                FortiFitHealthSourceInfoSheet(
-                    workout: workout,
-                    sourceName: LogWorkoutView.resolveSourceName(bundleID: workout.healthKitSourceBundleID)
-                ) {
-                    WorkoutService.unlink(workout, context: modelContext)
-                }
-            }
-        }
         .alert(
             "Delete \(viewModel.workoutName)?",
             isPresented: $showDeleteAlert
@@ -256,12 +246,28 @@ struct LogWorkoutView: View {
                 viewModel.saveAsTemplateName = viewModel.workoutName
                 viewModel.showSaveAsTemplatePrompt = true
             } label: {
-                Label("Save As Template", systemImage: "square.and.arrow.down")
+                Label("Save as Template", systemImage: "square.and.arrow.down")
             }
             .disabled(!viewModel.canSaveAsTemplate)
         } label: {
             FortiFitEllipsisButton()
         }
+    }
+
+    // MARK: - Edit Mode Ellipsis Menu
+
+    private var editModeEllipsisMenu: some View {
+        Menu {
+            Button {
+                viewModel.showTemplateSelector = true
+            } label: {
+                Label("Use Template", systemImage: "doc.badge.arrow.up")
+            }
+            .accessibilityIdentifier(AccessibilityID.editWorkoutUseTemplateMenuItem)
+        } label: {
+            FortiFitEllipsisButton()
+        }
+        .accessibilityIdentifier(AccessibilityID.editWorkoutEllipsisMenu)
     }
 
     // MARK: - Template Selector Overlay
@@ -305,7 +311,11 @@ struct LogWorkoutView: View {
                         VStack(spacing: 0) {
                             ForEach(viewModel.templates) { template in
                                 Button {
-                                    viewModel.applyTemplate(template)
+                                    if viewModel.isEditMode {
+                                        viewModel.applyTemplateToEditingWorkout(template)
+                                    } else {
+                                        viewModel.applyTemplate(template)
+                                    }
                                     viewModel.showTemplateSelector = false
                                 } label: {
                                     HStack {
@@ -342,21 +352,51 @@ struct LogWorkoutView: View {
                 RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
                     .stroke(FortiFitColors.border, lineWidth: 1)
             )
+            .accessibilityIdentifier(
+                viewModel.isEditMode
+                    ? AccessibilityID.editWorkoutTemplateSelectorOverlay
+                    : ""
+            )
         }
     }
 
-    // MARK: - HealthKit Helper Text
+    // MARK: - HK Field Label with info.circle popover
 
-    private func healthKitHelperText(identifier: String) -> some View {
-        Button {
-            showHealthSourceInfoSheet = true
-        } label: {
-            Text("LINKED TO APPLE HEALTH · TAP TO UNLINK")
-                .font(.system(size: 11, weight: .bold))
-                .kerning(2)
-                .foregroundStyle(FortiFitColors.mutedText)
+    @ViewBuilder
+    private func hkFieldLabel(_ title: String, field: AppConstants.HKOwnedField, popoverShown: Binding<Bool>) -> some View {
+        if viewModel.isHealthKitLinked {
+            HStack(spacing: 4) {
+                FortiFitLabel(title, color: FortiFitColors.primaryText)
+                Button {
+                    popoverShown.wrappedValue = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(FortiFitColors.mutedText)
+                }
+                .accessibilityIdentifier(hkFieldInfoIdentifier(for: field))
+                .popover(isPresented: popoverShown) {
+                    Text(AppConstants.HealthKit.fieldPopoverCopy(for: field))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(FortiFitColors.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: 260)
+                        .padding(FortiFitSpacing.cardPadding)
+                        .presentationCompactAdaptation(.popover)
+                }
+            }
+        } else {
+            FortiFitLabel(title, color: FortiFitColors.primaryText)
         }
-        .accessibilityIdentifier(identifier)
+    }
+
+    private func hkFieldInfoIdentifier(for field: AppConstants.HKOwnedField) -> String {
+        switch field {
+        case .date: return AccessibilityID.logWorkoutHkFieldInfoIconDate
+        case .startTime: return AccessibilityID.logWorkoutHkFieldInfoIconStartTime
+        case .duration: return AccessibilityID.logWorkoutHkFieldInfoIconDuration
+        case .distance: return AccessibilityID.logWorkoutHkFieldInfoIconDistance
+        }
     }
 
     // MARK: - Exercises Section (Strength/HIIT)
@@ -397,7 +437,7 @@ struct LogWorkoutView: View {
 
     private var distanceSection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            FortiFitLabel("Distance (\(distanceUnit))", color: FortiFitColors.primaryText)
+            hkFieldLabel("Distance (\(distanceUnit))", field: .distance, popoverShown: $showHKPopover_distance)
             FortiFitInput(placeholder: "Optional", text: $viewModel.distanceKm)
                 .accessibilityIdentifier(AccessibilityID.distanceInput)
                 #if os(iOS)
@@ -405,10 +445,6 @@ struct LogWorkoutView: View {
                 #endif
                 .disabled(viewModel.isHealthKitLinked)
                 .opacity(viewModel.isHealthKitLinked ? 0.5 : 1)
-
-            if viewModel.isHealthKitLinked {
-                healthKitHelperText(identifier: AccessibilityID.logWorkoutDistanceReadOnlyHelper)
-            }
         }
     }
 

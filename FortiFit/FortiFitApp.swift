@@ -15,7 +15,6 @@ struct FortiFitApp: App {
     @State private var showImportError = false
     @State private var healthKitMatcher = WorkoutMatcher()
     @State private var healthKitSyncService: HealthKitSyncService?
-    @State private var showMatchPrompt = false
     @State private var currentPendingMatch: PendingMatch?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -79,6 +78,7 @@ struct FortiFitApp: App {
                     healthKitSyncService = syncService
                     let context = sharedModelContainer.mainContext
                     WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
+                    HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
                     syncService.setContext(context)
                     if CommandLine.arguments.contains("--seed-hk-workout") {
                         seedHealthKitLinkedWorkout(context: context)
@@ -104,41 +104,39 @@ struct FortiFitApp: App {
                         presentNextPendingMatch()
                     }
                 }
-                .sheet(isPresented: $showMatchPrompt) {
+                .sheet(item: $currentPendingMatch, onDismiss: {
                     presentNextPendingMatch()
-                } content: {
-                    if let match = currentPendingMatch {
-                        let context = sharedModelContainer.mainContext
-                        let workout = fetchWorkout(id: match.workoutId, context: context)
-                        MatchPromptSheetView(
-                            pendingMatch: match,
-                            workout: workout,
-                            onLink: {
-                                healthKitMatcher.resolvePending(
-                                    workoutId: match.workoutId,
-                                    snapshot: match.snapshot,
-                                    decision: .link,
-                                    context: context
-                                )
-                            },
-                            onKeepSeparate: {
-                                healthKitMatcher.resolvePending(
-                                    workoutId: match.workoutId,
-                                    snapshot: match.snapshot,
-                                    decision: .keepSeparate,
-                                    context: context
-                                )
-                            },
-                            onDecideLater: {
-                                healthKitMatcher.resolvePending(
-                                    workoutId: match.workoutId,
-                                    snapshot: match.snapshot,
-                                    decision: .decideLater,
-                                    context: context
-                                )
-                            }
-                        )
-                    }
+                }) { match in
+                    let context = sharedModelContainer.mainContext
+                    let workout = fetchWorkout(id: match.workoutId, context: context)
+                    MatchPromptSheetView(
+                        pendingMatch: match,
+                        workout: workout,
+                        onLink: {
+                            healthKitMatcher.resolvePending(
+                                workoutId: match.workoutId,
+                                snapshot: match.snapshot,
+                                decision: .link,
+                                context: context
+                            )
+                        },
+                        onKeepSeparate: {
+                            healthKitMatcher.resolvePending(
+                                workoutId: match.workoutId,
+                                snapshot: match.snapshot,
+                                decision: .keepSeparate,
+                                context: context
+                            )
+                        },
+                        onDecideLater: {
+                            healthKitMatcher.resolvePending(
+                                workoutId: match.workoutId,
+                                snapshot: match.snapshot,
+                                decision: .decideLater,
+                                context: context
+                            )
+                        }
+                    )
                 }
                 .onOpenURL { url in
                     guard url.scheme == "fitnavi", url.host == "template" else { return }
@@ -167,12 +165,7 @@ struct FortiFitApp: App {
     }
 
     private func presentNextPendingMatch() {
-        guard let match = healthKitMatcher.pendingMatches().first else {
-            currentPendingMatch = nil
-            return
-        }
-        currentPendingMatch = match
-        showMatchPrompt = true
+        currentPendingMatch = healthKitMatcher.pendingMatches().first
     }
 
     private func fetchWorkout(id: UUID, context: ModelContext) -> Workout? {

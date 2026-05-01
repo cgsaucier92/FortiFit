@@ -36,8 +36,6 @@ struct WorkoutShareCardView: View {
                 .lineLimit(2)
                 .truncationMode(.tail)
 
-            FortiFitDivider()
-
             // Date/time line
             Text(dateTimeLine)
                 .font(.system(size: 13, weight: .semibold))
@@ -47,6 +45,8 @@ struct WorkoutShareCardView: View {
             Text(workout.workoutType)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(FortiFitColors.secondaryText)
+
+            FortiFitDivider()
 
             // Stat-card grid
             let cards = shareCardStats
@@ -132,30 +132,6 @@ struct WorkoutShareCardView: View {
 
             ))
         }
-        if workout.workoutType == "Cardio", let distance = workout.distanceKm {
-            let color = AppConstants.statCardColor(for: .distance)
-            if userSettings.useMiles {
-                cards.append(ShareStatData(
-                    symbol: WorkoutMetric.distance.sfSymbol,
-                    label: "Distance",
-                    value: String(format: "%.1f", UnitConversion.kmToMiles(distance)),
-                    unit: "mi",
-                    iconColor: color,
-                    valueColor: color,
-    
-                ))
-            } else {
-                cards.append(ShareStatData(
-                    symbol: WorkoutMetric.distance.sfSymbol,
-                    label: "Distance",
-                    value: String(format: "%.1f", distance),
-                    unit: "km",
-                    iconColor: color,
-                    valueColor: color,
-    
-                ))
-            }
-        }
         if let avg = workout.avgHeartRate {
             let color = AppConstants.statCardColor(for: .avgHR)
             cards.append(ShareStatData(
@@ -240,6 +216,30 @@ struct WorkoutShareCardView: View {
 
             ))
         }
+        if workout.workoutType == "Cardio", let distance = workout.distanceKm {
+            let color = AppConstants.statCardColor(for: .distance)
+            if userSettings.useMiles {
+                cards.append(ShareStatData(
+                    symbol: WorkoutMetric.distance.sfSymbol,
+                    label: "Distance",
+                    value: String(format: "%.1f", UnitConversion.kmToMiles(distance)),
+                    unit: "mi",
+                    iconColor: color,
+                    valueColor: color,
+
+                ))
+            } else {
+                cards.append(ShareStatData(
+                    symbol: WorkoutMetric.distance.sfSymbol,
+                    label: "Distance",
+                    value: String(format: "%.1f", distance),
+                    unit: "km",
+                    iconColor: color,
+                    valueColor: color,
+
+                ))
+            }
+        }
 
         return cards
     }
@@ -281,11 +281,9 @@ struct WorkoutShareCardView: View {
 
     private var exercisesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Rectangle()
-                .fill(FortiFitColors.border)
-                .frame(height: 1)
+            FortiFitDivider()
 
-            Text("EXERCISES")
+            Text("Exercises")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(FortiFitColors.primaryAccent)
                 .kerning(2)

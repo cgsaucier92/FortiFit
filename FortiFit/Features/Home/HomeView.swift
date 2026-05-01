@@ -258,6 +258,17 @@ struct HomeView: View {
         ))
         .contextMenu {
             if !viewModel.isEditMode {
+                if widget.widgetType == "todaysPlan" && viewModel.currentPlannedWorkout != nil {
+                    Button {
+                        planCompletionRPE = nil
+                        planCompletionDuration = ""
+                        showPlanCompletion = true
+                    } label: {
+                        Label("Complete Workout", systemImage: AppConstants.completeWorkoutIcon)
+                    }
+                    .accessibilityIdentifier(AccessibilityID.homeWidget_todaysPlan_completeWorkoutMenuItem)
+                }
+
                 if widget.widgetType == "trainingLoad" || widget.widgetType == "powerLevel" {
                     Button {
                         seeInfoWidgetType = widget.widgetType
@@ -314,61 +325,6 @@ struct HomeView: View {
         case "trainingLoad":
             trainingLoadWidget
 
-        case "workoutInfo":
-            FortiFitCard {
-                VStack(spacing: 0) {
-                    FortiFitWidgetHeader(title: "Workout Info")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.bottom, FortiFitSpacing.gapSmall)
-
-                    Rectangle()
-                        .fill(FortiFitColors.border)
-                        .frame(height: 1)
-                        .padding(.bottom, FortiFitSpacing.gapSmall)
-
-                    HStack(alignment: .top, spacing: 0) {
-                        // Left half: Last Workout
-                        VStack(alignment: .center, spacing: 4) {
-                            Text("Last Workout")
-                                .font(FortiFitTypography.body)
-                                .kerning(FortiFitTypography.labelKerning)
-                                .foregroundStyle(FortiFitColors.primaryAccent)
-                            Text(viewModel.lastWorkoutName)
-                                .font(FortiFitTypography.dataValue)
-                                .foregroundStyle(FortiFitColors.primaryText)
-                                .lineLimit(1)
-                            if viewModel.lastWorkoutDate != "—" {
-                                Text(viewModel.lastWorkoutDate)
-                                    .font(FortiFitTypography.body)
-                                    .foregroundStyle(FortiFitColors.primaryText)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-
-                        // Vertical divider
-                        Rectangle()
-                            .fill(FortiFitColors.border)
-                            .frame(width: 1)
-                            .padding(.vertical, 2)
-                            .padding(.horizontal, FortiFitSpacing.gapMedium)
-
-                        // Right half: Total Workouts
-                        VStack(alignment: .center, spacing: 4) {
-                            Text("Total Workouts")
-                                .font(FortiFitTypography.body)
-                                .kerning(FortiFitTypography.labelKerning)
-                                .foregroundStyle(FortiFitColors.primaryAccent)
-                                .multilineTextAlignment(.center)
-                            Text(viewModel.totalWorkouts > 0 ? "\(viewModel.totalWorkouts)" : "—")
-                                .font(FortiFitTypography.dataValue)
-                                .foregroundStyle(FortiFitColors.primaryText)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                }
-                .padding(.trailing, viewModel.isEditMode ? 24 : 0)
-            }
-
         case "weekStreak":
             FortiFitStreakWidget(
                 streak: viewModel.streakResult.streak,
@@ -395,62 +351,51 @@ struct HomeView: View {
     private var todaysPlanWidget: some View {
         FortiFitCard {
             HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
-                // Left column — title + workout info
-                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                    FortiFitWidgetHeader(title: "Today's Plan")
-
-                    if let workout = viewModel.currentPlannedWorkout {
-                        Text(workout.workoutName)
-                            .font(FortiFitTypography.dataValue)
-                            .foregroundStyle(FortiFitColors.primaryText)
-                            .lineLimit(2)
-
-                        Text(workout.workoutType.uppercased())
-                            .font(FortiFitTypography.labelSmall)
-                            .kerning(FortiFitTypography.labelKerning)
-                            .foregroundStyle(FortiFitColors.secondaryText)
-
-                        Button {
-                            #if os(iOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            planCompletionRPE = nil
-                            planCompletionDuration = ""
-                            showPlanCompletion = true
-                        } label: {
-                            Text("Complete Workout")
-                                .font(.system(size: 13, weight: .semibold))
-                                .kerning(FortiFitTypography.labelKerning)
-                                .foregroundStyle(FortiFitColors.primaryAccent)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
-                                        .stroke(FortiFitColors.primaryAccent, lineWidth: 1)
-                                )
-                        }
-
-                        if viewModel.additionalPlannedCount > 0 {
-                            Text("\(viewModel.additionalPlannedCount) more planned")
-                                .font(.system(size: 11, weight: .bold))
-                                .kerning(FortiFitTypography.labelKerning)
-                                .foregroundStyle(FortiFitColors.mutedText)
-                        }
-                    } else if viewModel.todaysPlanAllCompleted {
-                        HStack(spacing: FortiFitSpacing.elementSpacing) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(FortiFitColors.positive)
-                            Text("All planned workouts completed.")
-                                .font(FortiFitTypography.note)
-                                .foregroundStyle(FortiFitColors.mutedText)
-                        }
-                    } else {
-                        Text("No workout planned for today.")
-                            .font(FortiFitTypography.note)
-                            .foregroundStyle(FortiFitColors.primaryText)
+                // Left column — title + workout info with silhouette watermark
+                ZStack(alignment: .center) {
+                    if let workout = viewModel.currentPlannedWorkout,
+                       let symbol = AppConstants.workoutTypeSymbols[workout.workoutType] {
+                        Image(systemName: symbol)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 100, height: 100)
+                            .foregroundStyle(FortiFitColors.mutedText.opacity(0.1))
+                            .accessibilityIdentifier(AccessibilityID.homeWidget_todaysPlan_silhouette)
+                            .accessibilityHidden(true)
                     }
+
+                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                        FortiFitWidgetHeader(title: "Today's Plan")
+
+                        if let workout = viewModel.currentPlannedWorkout {
+                            Text(workout.workoutName)
+                                .font(FortiFitTypography.dataValue)
+                                .foregroundStyle(FortiFitColors.primaryText)
+                                .lineLimit(2)
+
+                            if viewModel.additionalPlannedCount > 0 {
+                                Text("\(viewModel.additionalPlannedCount) more planned")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .kerning(FortiFitTypography.labelKerning)
+                                    .foregroundStyle(FortiFitColors.mutedText)
+                            }
+                        } else if viewModel.todaysPlanAllCompleted {
+                            HStack(spacing: FortiFitSpacing.elementSpacing) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(FortiFitColors.positive)
+                                Text("All planned workouts completed.")
+                                    .font(FortiFitTypography.note)
+                                    .foregroundStyle(FortiFitColors.mutedText)
+                            }
+                        } else {
+                            Text("No workout planned for today.")
+                                .font(FortiFitTypography.note)
+                                .foregroundStyle(FortiFitColors.primaryText)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
 
                 // Right column — calendar square (25% width)
                 GeometryReader { geo in

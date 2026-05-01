@@ -20,6 +20,7 @@ final class UserSettings {
         static let healthKitLastSyncDate = "healthKitLastSyncDate"
         static let hasMigratedSprintsToCardio = "hasMigratedSprintsToCardio"
         static let healthKitAuthorizationRequested = "healthKitAuthorizationRequested"
+        static let hasMigratedWorkoutInfoRemoval = "hasMigratedWorkoutInfoRemoval"
     }
 
     var useLbs: Bool {
@@ -74,6 +75,10 @@ final class UserSettings {
         didSet { defaults.set(healthKitAuthorizationRequested, forKey: Keys.healthKitAuthorizationRequested) }
     }
 
+    var hasMigratedWorkoutInfoRemoval: Bool {
+        didSet { defaults.set(hasMigratedWorkoutInfoRemoval, forKey: Keys.hasMigratedWorkoutInfoRemoval) }
+    }
+
     private init() {
         // Register defaults for first launch
         defaults.register(defaults: [
@@ -87,7 +92,8 @@ final class UserSettings {
             Keys.hasSeededDefaultTrendsCharts: false,
             Keys.healthKitEnabled: false,
             Keys.hasMigratedSprintsToCardio: false,
-            Keys.healthKitAuthorizationRequested: false
+            Keys.healthKitAuthorizationRequested: false,
+            Keys.hasMigratedWorkoutInfoRemoval: false
         ])
 
         self.useLbs = defaults.bool(forKey: Keys.useLbs)
@@ -103,5 +109,6 @@ final class UserSettings {
         self.healthKitLastSyncDate = defaults.object(forKey: Keys.healthKitLastSyncDate) as? Date
         self.hasMigratedSprintsToCardio = defaults.bool(forKey: Keys.hasMigratedSprintsToCardio)
         self.healthKitAuthorizationRequested = defaults.bool(forKey: Keys.healthKitAuthorizationRequested)
+        self.hasMigratedWorkoutInfoRemoval = defaults.bool(forKey: Keys.hasMigratedWorkoutInfoRemoval)
     }
 }

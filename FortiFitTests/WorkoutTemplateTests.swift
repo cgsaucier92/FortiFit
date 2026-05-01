@@ -462,6 +462,166 @@ struct WorkoutTemplateServiceTests {
         #expect(workouts.first?.name == "Push Day")
     }
 
+    // MARK: - templates(matching:) Tests
+
+    @Test func templatesMatchingReturnsOnlyMatchingType() throws {
+        let context = try makeTemplateTestContext()
+        let strength = WorkoutTemplate(name: "Push Day", workoutType: "Strength Training", dateCreated: Date())
+        let hiit = WorkoutTemplate(name: "HIIT Blast", workoutType: "HIIT", dateCreated: Date())
+        let yoga = WorkoutTemplate(name: "Flow", workoutType: "Yoga", dateCreated: Date())
+        context.insert(strength)
+        context.insert(hiit)
+        context.insert(yoga)
+        try context.save()
+
+        let results = WorkoutTemplateService.templates(matching: "Strength Training", context: context)
+        #expect(results.count == 1)
+        #expect(results.first?.name == "Push Day")
+    }
+
+    @Test func templatesMatchingReturnsSortedNewestFirst() throws {
+        let context = try makeTemplateTestContext()
+        let older = WorkoutTemplate(name: "Old Template", workoutType: "Strength Training", dateCreated: Date().addingTimeInterval(-86400))
+        let newer = WorkoutTemplate(name: "New Template", workoutType: "Strength Training", dateCreated: Date())
+        context.insert(older)
+        context.insert(newer)
+        try context.save()
+
+        let results = WorkoutTemplateService.templates(matching: "Strength Training", context: context)
+        #expect(results.count == 2)
+        #expect(results[0].name == "New Template")
+        #expect(results[1].name == "Old Template")
+    }
+
+    // MARK: - applyToExistingWorkout Tests
+
+    @Test func applyToExistingWorkoutAppendsExercisesWithCorrectSortOrder() throws {
+        let context = try makeTemplateTestContext()
+
+        let workout = Workout(name: "Push Day", workoutType: "Strength Training")
+        let es1 = ExerciseSet(exerciseName: "Bench Press", sets: 3, reps: 8, weightKg: 80, sortOrder: 0)
+        let es2 = ExerciseSet(exerciseName: "Flyes", sets: 3, reps: 12, weightKg: 20, sortOrder: 1)
+        workout.exerciseSets.append(es1)
+        workout.exerciseSets.append(es2)
+        context.insert(workout)
+
+        let template = WorkoutTemplate(name: "Template", workoutType: "Strength Training")
+        let ts1 = TemplateExerciseSet(exerciseName: "OHP", sets: 4, reps: 6, weightKg: 50, sortOrder: 0)
+        let ts2 = TemplateExerciseSet(exerciseName: "Lat Raise", sets: 3, reps: 15, weightKg: 10, sortOrder: 1)
+        let ts3 = TemplateExerciseSet(exerciseName: "Tricep Dips", sets: 3, reps: 10, sortOrder: 2)
+        template.exerciseSets.append(ts1)
+        template.exerciseSets.append(ts2)
+        template.exerciseSets.append(ts3)
+        context.insert(template)
+        try context.save()
+
+        WorkoutTemplateService.applyToExistingWorkout(template: template, workout: workout)
+
+        #expect(workout.exerciseSets.count == 5)
+        let sorted = workout.exerciseSets.sorted { $0.sortOrder < $1.sortOrder }
+        #expect(sorted[0].exerciseName == "Bench Press")
+        #expect(sorted[1].exerciseName == "Flyes")
+        #expect(sorted[2].exerciseName == "OHP")
+        #expect(sorted[2].sortOrder == 2)
+        #expect(sorted[3].exerciseName == "Lat Raise")
+        #expect(sorted[3].sortOrder == 3)
+        #expect(sorted[4].exerciseName == "Tricep Dips")
+        #expect(sorted[4].sortOrder == 4)
+    }
+
+    @Test func applyToExistingWorkoutFillsNameWhenEmpty() throws {
+        let context = try makeTemplateTestContext()
+        let workout = Workout(name: "", workoutType: "Strength Training")
+        context.insert(workout)
+        let template = WorkoutTemplate(name: "Push Day Template", workoutType: "Strength Training")
+        context.insert(template)
+        try context.save()
+
+        WorkoutTemplateService.applyToExistingWorkout(template: template, workout: workout)
+        #expect(workout.name == "Push Day Template")
+    }
+
+    @Test func applyToExistingWorkoutLeavesNameWhenSet() throws {
+        let context = try makeTemplateTestContext()
+        let workout = Workout(name: "My Custom Name", workoutType: "Strength Training")
+        context.insert(workout)
+        let template = WorkoutTemplate(name: "Push Day Template", workoutType: "Strength Training")
+        context.insert(template)
+        try context.save()
+
+        WorkoutTemplateService.applyToExistingWorkout(template: template, workout: workout)
+        #expect(workout.name == "My Custom Name")
+    }
+
+    @Test func applyToExistingWorkoutFillsDurationWhenNilAndNotHKLinked() throws {
+        let context = try makeTemplateTestContext()
+        let workout = Workout(name: "Push Day", workoutType: "Strength Training", durationMinutes: nil)
+        context.insert(workout)
+        let template = WorkoutTemplate(name: "Template", workoutType: "Strength Training", durationMinutes: 60)
+        context.insert(template)
+        try context.save()
+
+        WorkoutTemplateService.applyToExistingWorkout(template: template, workout: workout)
+        #expect(workout.durationMinutes == 60)
+    }
+
+    @Test func applyToExistingWorkoutSkipsDurationWhenHKLinked() throws {
+        let context = try makeTemplateTestContext()
+        let workout = Workout(name: "Push Day", workoutType: "Strength Training", durationMinutes: nil, healthKitUUID: UUID())
+        context.insert(workout)
+        let template = WorkoutTemplate(name: "Template", workoutType: "Strength Training", durationMinutes: 60)
+        context.insert(template)
+        try context.save()
+
+        WorkoutTemplateService.applyToExistingWorkout(template: template, workout: workout)
+        #expect(workout.durationMinutes == nil)
+    }
+
+    @Test func applyToExistingWorkoutLeavesDurationWhenAlreadySet() throws {
+        let context = try makeTemplateTestContext()
+        let workout = Workout(name: "Push Day", workoutType: "Strength Training", durationMinutes: 45)
+        context.insert(workout)
+        let template = WorkoutTemplate(name: "Template", workoutType: "Strength Training", durationMinutes: 60)
+        context.insert(template)
+        try context.save()
+
+        WorkoutTemplateService.applyToExistingWorkout(template: template, workout: workout)
+        #expect(workout.durationMinutes == 45)
+    }
+
+    @Test func applyToExistingWorkoutNeverModifiesOtherFields() throws {
+        let context = try makeTemplateTestContext()
+        let originalDate = Date().addingTimeInterval(-3600)
+        let hkUUID = UUID()
+        let workout = Workout(
+            name: "Existing",
+            date: originalDate,
+            workoutType: "Strength Training",
+            rpe: 7,
+            durationMinutes: 45,
+            distanceKm: 5.0,
+            time: originalDate,
+            healthKitUUID: hkUUID,
+            healthKitSourceBundleID: "com.apple.health"
+        )
+        context.insert(workout)
+        let template = WorkoutTemplate(name: "Template", workoutType: "Strength Training", durationMinutes: 99)
+        context.insert(template)
+        try context.save()
+
+        WorkoutTemplateService.applyToExistingWorkout(template: template, workout: workout)
+
+        #expect(workout.workoutType == "Strength Training")
+        #expect(workout.date == originalDate)
+        #expect(workout.rpe == 7)
+        #expect(workout.distanceKm == 5.0)
+        #expect(workout.healthKitUUID == hkUUID)
+        #expect(workout.healthKitSourceBundleID == "com.apple.health")
+        #expect(workout.durationMinutes == 45)
+    }
+
+    // MARK: - Existing Tests (continued)
+
     @Test func deletingTemplateDoesNotAffectGoals() throws {
         let context = try makeTemplateTestContext()
 

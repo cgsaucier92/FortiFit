@@ -64,6 +64,7 @@ struct FortiFitWorkoutTypeCard: View {
                     .font(FortiFitTypography.label)
                     .kerning(FortiFitTypography.labelKerning)
                     .foregroundStyle(FortiFitColors.mutedText)
+                    .fixedSize()
 
                 // Sort indicator
                 if isNonDefaultSort {

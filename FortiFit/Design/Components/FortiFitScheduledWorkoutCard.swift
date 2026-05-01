@@ -77,7 +77,7 @@ struct FortiFitScheduledWorkoutCard: View {
                         Text("COMPLETED")
                             .font(.system(size: 11, weight: .bold))
                             .kerning(2)
-                            .foregroundStyle(FortiFitColors.mutedText)
+                            .foregroundStyle(FortiFitColors.positive)
                     }
                     .frame(maxWidth: .infinity, minHeight: FortiFitSpacing.minTouchTarget, alignment: .leading)
 
@@ -220,7 +220,7 @@ struct FortiFitLoggedWorkoutCard: View {
                     Text("COMPLETED")
                         .font(.system(size: 11, weight: .bold))
                         .kerning(2)
-                        .foregroundStyle(FortiFitColors.mutedText)
+                        .foregroundStyle(FortiFitColors.positive)
                 }
                 .frame(maxWidth: .infinity, minHeight: FortiFitSpacing.minTouchTarget, alignment: .leading)
             }

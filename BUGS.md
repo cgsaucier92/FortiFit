@@ -314,3 +314,16 @@
 | Root Cause | Race condition with no retry mechanism. `workoutEffortScore` is a separate `HKQuantitySample` in HealthKit — not a property of `HKWorkout`. When the anchored query delivers a new workout, `HealthKitSyncService.processSnapshot` calls `applyEffortScoreIfNeeded`, which calls `DefaultHealthKitClient.fetchEffortScore`. However, the effort score sample typically syncs from Apple Watch *after* the workout sample, so the query returns nil. Three factors make this failure permanent: (1) `fetchEffortScore` errors are silently swallowed by `try?` at the call sites in `processSnapshot` (lines 121 and 129 of `HealthKitSyncService.swift`), providing no signal that a retry is needed; (2) `handleUpstreamUpdate` (line 170) does not attempt effort score nil-fill — correct per HEALTHKIT.md § 11 which says `rpe` is user-owned and never touched by upstream updates, but this creates a gap when the initial import misses the score; (3) effort score samples are a different `HKQuantityType` than workouts, so their arrival in HealthKit does not trigger the `HKObserverQuery` on `HKObjectType.workoutType()`, meaning no re-import is attempted when the score becomes available. |
 | Resolution | Three-layer fix: (1) `handleUpstreamUpdate` now calls `applyEffortScoreIfNeeded` when `rpe` is nil, so upstream workout updates backfill the score. (2) Added `backfillMissingEffortScores(context:)` which scans all HK-linked workouts with nil `rpe` and fetches effort scores — called at the end of every `importPendingWorkouts` cycle as a catch-all. (3) Added `observeEffortScoreChanges` to `HealthKitClient` protocol; `DefaultHealthKitClient` registers an `HKObserverQuery` on `HKQuantityType(.workoutEffortScore)` with background delivery, triggering backfill when effort score samples arrive independently of workout updates. Regression tests: `test_upstreamUpdate_nilFillsEffortScoreWhenRPEIsNil`, `test_upstreamUpdate_preservesExistingRPEDuringUpdate`, `test_backfillEffortScores_fillsMissingRPEOnLinkedWorkouts`. |
 | Status | Resolved |
+
+---
+
+### BUG-024
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-04-30 |
+| Phase | Phase 8 — HealthKit Match Prompt (grey empty sheet flash before content appears) |
+| Description | When the workout matching service finds a potential Apple Workout match, a blank grey sheet appears briefly before the correct Match Prompt Sheet renders with its content. |
+| Root Cause | `FortiFitApp.swift` uses `.sheet(isPresented: $showMatchPrompt)` with an `if let match = currentPendingMatch` conditional inside the content closure. When `showMatchPrompt` becomes `true`, SwiftUI may render the sheet content before the `currentPendingMatch` state update has propagated through the view update cycle. The `if let` fails on the first render pass, producing an empty view (grey sheet), then succeeds on the next pass once the state catches up. This is a known SwiftUI timing issue with `@State` and conditional sheet content. |
+| Resolution | Replaced `.sheet(isPresented: $showMatchPrompt)` with `.sheet(item: $currentPendingMatch)`, which ties presentation directly to the data. The sheet only appears when the item is non-nil, and the item is passed directly to the content closure — no conditional unwrap, no race condition. Removed the now-unnecessary `showMatchPrompt` boolean. |
+| Status | Resolved |

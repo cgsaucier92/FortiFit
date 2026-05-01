@@ -168,10 +168,19 @@ struct WorkoutService {
     // MARK: - HealthKit Unlink
 
     static func unlink(_ workout: Workout, context: ModelContext) {
+        let capturedUUID = workout.healthKitUUID
         workout.healthKitUUID = nil
         workout.healthKitSourceBundleID = nil
         workout.healthKitActivityType = nil
         workout.lastModifiedDate = .now
+        if let capturedUUID {
+            let rejection = WorkoutMatchRejection(
+                healthKitUUID: capturedUUID,
+                workoutId: workout.id,
+                reason: .unlinked
+            )
+            context.insert(rejection)
+        }
         try? context.save()
     }
 

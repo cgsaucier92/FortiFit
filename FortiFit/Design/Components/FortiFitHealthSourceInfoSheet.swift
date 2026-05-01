@@ -3,74 +3,156 @@ import SwiftUI
 struct FortiFitHealthSourceInfoSheet: View {
     let workout: Workout
     let sourceName: String?
+    let lastSyncDate: Date?
     let onUnlink: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var showUnlinkConfirmation = false
 
     private var displaySourceName: String {
-        sourceName ?? "another app"
+        sourceName ?? AppConstants.HealthKit.unknownSourceName
     }
 
     var body: some View {
-        VStack(spacing: FortiFitSpacing.gapLarge) {
-            VStack(spacing: FortiFitSpacing.gapSmall) {
-                Image(systemName: "heart.fill")
+        ScrollView {
+            VStack(spacing: FortiFitSpacing.gapLarge) {
+                // 1. Header icon
+                Image(systemName: AppConstants.HealthKit.infoSheetHeaderIcon)
                     .font(.system(size: 32))
-                    .foregroundStyle(.pink)
+                    .foregroundStyle(Color(hex: "FF2D55"))
 
-                Text("Imported from Apple Health")
+                // 2. Title
+                Text(AppConstants.HealthKit.infoSheetTitle)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(FortiFitColors.primaryText)
                     .multilineTextAlignment(.center)
 
-                Text("This workout was imported from Apple Health via \(displaySourceName). Measured values like duration, distance, heart rate, and calories are sourced from Apple Health and cannot be edited here.")
+                // 3. Lead sentence
+                Text(AppConstants.HealthKit.infoSheetLead)
                     .font(.system(size: 14))
                     .foregroundStyle(FortiFitColors.secondaryText)
                     .multilineTextAlignment(.center)
-            }
 
-            VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                if let activityType = workout.healthKitActivityType {
-                    HStack {
-                        Text("Activity Type:")
-                            .font(FortiFitTypography.bodySmall)
-                            .foregroundStyle(FortiFitColors.mutedText)
-                        Text(activityType)
-                            .font(FortiFitTypography.body)
-                            .foregroundStyle(FortiFitColors.primaryText)
+                // 4. Two-row callout card
+                VStack(spacing: FortiFitSpacing.elementSpacing) {
+                    calloutRow(
+                        icon: AppConstants.HealthKit.infoSheetReadOnlyIcon,
+                        iconColor: FortiFitColors.mutedText,
+                        headline: AppConstants.HealthKit.infoSheetReadOnlyHeadline,
+                        subline: AppConstants.HealthKit.infoSheetReadOnlySubline,
+                        identifier: AccessibilityID.sourceInfoSheetReadOnlyCallout
+                    )
+
+                    calloutRow(
+                        icon: AppConstants.HealthKit.infoSheetPermanentIcon,
+                        iconColor: FortiFitColors.alert,
+                        headline: AppConstants.HealthKit.infoSheetPermanentHeadline,
+                        subline: AppConstants.HealthKit.infoSheetPermanentSubline,
+                        identifier: AccessibilityID.sourceInfoSheetPermanentUnlinkCallout
+                    )
+                }
+
+                // 5. Primary safe action — Done
+                FortiFitButton(AppConstants.HealthKit.infoSheetDoneButton, style: .outline) {
+                    dismiss()
+                }
+                .accessibilityIdentifier(AccessibilityID.sourceInfoSheetDoneButton)
+
+                // 6. Demoted destructive link — Unlink
+                Button {
+                    showUnlinkConfirmation = true
+                } label: {
+                    Text(AppConstants.HealthKit.infoSheetUnlinkLink)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.alert)
+                }
+                .accessibilityIdentifier(AccessibilityID.workoutDetailHealthUnlinkButton)
+                .confirmationDialog(
+                    AppConstants.HealthKit.unlinkConfirmTitle,
+                    isPresented: $showUnlinkConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button(AppConstants.HealthKit.unlinkConfirmDestructive, role: .destructive) {
+                        onUnlink()
+                        dismiss()
                     }
-                }
-                HStack {
-                    Text("Source:")
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(FortiFitColors.mutedText)
-                    Text(displaySourceName)
-                        .font(FortiFitTypography.body)
-                        .foregroundStyle(FortiFitColors.primaryText)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier(AccessibilityID.sourceInfoSheetUnlinkConfirmButton)
 
-            Button(role: .destructive) {
-                onUnlink()
-                dismiss()
-            } label: {
-                Text("Unlink from Apple Health")
-                    .font(FortiFitTypography.body.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, FortiFitSpacing.elementSpacing)
-                    .background(FortiFitColors.elevatedSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadiusSmall))
-            }
-            .accessibilityIdentifier(AccessibilityID.workoutDetailHealthUnlinkButton)
+                    Button(AppConstants.HealthKit.unlinkConfirmCancel, role: .cancel) {}
+                        .accessibilityIdentifier(AccessibilityID.sourceInfoSheetUnlinkCancelButton)
+                } message: {
+                    Text(AppConstants.HealthKit.unlinkConfirmMessage)
+                }
 
-            Button("Done") {
-                dismiss()
+                // 8. Footer metadata
+                footerMetadata
             }
-            .tint(FortiFitColors.primaryAccent)
+            .padding(FortiFitSpacing.screenHorizontal)
+            .padding(.bottom, FortiFitSpacing.gapXLarge)
         }
-        .padding(FortiFitSpacing.screenHorizontal)
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
         .presentationBackground(FortiFitColors.background)
+    }
+
+    // MARK: - Callout Row
+
+    private func calloutRow(
+        icon: String,
+        iconColor: Color,
+        headline: String,
+        subline: String,
+        identifier: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: FortiFitSpacing.gapSmall) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(iconColor)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(headline)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(FortiFitColors.primaryText)
+                Text(subline)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(FortiFitColors.mutedText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(FortiFitSpacing.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
+                .fill(FortiFitColors.cardSurface)
+                .stroke(FortiFitColors.border, lineWidth: 1)
+        )
+        .accessibilityIdentifier(identifier)
+    }
+
+    // MARK: - Footer Metadata
+
+    private var footerMetadata: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let activityType = workout.healthKitActivityType {
+                footerRow(label: AppConstants.HealthKit.infoSheetActivityTypeLabel, value: activityType)
+            }
+            footerRow(label: AppConstants.HealthKit.infoSheetSourceLabel, value: displaySourceName)
+            footerRow(
+                label: AppConstants.HealthKit.infoSheetImportedLabel,
+                value: workout.date.formatted(date: .abbreviated, time: .shortened)
+            )
+            if let syncDate = lastSyncDate {
+                footerRow(
+                    label: AppConstants.HealthKit.infoSheetLastSyncedLabel,
+                    value: syncDate.formatted(.relative(presentation: .named))
+                )
+                .accessibilityIdentifier(AccessibilityID.sourceInfoSheetLastSyncedRow)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func footerRow(label: String, value: String) -> some View {
+        Text("\(label) · \(value)")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(FortiFitColors.mutedText)
     }
 }

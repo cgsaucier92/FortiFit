@@ -682,7 +682,11 @@ final class WorkoutViewModel {
     // MARK: - Template Actions
 
     func loadTemplates(context: ModelContext) {
-        templates = WorkoutTemplateService.fetchAll(context: context)
+        if isEditMode {
+            templates = WorkoutTemplateService.templates(matching: workoutType, context: context)
+        } else {
+            templates = WorkoutTemplateService.fetchAll(context: context)
+        }
     }
 
     func applyTemplate(_ template: WorkoutTemplate) {
@@ -724,6 +728,57 @@ final class WorkoutViewModel {
                     }
                 }
                 return entry
+            }
+        }
+    }
+
+    func applyTemplateToEditingWorkout(_ template: WorkoutTemplate) {
+        let snapshot = WorkoutTemplateService.snapshot(from: template)
+        let settings = UserSettings.shared
+
+        let isFormEmpty = exercises.count == 1
+            && exercises[0].name.trimmingCharacters(in: .whitespaces).isEmpty
+            && exercises[0].rows.allSatisfy { $0.sets.isEmpty && $0.reps.isEmpty && $0.weight.isEmpty }
+        if isFormEmpty {
+            exercises.removeAll()
+        }
+
+        let sorted = snapshot.exercises.sorted { $0.sortOrder < $1.sortOrder }
+        var seen = Set<String>()
+        var uniqueNames: [String] = []
+        for ex in sorted {
+            if seen.insert(ex.name).inserted { uniqueNames.append(ex.name) }
+        }
+        let grouped = Dictionary(grouping: sorted, by: { $0.name })
+
+        for name in uniqueNames {
+            let entry = ExerciseFormEntry()
+            entry.name = name
+            if let rows = grouped[name] {
+                entry.rows = rows.map { ex in
+                    let row = SetRow()
+                    row.sets = String(ex.sets)
+                    row.reps = String(ex.reps)
+                    if let weightKg = ex.weightKg {
+                        if settings.useLbs, let lbs = UnitConversion.kgToLbs(weightKg) {
+                            row.weight = String(Int(round(lbs)))
+                        } else {
+                            row.weight = String(format: "%g", weightKg)
+                        }
+                    }
+                    return row
+                }
+            }
+            exercises.append(entry)
+        }
+
+        if workoutName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            workoutName = snapshot.name
+        }
+
+        if !isHealthKitLinked && durationMinutes.trimmingCharacters(in: .whitespaces).isEmpty {
+            if let dur = snapshot.durationMinutes {
+                durationMinutes = String(dur)
             }
         }
     }

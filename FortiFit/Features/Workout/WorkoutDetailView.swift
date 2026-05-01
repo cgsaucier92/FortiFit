@@ -88,7 +88,7 @@ struct WorkoutDetailView: View {
                                         saveAsTemplateName = workout.name
                                         showSaveAsTemplatePrompt = true
                                     } label: {
-                                        Label("Save As Template", systemImage: "square.and.arrow.down")
+                                        Label("Save as Template", systemImage: "square.and.arrow.down")
                                     }
                                     .accessibilityIdentifier(AccessibilityID.saveAsTemplateMenuItem)
                                 }
@@ -249,6 +249,7 @@ struct WorkoutDetailView: View {
             FortiFitHealthSourceInfoSheet(
                 workout: workout,
                 sourceName: resolvedSourceName,
+                lastSyncDate: workout.healthKitUUID != nil ? UserSettings.shared.healthKitLastSyncDate : nil,
                 onUnlink: {
                     WorkoutService.unlink(workout, context: modelContext)
                 }

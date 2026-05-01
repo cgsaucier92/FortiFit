@@ -27,7 +27,6 @@ struct HomeWidgetService {
 
     /// Seeds the default Home screen widgets on first launch.
     /// Idempotent — skips any widget type that already exists in the store.
-    /// Also migrates legacy lastWorkout/totalWorkouts widgets to the combined workoutInfo widget.
     static func seedDefaultWidgets(context: ModelContext) {
         // Migrate legacy widgets if present
         migrateLegacyWidgets(context: context)
@@ -46,29 +45,15 @@ struct HomeWidgetService {
         try? context.save()
     }
 
-    /// Replaces legacy "lastWorkout" and "totalWorkouts" widgets with a single "workoutInfo" widget.
-    /// The new widget takes the lower sortOrder of the two replaced widgets.
+    /// Removes legacy "lastWorkout" and "totalWorkouts" widgets (retired in earlier versions).
     private static func migrateLegacyWidgets(context: ModelContext) {
         let lastWorkout = fetch(for: "lastWorkout", context: context)
         let totalWorkouts = fetch(for: "totalWorkouts", context: context)
 
         guard lastWorkout != nil || totalWorkouts != nil else { return }
-        // Already migrated if workoutInfo exists
-        guard fetch(for: "workoutInfo", context: context) == nil else {
-            // Clean up any leftover legacy widgets
-            if let lw = lastWorkout { context.delete(lw) }
-            if let tw = totalWorkouts { context.delete(tw) }
-            try? context.save()
-            reindexSortOrder(context: context)
-            return
-        }
 
-        let sortOrder = min(lastWorkout?.sortOrder ?? Int.max, totalWorkouts?.sortOrder ?? Int.max)
         if let lw = lastWorkout { context.delete(lw) }
         if let tw = totalWorkouts { context.delete(tw) }
-
-        let workoutInfo = HomeWidget(widgetType: "workoutInfo", sortOrder: sortOrder)
-        context.insert(workoutInfo)
         try? context.save()
         reindexSortOrder(context: context)
     }
@@ -109,6 +94,22 @@ struct HomeWidgetService {
             widgetMap[type]?.sortOrder = index
         }
         try? context.save()
+    }
+
+    // MARK: - Migrations
+
+    /// Removes any existing Workout Info widget records and re-indexes sort order.
+    /// Idempotent — guarded by UserSettings flag.
+    static func migrateWorkoutInfoRemovalIfNeeded(context: ModelContext) {
+        let settings = UserSettings.shared
+        guard !settings.hasMigratedWorkoutInfoRemoval else { return }
+        let stale = fetch(for: "workoutInfo", context: context)
+        if let stale {
+            context.delete(stale)
+            try? context.save()
+            reindexSortOrder(context: context)
+        }
+        settings.hasMigratedWorkoutInfoRemoval = true
     }
 
     // MARK: - Private

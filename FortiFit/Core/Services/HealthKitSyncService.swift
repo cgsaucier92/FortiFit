@@ -238,6 +238,13 @@ final class HealthKitSyncService {
         }
     }
 
+    // MARK: - Last Sync Date
+
+    func lastSyncDate(for workout: Workout) -> Date? {
+        guard workout.healthKitUUID != nil else { return nil }
+        return settings.healthKitLastSyncDate
+    }
+
     // MARK: - Queries
 
     private func fetchWorkoutByHKUUID(_ uuid: UUID, context: ModelContext) -> Workout? {

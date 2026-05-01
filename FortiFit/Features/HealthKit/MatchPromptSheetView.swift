@@ -22,6 +22,7 @@ struct MatchPromptSheetView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(FortiFitColors.secondaryText)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .top, spacing: FortiFitSpacing.gapSmall) {
                 hkCard
@@ -53,7 +54,7 @@ struct MatchPromptSheetView: View {
             }
         }
         .padding(FortiFitSpacing.screenHorizontal)
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
         .presentationBackground(FortiFitColors.background)
     }
 
@@ -72,6 +73,9 @@ struct MatchPromptSheetView: View {
                         .font(.system(size: 11, weight: .bold))
                         .kerning(2)
                         .foregroundStyle(Color(hex: "#FF2D55"))
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .minimumScaleFactor(1.0)
                 }
 
                 Text(mapping.workoutType.uppercased())
@@ -121,7 +125,10 @@ struct MatchPromptSheetView: View {
                 Text("YOUR LOG")
                     .font(.system(size: 11, weight: .bold))
                     .kerning(2)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .minimumScaleFactor(1.0)
 
                 if let workout {
                     Text(workout.workoutType.uppercased())

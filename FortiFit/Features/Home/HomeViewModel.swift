@@ -15,9 +15,6 @@ final class HomeViewModel {
         advisory: "No workouts yet this week. Time to begin."
     )
     var streakResult = StreakService.StreakResult(streak: 0, tier: .dormant, message: StreakService.message(for: 0))
-    var totalWorkouts: Int = 0
-    var lastWorkoutName: String = "—"
-    var lastWorkoutDate: String = "—"
     var recentWorkouts: [Workout] = []
     var powerLevelResult = PowerLevelService.PowerLevelResult(
         status: .noData, statusLabel: "", indicator: "",
@@ -72,20 +69,8 @@ final class HomeViewModel {
         // Streak
         streakResult = StreakService.calculateStreak(context: context)
 
-        // All workouts
-        let allWorkouts = WorkoutService.fetchAll(context: context)
-        totalWorkouts = allWorkouts.count
-
-        // Last workout
-        if let last = allWorkouts.first {
-            lastWorkoutName = last.name
-            lastWorkoutDate = last.date.shortFormatted
-        } else {
-            lastWorkoutName = "—"
-            lastWorkoutDate = "—"
-        }
-
         // Recent 5
+        let allWorkouts = WorkoutService.fetchAll(context: context)
         recentWorkouts = Array(allWorkouts.prefix(5))
 
         // Power Level

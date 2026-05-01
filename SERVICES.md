@@ -296,7 +296,7 @@ Any time a workout is logged, edited, deleted, or batch-deleted via workout type
 **Recalculations:**
 - **PR timeline** — remove PRs without supporting data; recompute from remaining workout data.
 - **Training Load score** — remove affected workouts from the 10-day window; `consecutive_days` may change.
-- **Home screen** — Workout Info widget, Recent Workouts list, Training Load widget refresh.
+- **Home screen** — Recent Workouts list, Training Load widget, Today's Plan widget (left-column workout name, silhouette, and Complete Workout context-menu visibility) refresh.
 - **Strength Tracker chart** — data points reflect current state.
 - **Training Frequency chart** — affected week(s) re-count.
 - **Strength PR goals** — recalculate `currentValueKg` for matching goals across remaining in-scope workouts (per § Reset Scoping). No in-scope matches → 0.
@@ -363,8 +363,20 @@ When `HealthKitSyncService` receives a `deletedObjectHandler` callback for an HK
 
 See HEALTHKIT.md § 11 for rationale. This is a non-destructive operation: the user retains their training history even if they clean up HealthKit data upstream.
 
-### HealthKit Unlink (user-initiated)
-Identical to HealthKit Upstream Delete in data behavior (clear the three pointer fields, retain numeric values, bump `lastModifiedDate`, no cascade), but triggered by the user via Workout Detail's ellipsis menu, the source indicator info sheet, or the Log Workout disabled-field helper text. See HEALTHKIT.md § 14. Re-adds the HK workout UUID to `WorkoutMatcher`'s candidate pool for future sync events.
+### HealthKit Unlink (user-initiated, one-way)
+Triggered by the user via Workout Detail's ellipsis menu or the source indicator info sheet. Always gated by a `.confirmationDialog` (see HEALTHKIT.md § 14 Confirmation).
+
+Behavior:
+1. Capture `healthKitUUID` into a local before clearing.
+2. Clear the three pointer fields (`healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`) — sets to nil.
+3. Retain numeric values (duration, distance, HR, calories, elevation, exercise minutes, indoor flag) as-is.
+4. Bump `workout.lastModifiedDate = .now`.
+5. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. This makes unlink one-way:
+   - `WorkoutMatcher.findCandidates(for:)` will skip this exact `(uuid, workoutId)` pair forever.
+   - If the same HK UUID re-imports later, auto-create proceeds normally as a new workout — but auto-link to *this* FortiFit workout is short-circuited.
+6. Do NOT fire the deletion cascade.
+
+See HEALTHKIT.md § 14 for rationale.
 
 ---
 
@@ -377,7 +389,7 @@ CRUD wrapper for workouts via SwiftData:
 - **Update notes:** Inline note edit. Sets `workout.lastModifiedDate = .now` (cosmetic edit per § Reset Scoping).
 - **Delete:** Cascade-delete all ExerciseSets. Trigger all cascading recalculations (see Deletion Behavior above). If the deleted workout is linked to a `ScheduledWorkout` (via `completedWorkoutId`), notify PlanService to revert that slot to "planned". **HK-linked workouts delete normally** — deletion removes the FortiFit record but does not propagate to HealthKit (no write-back in MVP). Orphan `WorkoutMatchRejection` records pointing at the deleted workout are retained; harmless.
 - **Delete all for type:** Accept a workoutType string, fetch all workouts matching that type, cascade-delete each with ExerciseSets, then trigger all cascading recalculations once (see Workout Type Deletion above). Remove the corresponding WorkoutTypeOrder record. Revert any linked ScheduledWorkout slots to "planned".
-- **Unlink (HK-linked workouts):** Invoked via Workout Detail's ellipsis menu, the source indicator info sheet, or the Log Workout disabled-field helper text. See § HealthKit Unlink for data behavior.
+- **Unlink (HK-linked workouts):** Invoked via Workout Detail's ellipsis menu or the source indicator info sheet. See § HealthKit Unlink for data behavior.
 
 ---
 
@@ -436,6 +448,7 @@ See HEALTHKIT.md § 9 for the sync lifecycle overview.
 - Run a catch-up anchored query on every cold launch and foreground transition (Phase 1 — mandatory).
 - On each sync event: fetch workouts since anchor, process each via `importPendingWorkouts()`, update anchor on success.
 - Update `UserSettings.healthKitLastSyncDate` to `.now` after each successful sync.
+- Expose `lastSyncDate(for workout: Workout) -> Date?` — returns the most recent sync timestamp at which the workout's HK record was observed (read from `UserSettings.healthKitLastSyncDate`, scoped to the workout's `healthKitUUID`). Used by the Source Indicator Info Sheet's "Last synced · {relative}" footer row (see SCREENS.md § Workout Detail → Source Indicator Info Sheet). Returns nil for workouts that have never synced.
 
 ### Triggers
 
@@ -656,9 +669,19 @@ Callers pass the enum case rather than a field name string. Each case maps to a 
 
 - **Create:** Template + TemplateExerciseSets. workoutType restricted to Strength Training / HIIT.
 - **Retrieve:** All templates sorted by dateCreated (newest first).
+- **Retrieve filtered by type:** `templates(matching workoutType: String) -> [WorkoutTemplate]` — returns only templates with matching `workoutType`. Used by the Edit Workout ellipsis "Use Template" selector to constrain choices to the current workout's type (see SCREENS.md § Log Workout → Edit Mode Ellipsis Menu).
 - **Update:** Name, duration, add/modify/delete TemplateExerciseSets.
 - **Delete:** Cascade-delete all TemplateExerciseSets. No effect on other data.
-- **Apply:** Return data snapshot (not a reference) for pre-populating Log Workout form.
+- **Apply (new-workout mode, Log Workout):** Return data snapshot (not a reference) for pre-populating the empty Log Workout form. Pre-populates name, type, duration, and exercises. Date/time default to now, Effort empty. Existing call sites unchanged.
+- **Apply to existing workout (edit mode):** `applyToExistingWorkout(template: WorkoutTemplate, workout: Workout) -> Void` — mutates the in-memory `Workout` (not yet persisted). Rules:
+   1. **Exercises (always applied):** for each `TemplateExerciseSet` on the template, create a new `ExerciseSet` and append it to `workout.exerciseSets`. The new sets get `sortOrder` values continuing from `(workout.exerciseSets.map(\.sortOrder).max() ?? -1) + 1` so they sit after existing rows. Do not modify or remove any existing `ExerciseSet`. No dedupe by name.
+   2. **Name (fill-if-empty):** if `workout.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty`, set `workout.name = template.name`. Otherwise leave `workout.name` alone.
+   3. **Duration (fill-if-empty, non-HK-linked only):** if `workout.healthKitUUID == nil` AND `workout.durationMinutes == nil`, set `workout.durationMinutes = template.durationMinutes`. Otherwise leave `workout.durationMinutes` alone — for HK-linked workouts the field is HK-owned and read-only (see HEALTHKIT.md § 7); for non-linked workouts with a duration already set, the user's value wins.
+   4. **Type, effort, date, time, distance:** never applied. Type is locked in Edit Mode and the selector filter ensures match anyway. Effort is per-session. Date/time/distance aren't carried by templates.
+
+   This method does not call `WorkoutService.update()` and does not bump `lastModifiedDate`. Persistence is the caller's responsibility — the typical caller is the Edit Workout view, which mutates the in-memory `@State` workout and persists on the user's "Save Changes" tap. The Workout Cascade fires through that save path normally.
+
+   **Why a separate method from "Apply (new-workout mode)":** the new-workout call site populates an empty form (overwrite is fine because there's nothing to overwrite). The edit-mode call site has existing user data and must respect it (append + fill-if-empty + HK-aware skip). Keeping the two methods distinct prevents accidental data loss in edit flows.
 
 ---
 
@@ -743,10 +766,21 @@ When a `Workout` that is linked to a `ScheduledWorkout` (via `completedWorkoutId
 
 ## HomeWidgetService (HomeWidgetService.swift)
 
-- **Seed defaults:** On first launch (hasSeededDefaultWidgets = false), create HomeWidget records for Training Load, Workout Info, Week Streak in that order. Set hasSeededDefaultWidgets = true.
-- **Add:** Create HomeWidget at max sortOrder + 1. No duplicate widgetType allowed.
+- **Seed defaults:** On first launch (hasSeededDefaultWidgets = false), create HomeWidget records for Training Load, Week Streak in that order. Set hasSeededDefaultWidgets = true. (Workout Info was previously seeded between Training Load and Week Streak; it has been removed from the product entirely — see § One-time migration below.)
+- **Add:** Create HomeWidget at max sortOrder + 1. No duplicate widgetType allowed. Add Widgets menu lists every entry in CONSTANTS.md § Widget Types not currently present on the user's home — `workoutInfo` is no longer in that list.
 - **Delete:** Remove HomeWidget record. Re-index remaining sortOrder.
 - **Reorder:** Accept array of widgetType strings, re-index sortOrder starting from 0.
+
+### One-time migration: remove `workoutInfo` HomeWidget records
+On launch, before any home rendering:
+1. Fetch every `HomeWidget` where `widgetType == "workoutInfo"`.
+2. If any exist, delete them and re-index remaining `sortOrder` starting from 0 (preserve relative order of the surviving widgets).
+3. Persist a one-shot migration flag (`UserSettings.hasMigratedWorkoutInfoRemoval = true`) so the cleanup is idempotent across subsequent launches.
+
+This is a destructive migration — there is no replacement widget. If a user previously had Workout Info, Training Load, and Week Streak in that order, after migration they have Training Load and Week Streak. The user can re-add any widget from the Add Widgets menu.
+
+### Today's Plan — Complete Workout from context menu
+The Today's Plan widget exposes a "Complete Workout" item in its long-press context menu (see SCREENS.md § Home Screen → Widget Context Menu). Visibility rule: the item is rendered if and only if `PlanService.fetchTodaysPlanned()` returns a non-nil `ScheduledWorkout` (i.e., at least one uncompleted plan for today). The action delegates to the same compact confirmation sheet used by the Plan tab (`PlanService.completeScheduled(workoutId:)` flow). On confirm, the widget refresh (see Workout Cascade above) repopulates the left column with the next planned workout for today, or falls back to the "All planned workouts completed." state when no more remain.
 
 ---
 

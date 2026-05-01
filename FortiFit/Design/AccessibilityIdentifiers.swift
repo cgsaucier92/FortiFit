@@ -23,6 +23,8 @@ enum AccessibilityID {
     static let homeWidget_powerLevel_seeInfo = "homeWidget_powerLevel_seeInfo"
     static let homeWidget_trainingLoad_configureSettings = "homeWidget_trainingLoad_configureSettings"
     static let homeWidget_weeklyStreak_configureSettings = "homeWidget_weeklyStreak_configureSettings"
+    static let homeWidget_todaysPlan_completeWorkoutMenuItem = "homeWidget_todaysPlan_completeWorkoutMenuItem"
+    static let homeWidget_todaysPlan_silhouette = "homeWidget_todaysPlan_silhouette"
 
     static func addWidgetRow(_ widgetType: String) -> String {
         "addWidgetRow_\(widgetType)"
@@ -56,6 +58,12 @@ enum AccessibilityID {
         "weightInput_\(exerciseIndex)_\(rowIndex)"
     }
 
+    // MARK: - Edit Workout (Strength / HIIT)
+
+    static let editWorkoutEllipsisMenu = "editWorkout_ellipsisMenu"
+    static let editWorkoutUseTemplateMenuItem = "editWorkout_useTemplateMenuItem"
+    static let editWorkoutTemplateSelectorOverlay = "editWorkout_templateSelectorOverlay"
+
     // MARK: - Goals
 
     static let addGoalButton = "addGoalButton"
@@ -71,12 +79,6 @@ enum AccessibilityID {
     static let settingsAppleHealthToggle = "settings_appleHealthToggle"
     static let settingsAppleHealthSyncNowButton = "settings_appleHealthSyncNowButton"
     static let settingsAppleHealthOpenSettingsButton = "settings_appleHealthOpenSettingsButton"
-
-    // MARK: - Log Workout (HealthKit)
-
-    static let logWorkoutDateReadOnlyHelper = "logWorkout_dateReadOnlyHelper"
-    static let logWorkoutDurationReadOnlyHelper = "logWorkout_durationReadOnlyHelper"
-    static let logWorkoutDistanceReadOnlyHelper = "logWorkout_distanceReadOnlyHelper"
 
     // MARK: - Workout Detail
 
@@ -135,6 +137,22 @@ enum AccessibilityID {
     // MARK: - Workout Detail
 
     static let workoutDetailShowOnPlanMenuItem = "workoutDetailShowOnPlanMenuItem"
+
+    // MARK: - Source Info Sheet
+
+    static let sourceInfoSheetReadOnlyCallout = "sourceInfoSheet_readOnlyCallout"
+    static let sourceInfoSheetPermanentUnlinkCallout = "sourceInfoSheet_permanentUnlinkCallout"
+    static let sourceInfoSheetDoneButton = "sourceInfoSheet_doneButton"
+    static let sourceInfoSheetUnlinkConfirmButton = "sourceInfoSheet_unlinkConfirmButton"
+    static let sourceInfoSheetUnlinkCancelButton = "sourceInfoSheet_unlinkCancelButton"
+    static let sourceInfoSheetLastSyncedRow = "sourceInfoSheet_lastSyncedRow"
+
+    // MARK: - Log Workout (HealthKit Field Info Icons)
+
+    static let logWorkoutHkFieldInfoIconDate = "logWorkout_hkFieldInfoIcon_date"
+    static let logWorkoutHkFieldInfoIconStartTime = "logWorkout_hkFieldInfoIcon_startTime"
+    static let logWorkoutHkFieldInfoIconDuration = "logWorkout_hkFieldInfoIcon_duration"
+    static let logWorkoutHkFieldInfoIconDistance = "logWorkout_hkFieldInfoIcon_distance"
 
     // MARK: - Match Prompt Sheet
 

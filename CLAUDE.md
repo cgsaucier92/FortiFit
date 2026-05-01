@@ -128,7 +128,7 @@ At the end of each development session, before closing or pausing work:
 | Log Workout (form, type-adaptive, templates, autocomplete) | SCREENS.md § Log Workout |
 | Exercise name autocomplete (FortiFitExerciseAutocomplete) | SERVICES.md § ExerciseSuggestionService |
 | Workout Detail (breakdown, edit, delete, save as template) | SCREENS.md § Workout Detail |
-| Edit Workout (pre-populated, type locked, trash) | SCREENS.md § Log Workout (Edit Mode) |
+| Edit Workout (pre-populated, type locked, trash, ellipsis with "Use Template" for Strength/HIIT — append exercises + fill-if-empty for name & duration; HK-aware skip of duration on linked workouts) | SCREENS.md § Log Workout (Edit Mode, Edit Mode Ellipsis Menu, Edit Mode — HealthKit-Linked Workouts); SERVICES.md § WorkoutTemplateService (Apply to existing workout); HEALTHKIT.md § 7 (Template Application on HK-Linked Workouts) |
 | Goals screen (progress rings, SF Symbol silhouettes, expandable sparkline, ellipsis menu) | SCREENS.md § Goals |
 | Add Goal (type selector, conditional fields) | SCREENS.md § Add Goal |
 | Progress screen (4 charts, thresholds, auto-update) | SCREENS.md § Progress |
@@ -195,7 +195,7 @@ At the end of each development session, before closing or pausing work:
 | Skip / Restore / Remove from Plan scheduled workouts | SCREENS.md § Plan (Long-Press Context Menu) |
 | Recurring workout management (edit/delete this or future) | SCREENS.md § Plan (Editing Recurring Workouts) |
 | Recurrence auto-regeneration (12-week lookahead) | SERVICES.md § PlanService |
-| Today's Plan HomeWidget | SCREENS.md § Home Screen (Widget Definitions), CONSTANTS.md § Widget Types |
+| Today's Plan HomeWidget (workout-type silhouette watermark, "Complete Workout" context-menu item, no inline button, no workout-type pill; Workout Info widget removed entirely with one-time HomeWidget cleanup migration) | SCREENS.md § Home Screen (Widget Definitions, Widget Context Menu), CONSTANTS.md § Widget Types, § Widget Context Menu SF Symbols, SERVICES.md § HomeWidgetService (One-time migration), PRD.md § Data Model (UserSettings.hasMigratedWorkoutInfoRemoval) |
 | "Schedule This Template" context menu on Saved Templates | SCREENS.md § Saved Templates List |
 | FortiFitWeekStrip, FortiFitMonthGrid, FortiFitScheduledWorkoutCard components | PRD.md § Project Structure (Design/Components/) |
 | Workout deletion → ScheduledWorkout revert | SERVICES.md § Deletion Cascading Behavior, SERVICES.md § PlanService |
@@ -225,9 +225,9 @@ Phases 1 and 2 in HEALTHKIT.md ship together as a single implementation pass. Ca
 | Workout Cascade fires on HK import (reuses existing cascade) | SERVICES.md § Deletion Cascading Behavior → Workout Cascade |
 | `workoutEffortScore` import into `rpe` (nil-fill only, iOS 18+ gated) | HEALTHKIT.md § 8 Effort Score |
 | Match Prompt Sheet (sheet-on-foreground, side-by-side summary, 3 actions) | HEALTHKIT.md § 13 Prompt UX; SCREENS.md § Match Prompt Sheet |
-| Unlink action (three entry points: ellipsis, info sheet, Log Workout helper) | HEALTHKIT.md § 14 Unlink; SCREENS.md § Workout Detail (Ellipsis Menu) |
+| Unlink action (two entry points: ellipsis, info sheet) | HEALTHKIT.md § 14 Unlink; SCREENS.md § Workout Detail (Ellipsis Menu) |
 | Workout Detail source indicator + info sheet + Summary two-column grid (HK-linked) | HEALTHKIT.md § 15 UI Surfaces; SCREENS.md § Workout Detail |
-| Log Workout read-only fields (`durationMinutes`, `distanceKm`, `date`) + helper text | HEALTHKIT.md § 15 UI Surfaces; SCREENS.md § Log Workout |
+| Log Workout read-only fields (`durationMinutes`, `distanceKm`, `date`) + inline `info.circle` popovers | HEALTHKIT.md § 15 UI Surfaces; SCREENS.md § Log Workout |
 | Peripheral HK glyph on Home, Workouts, Plan | HEALTHKIT.md § 15 UI Surfaces; SCREENS.md § Home, § Workouts, § Plan |
 | Settings "Apple Health" section (toggle, status line, Sync Now, iOS deep link) | HEALTHKIT.md § 16 Settings; SCREENS.md § Settings (Apple Health Section) |
 | Authorization flow + Info.plist `NSHealthShareUsageDescription` | HEALTHKIT.md § 17 Authorization |

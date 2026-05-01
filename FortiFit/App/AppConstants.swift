@@ -138,6 +138,7 @@ enum AppConstants {
     // MARK: - Widget Context Menu SF Symbols
 
     static let configureSettingsIcon = "gear"
+    static let completeWorkoutIcon = "checkmark.circle"
 
     // MARK: - Trends Chart Context Menu SF Symbols
 
@@ -147,7 +148,6 @@ enum AppConstants {
 
     static let widgetTypes = [
         "trainingLoad",
-        "workoutInfo",
         "weekStreak",
         "powerLevel",
         "todaysPlan"
@@ -155,13 +155,11 @@ enum AppConstants {
 
     static let defaultHomeWidgets = [
         "trainingLoad",
-        "powerLevel",
-        "todaysPlan"
+        "weekStreak"
     ]
 
     static let widgetDisplayNames: [String: String] = [
         "trainingLoad": "Training Load",
-        "workoutInfo": "Workout Info",
         "weekStreak": "Weekly Streak",
         "powerLevel": "Power Level",
         "todaysPlan": "Today's Plan"
@@ -169,7 +167,6 @@ enum AppConstants {
 
     static let widgetDescriptions: [String: String] = [
         "trainingLoad": "Shows your accumulated training stress score and recovery readiness based on recent workout intensity, volume, and frequency.",
-        "workoutInfo": "Displays your most recent workout and total workout count at a glance.",
         "weekStreak": "Tracks how many consecutive weeks you've met your weekly workout target.",
         "powerLevel": "Measures your average strength volume trend over the last 30 days across Strength Training and HIIT workouts.",
         "todaysPlan": "Shows your scheduled workout for today so you can jump straight into logging."
@@ -343,6 +340,58 @@ enum AppConstants {
         "KB Swings": "Kettlebell Swings"
     ]
 
+    // MARK: - HealthKit Strings
+
+    enum HKOwnedField: String, CaseIterable {
+        case date, startTime, duration, distance
+    }
+
+    enum HealthKit {
+        // Source Indicator Info Sheet
+        static let infoSheetTitle = "Imported from Apple Health"
+        static let infoSheetLead = "This workout was imported from Apple Health."
+        static let infoSheetReadOnlyHeadline = "Date, Start Time, Effort, and Duration are read-only for this workout."
+        static let infoSheetReadOnlySubline = "Edit in Apple Health, or unlink to edit in FitNavi."
+        static let infoSheetPermanentHeadline = "Unlinking is permanent."
+        static let infoSheetPermanentSubline = "Future Apple Health edits won't sync to this workout."
+        static let infoSheetDoneButton = "Done"
+        static let infoSheetUnlinkLink = "Unlink from Apple Health"
+        static let infoSheetActivityTypeLabel = "Activity Type"
+        static let infoSheetSourceLabel = "Source"
+        static let infoSheetImportedLabel = "Imported"
+        static let infoSheetLastSyncedLabel = "Last synced"
+
+        // SF Symbols
+        static let infoSheetHeaderIcon = "heart.fill"
+        static let infoSheetReadOnlyIcon = "pencil.slash"
+        static let infoSheetPermanentIcon = "arrow.uturn.backward"
+
+        // Unlink Confirmation Dialog
+        static let unlinkConfirmTitle = "Unlink this workout?"
+        static let unlinkConfirmMessage = "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore."
+        static let unlinkConfirmDestructive = "Unlink"
+        static let unlinkConfirmCancel = "Cancel"
+        static let unlinkSuccessToast = "Unlinked from Apple Health."
+
+        // Source Name Display
+        static let appleWorkoutName = "Apple Workout"
+        static let unknownSourceName = "another app"
+
+        // Log Workout — HealthKit-Linked Field Popovers
+        static func fieldPopoverCopy(for field: HKOwnedField) -> String {
+            switch field {
+            case .date:
+                return "Date is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi."
+            case .startTime:
+                return "Start time is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi."
+            case .duration:
+                return "Duration is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi."
+            case .distance:
+                return "Distance is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi."
+            }
+        }
+    }
+
     // MARK: - Scheduled Workout
 
     static let scheduledWorkoutStatuses = ["planned", "completed", "skipped"]
@@ -417,7 +466,7 @@ enum AppConstants {
                 ("How it's calculated", "Effort uses a 1–10 scale where 1 is barely a warm-up and 10 is an all-out max effort. Each bar is the average of every effort rating you logged within that calendar week (Monday through Sunday). Workouts you didn't rate aren't counted — they don't pull the average up or down."),
                 ("The reference line", "The dashed line at Effort 7 marks the rough threshold between hard and very hard sessions. Several weeks averaging well above 7 in a row may signal it's time for a deload."),
                 ("Time range", "The 8 most recent calendar weeks, including the current in-progress week."),
-                ("Apple Health import", "If you record a workout on Apple Watch and rate its effort there (iOS 18 or later), that effort score imports into FortiFit automatically when the workout is linked — but only if you haven't already entered an effort rating yourself. Your manually entered ratings always win."),
+                ("Apple Health import", "If you record a workout on Apple Watch and rate its effort there (iOS 18 or later), that effort score imports into FitNavi automatically when the workout is linked — but only if you haven't already entered an effort rating yourself. Your manually entered ratings always win."),
                 ("Empty state", "At least one full Monday–Sunday week with at least one workout that has a recorded effort rating is needed before the chart renders.")
             ]
         ),

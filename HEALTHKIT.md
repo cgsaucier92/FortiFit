@@ -54,7 +54,7 @@ Phases 1 and 2 below ship together as a single Claude Code implementation pass. 
 | HK-to-FortiFit type mapping table | § 6 Workout Type Taxonomy; CONSTANTS.md § HealthKit Mapping |
 | Sprints → Cardio one-time migration | § 18 Platform and Migration |
 | Field ownership rules (HK-owned vs user-owned) | § 7 Field Ownership |
-| Log Workout read-only fields + helper text | § 7 Field Ownership; § 15 UI Surfaces; SCREENS.md § Log Workout |
+| Log Workout read-only fields + inline `info.circle` popovers | § 7 Field Ownership; § 15 UI Surfaces; SCREENS.md § Log Workout |
 | `workoutEffortScore` import (iOS 18+ gated) | § 8 Effort Score |
 | `HealthKitSyncService` with `HKAnchoredObjectQuery` catch-up on launch/foreground | § 9 Sync Lifecycle |
 | Persisted `HKQueryAnchor` (UserDefaults-serialized Data) | § 9 Sync Lifecycle |
@@ -72,7 +72,7 @@ Phases 1 and 2 below ship together as a single Claude Code implementation pass. 
 | Accessibility identifiers for all new interactive elements | § 19 Testing Strategy; TESTING.md |
 | Unit tests (`FortiFitTests`): HK-to-category mapping, matcher rules, field ownership, auto-create defaults | § 19 Testing Strategy |
 | Integration tests (`FortiFitIntegrationTests`): auto-create cascade, link flow (both directions), upstream delete, rejection persistence, effort score nil-fill, Sprints migration | § 19 Testing Strategy |
-| UI smoke tests (`FortiFitUITests`): Settings section states, Workout Detail source indicator + info sheet, unlink flow, Match Prompt Sheet actions, Log Workout read-only helper text | § 19 Testing Strategy |
+| UI smoke tests (`FortiFitUITests`): Settings section states, Workout Detail source indicator + info sheet, unlink flow, Match Prompt Sheet actions, Log Workout read-only field popovers | § 19 Testing Strategy |
 
 ### Phase 2: Ongoing Sync (Background Delivery)
 
@@ -173,9 +173,19 @@ Static table in CONSTANTS.md § HealthKit Mapping. Not user-configurable. Claude
 ### Read-Only Behavior in Log Workout Edit
 When `healthKitUUID != nil`, the following fields are disabled (non-editable) in the Log Workout edit view: `durationMinutes`, `distanceKm`, `date` (start time).
 
-Each disabled field renders helper text below it: **"Linked to Apple Health · tap to unlink."** Tap target opens the same info sheet as the Workout Detail source indicator (see § 15), with an "Unlink from Apple Health" button.
+Each disabled field's label shows a trailing `info.circle` icon (14pt, Muted Text). Tapping it opens a `.popover` with field-specific copy explaining why the field is read-only and how to recover edit access (see CONSTANTS.md § HealthKit Strings → Log Workout — HealthKit-Linked Field Popovers).
 
-To edit these fields, the user must first unlink.
+To edit these fields, the user must first unlink via Workout Detail (ellipsis menu or source indicator info sheet).
+
+### Template Application on HK-Linked Workouts (Edit Mode)
+The Edit Workout screen exposes a "Use Template" item in the top-right ellipsis menu for Strength Training and HIIT workouts (regardless of whether the workout is HK-linked — see SCREENS.md § Log Workout → Edit Mode Ellipsis Menu). Templates apply to user-owned fields only:
+
+- **Exercises** (`ExerciseSets`, user-owned): the template's exercises are appended to the workout's existing exercise list as new rows. No dedupe by name. This is the primary value of applying a template to an imported workout — Apple Watch typically imports a workout with empty exercise data, so the template fills it in.
+- **Name** (user-owned): fills only if `workout.name` is empty. Never overwrites a name the user has already entered.
+- **Duration** (HK-owned): the template's `durationMinutes` is **silently dropped**. The HK-linked workout's `durationMinutes` continues to come from the HK record. The disabled-field treatment and `info.circle` popover are unaffected.
+- **Workout type** (HK-owned via mapping): the template selector filters to templates matching the workout's current type, so a type mismatch can't arise. The template's type is not applied.
+
+Field-ownership invariant: applying a template never changes a HK-owned field's value, even transiently. The matcher and upstream-update flow are unaffected because no HK-relevant fields move.
 
 ---
 
@@ -332,17 +342,26 @@ Add `SCREENS.md § Match Prompt Sheet` section with layout spec.
 
 ## 14. Unlink
 
-### Three Entry Points
+### Two Entry Points
 1. Workout Detail ellipsis menu → "Unlink from Apple Health" (visible only when `healthKitUUID != nil`)
-2. Source indicator info sheet → "Unlink from Apple Health" button
-3. Log Workout edit view → disabled field helper text "tap to unlink" → opens info sheet → unlink button
+2. Source indicator info sheet → "Unlink from Apple Health" link (gated by confirmation dialog)
 
-### On Unlink
-1. Clear `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType` (set to nil).
-2. Retain all HK-sourced numeric values (duration, distance, HR, calories, elevation, etc.) as-is — they become regular editable fields on a now-manual workout.
-3. Bump `lastModifiedDate` to `.now`.
-4. Re-add the HK workout UUID to the matching pool. (On next sync or next manual log, matcher may re-propose the pairing. If user rejected it, they would need a rejection record — but unlink does not create one automatically. If they want to prevent re-proposal, they resolve the next prompt with "Keep separate.")
-5. Do NOT fire the deletion cascade.
+### Confirmation
+Unlink is **always** gated behind a SwiftUI `.confirmationDialog` regardless of entry point. Title "Unlink this workout?" Message "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore." Actions: destructive "Unlink" + cancel "Cancel". Copy is owned by `AppConstants.HealthKit.unlinkConfirm*` (see CONSTANTS.md § HealthKit Strings).
+
+### On Unlink (one-way, post-Phase-8.5)
+1. Capture `healthKitUUID` into a local before clearing — needed for step 5.
+2. Clear `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType` (set to nil).
+3. Retain all HK-sourced numeric values (duration, distance, HR, calories, elevation, etc.) as-is — they become regular editable fields on a now-manual workout.
+4. Bump `lastModifiedDate` to `.now`.
+5. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. This guarantees:
+   - The matcher (`WorkoutMatcher.findCandidates(for:)`) skips the (UUID, workoutId) pair forever.
+   - If the same HK UUID re-imports (e.g., the user removes and re-installs the Health source), auto-create proceeds normally as a new workout, but auto-link to this specific FortiFit workout is short-circuited. Other FortiFit workouts can still match it via the normal flow.
+   - Re-linking via the Match Prompt Sheet for this same pairing is impossible — the matcher never queues it.
+6. Do NOT fire the deletion cascade.
+
+### Why one-way
+Phase 8.5 user research surfaced two issues with reversible unlinking: (a) users who unlinked to edit a field would see the matcher re-propose the link on next foreground, creating confusion; (b) the copy needed to explain "unlink" honestly was longer and weaker when the action was reversible. Committing to one-way makes the warning crisp ("Unlinking is permanent") and removes a class of bugs around stale re-prompts. The user can still get the same outcome as a re-link by deleting the FortiFit-side workout and letting auto-create rebuild from the Apple Health record.
 
 ---
 
@@ -358,12 +377,12 @@ Below the Workout Type row, when `workout.healthKitUUID != nil`. Format: `{sourc
 
 Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator.
 
-### Source Indicator Info Sheet
-- Body explainer: `This workout was imported from Apple Health via {sourceName}.` `{sourceName}` resolves via `HealthKitClient.sourceName(for:)` — Apple Watch becomes `Apple Workout`, other known sources show their `HKSource.name`, unresolvable bundle IDs fall back to `another app`. Never renders a raw bundle ID.
-- Full `healthKitActivityType` displayed prominently.
-- Source row also uses `{sourceName}` (same resolver).
-- "Unlink from Apple Health" button.
-- Dismiss.
+### Source Indicator Info Sheet (post-Phase-8.5 redesign)
+- **Lead sentence:** "This workout was imported from Apple Health." (no inline source-name interpolation — moved to the footer).
+- **Two-row callout** explaining (a) which fields are read-only here and (b) that unlinking is permanent — see SCREENS.md § Workout Detail → Source Indicator Info Sheet for exact copy and SF symbols.
+- **Primary safe action:** full-width "Done" button (Primary Accent blue outline). This is the visually largest action, matching the iOS convention of giving the safe path the prominence.
+- **Demoted destructive link:** "Unlink from Apple Health" rendered as a small Alert Red text-style link below Done. Tap → confirmation dialog (see § 14 Confirmation) → on confirm runs `HealthKitSyncService.unlink(workout:)` per § 14.
+- **Footer metadata** (muted, below destructive link): Activity Type, Source (uses `sourceName` resolver), Imported date, Last synced (relative time from `HealthKitSyncService.lastSyncDate(for:)`). Source name resolution: Apple Watch → `Apple Workout`, recognized sources → `HKSource.name`, unresolvable → `another app`. Never renders a raw bundle ID.
 
 Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator Info Sheet.
 
@@ -392,8 +411,7 @@ Visible only when `healthKitUUID != nil`. Full "from {source}" label stays on Wo
 ### Log Workout Read-Only Fields
 When `healthKitUUID != nil`:
 - `durationMinutes`, `distanceKm`, `date` inputs are disabled (visually greyed, non-interactive).
-- Helper text below each: "Linked to Apple Health · tap to unlink."
-- Helper text is tappable → opens source indicator info sheet.
+- Each disabled field's label shows a trailing `info.circle` icon → popover with field-specific copy.
 - All other fields (`name`, `note`, `time`, `rpe`, `ExerciseSets`) behave normally.
 
 ---
@@ -494,7 +512,7 @@ See TESTING.md for target structure and conventions.
 |---|---|
 | `FortiFitTests` (unit) | HK-to-category mapping table correctness. `WorkoutMatcher` time-window rules in isolation. Field ownership rule application. Default field value construction on auto-create. |
 | `FortiFitIntegrationTests` | Full auto-create → Workout Cascade (Training Load, goals, streak update). Link flow via both entry points (HK-side and manual-side). Upstream delete → null-out behavior. Rejection persistence. `workoutEffortScore` nil-fill under iOS 18+. Sprints migration. |
-| `FortiFitUITests` | Settings section toggle + status states. Workout Detail source indicator + info sheet. Unlink via all three entry points. Match Prompt Sheet Link / Keep Separate / Decide Later. Log Workout read-only fields + helper text. |
+| `FortiFitUITests` | Settings section toggle + status states. Workout Detail source indicator + info sheet. Unlink via both entry points (ellipsis menu, info sheet). Match Prompt Sheet Link / Keep Separate / Decide Later. Log Workout read-only fields + inline `info.circle` popovers. |
 
 ### Untestable (Requires Manual QA)
 - Real HK observer query wake-up from background
@@ -547,7 +565,7 @@ Deferred indefinitely. Revisit requires: `NSHealthUpdateUsageDescription`, exten
 |---|---|
 | PRD.md | § Data Model (Workout: 10 new fields, new entity WorkoutMatchRejection). § Technical Foundation (HealthKit added, moved out of Out of Scope). § Screen Summaries (Workout Detail Summary becomes a two-column grid for HK-linked workouts; Settings adds Apple Health section). |
 | SERVICES.md | New sections: HealthKitClient (protocol), HealthKitSyncService, WorkoutMatcher. Extensions to Workout Cascade (fires on HK import). Field ownership rules. Effort score rules. |
-| SCREENS.md | Workout Detail (source indicator + info sheet + Summary two-column grid for HK-linked workouts). Log Workout (read-only fields + helper text). Settings (Apple Health section). New section: Match Prompt Sheet. |
+| SCREENS.md | Workout Detail (source indicator + info sheet + Summary two-column grid for HK-linked workouts). Log Workout (read-only fields + inline `info.circle` popovers). Settings (Apple Health section). New section: Match Prompt Sheet. |
 | CONSTANTS.md | New section: HealthKit Mapping (full HK-to-FortiFit type table). New SF Symbol entries. |
 | CLAUDE.md | Out of Scope updated (HealthKit read removed, write-back explicitly retained). Development Phases: new "Phase 9: HealthKit Integration" entry (or similar numbering). |
 | TESTING.md | New section: HealthKit Test Strategy (protocol stubbing, fixture pattern). New accessibility identifier entries. |

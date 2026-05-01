@@ -1271,3 +1271,115 @@ final class UnknownSourceSmokeTests: XCTestCase {
         )
     }
 }
+
+// MARK: - Edit Workout "Use Template" Smoke Tests
+
+/// Tests for the Edit Workout ellipsis menu (Strength / HIIT only)
+/// and the filtered template selector overlay.
+final class EditWorkoutTemplateSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+    }
+
+    /// Logs a Strength workout, saves it as a template, then navigates to
+    /// edit mode on that workout. Returns after entering edit mode.
+    private func logStrengthWorkoutAndCreateTemplate() {
+        app.tabBars.buttons["HOME"].tap()
+        app.buttons["logWorkoutCTA"].tap()
+
+        let nameField = app.textFields["workoutNameInput"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.tap()
+        nameField.typeText("Edit Template Test")
+
+        app.buttons["addExerciseButton"].tap()
+        let exerciseName = app.textFields["exerciseNameInput_0"]
+        exerciseName.tap()
+        exerciseName.typeText("Bench Press\n")
+        app.textFields["setsInput_0_0"].tap(); app.textFields["setsInput_0_0"].typeText("3")
+        app.textFields["repsInput_0_0"].tap(); app.textFields["repsInput_0_0"].typeText("8")
+        app.textFields["weightInput_0_0"].tap(); app.textFields["weightInput_0_0"].typeText("135")
+        app.buttons["saveWorkoutButton"].tap()
+
+        let workoutLabel = app.staticTexts["Edit Template Test"]
+        XCTAssertTrue(workoutLabel.waitForExistence(timeout: 3))
+        workoutLabel.tap()
+
+        app.buttons["workoutDetailEllipsis"].tap()
+        app.buttons["saveAsTemplateMenuItem"].tap()
+        app.alerts.buttons["Save"].firstMatch.tap()
+    }
+
+    /// Navigate into edit mode on the currently displayed Workout Detail.
+    private func enterEditMode() {
+        let editButton = app.buttons.matching(identifier: "pencil").firstMatch
+        XCTAssertTrue(editButton.waitForExistence(timeout: 3))
+        editButton.tap()
+    }
+
+    // MARK: - Edit Strength workout: trash + ellipsis visible, Use Template works
+
+    func test_editStrengthWorkout_showsEllipsis_useTemplateOpensSelector() {
+        logStrengthWorkoutAndCreateTemplate()
+        enterEditMode()
+
+        let ellipsis = app.buttons["editWorkout_ellipsisMenu"]
+        XCTAssertTrue(ellipsis.waitForExistence(timeout: 3), "Ellipsis should appear in edit mode for Strength workout")
+
+        ellipsis.tap()
+
+        let useTemplate = app.buttons["editWorkout_useTemplateMenuItem"]
+        XCTAssertTrue(useTemplate.waitForExistence(timeout: 3), "Use Template item should appear in edit-mode ellipsis")
+        useTemplate.tap()
+
+        let selectorOverlay = app.otherElements["editWorkout_templateSelectorOverlay"]
+        XCTAssertTrue(selectorOverlay.waitForExistence(timeout: 3), "Template selector overlay should appear")
+
+        XCTAssertTrue(
+            app.staticTexts["Edit Template Test"].exists,
+            "Selector should show the Strength template we created"
+        )
+    }
+
+    // MARK: - Edit Cardio workout: no ellipsis
+
+    func test_editCardioWorkout_doesNotShowEllipsis() {
+        app.tabBars.buttons["HOME"].tap()
+        app.buttons["logWorkoutCTA"].tap()
+
+        let nameField = app.textFields["workoutNameInput"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.tap()
+        nameField.typeText("Cardio No Ellipsis")
+
+        app.buttons["workoutTypeDropdown"].tap()
+        app.buttons["workoutTypeOption_Cardio"].tap()
+
+        app.textFields["durationInput"].tap()
+        app.textFields["durationInput"].typeText("30")
+        app.buttons["saveWorkoutButton"].tap()
+
+        let workoutLabel = app.staticTexts["Cardio No Ellipsis"]
+        XCTAssertTrue(workoutLabel.waitForExistence(timeout: 3))
+        workoutLabel.tap()
+
+        enterEditMode()
+
+        let ellipsis = app.buttons["editWorkout_ellipsisMenu"]
+        XCTAssertFalse(
+            ellipsis.waitForExistence(timeout: 2),
+            "Ellipsis should NOT appear in edit mode for Cardio workout"
+        )
+    }
+}

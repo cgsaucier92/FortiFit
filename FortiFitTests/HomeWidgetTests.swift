@@ -44,7 +44,7 @@ struct HomeWidgetModelTests {
 
     @Test func deleteHomeWidget() throws {
         let context = try makeTestContext()
-        let widget = HomeWidget(widgetType: "workoutInfo", sortOrder: 0)
+        let widget = HomeWidget(widgetType: "powerLevel", sortOrder: 0)
         context.insert(widget)
         try context.save()
 
@@ -61,19 +61,17 @@ struct HomeWidgetModelTests {
 
 struct HomeWidgetServiceTests {
 
-    @Test func seedDefaultWidgetsCreates3Records() throws {
+    @Test func seedDefaultWidgetsCreates2Records() throws {
         let context = try makeTestContext()
 
         HomeWidgetService.seedDefaultWidgets(context: context)
 
         let widgets = HomeWidgetService.fetchAll(context: context)
-        #expect(widgets.count == 3)
+        #expect(widgets.count == 2)
         #expect(widgets[0].widgetType == "trainingLoad")
         #expect(widgets[0].sortOrder == 0)
-        #expect(widgets[1].widgetType == "workoutInfo")
+        #expect(widgets[1].widgetType == "weekStreak")
         #expect(widgets[1].sortOrder == 1)
-        #expect(widgets[2].widgetType == "weekStreak")
-        #expect(widgets[2].sortOrder == 2)
     }
 
     @Test func seedDefaultWidgetsIsIdempotent() throws {
@@ -83,7 +81,7 @@ struct HomeWidgetServiceTests {
         HomeWidgetService.seedDefaultWidgets(context: context)
 
         let widgets = HomeWidgetService.fetchAll(context: context)
-        #expect(widgets.count == 3)
+        #expect(widgets.count == 2)
     }
 
     @Test func addWidgetAssignsMaxSortOrderPlusOne() throws {
@@ -116,12 +114,11 @@ struct HomeWidgetServiceTests {
         let context = try makeTestContext()
 
         context.insert(HomeWidget(widgetType: "trainingLoad", sortOrder: 0))
-        context.insert(HomeWidget(widgetType: "workoutInfo", sortOrder: 1))
+        context.insert(HomeWidget(widgetType: "powerLevel", sortOrder: 1))
         context.insert(HomeWidget(widgetType: "weekStreak", sortOrder: 2))
         try context.save()
 
-        // Delete the middle one
-        let middle = HomeWidgetService.fetch(for: "workoutInfo", context: context)!
+        let middle = HomeWidgetService.fetch(for: "powerLevel", context: context)!
         HomeWidgetService.deleteWidget(middle, context: context)
 
         let widgets = HomeWidgetService.fetchAll(context: context)
@@ -136,34 +133,32 @@ struct HomeWidgetServiceTests {
         let context = try makeTestContext()
 
         context.insert(HomeWidget(widgetType: "trainingLoad", sortOrder: 0))
-        context.insert(HomeWidget(widgetType: "workoutInfo", sortOrder: 1))
+        context.insert(HomeWidget(widgetType: "powerLevel", sortOrder: 1))
         context.insert(HomeWidget(widgetType: "weekStreak", sortOrder: 2))
         try context.save()
 
-        // Reorder: weekStreak first, then trainingLoad, then workoutInfo
-        HomeWidgetService.reorder(orderedTypes: ["weekStreak", "trainingLoad", "workoutInfo"], context: context)
+        HomeWidgetService.reorder(orderedTypes: ["weekStreak", "trainingLoad", "powerLevel"], context: context)
 
         let widgets = HomeWidgetService.fetchAll(context: context)
         #expect(widgets[0].widgetType == "weekStreak")
         #expect(widgets[0].sortOrder == 0)
         #expect(widgets[1].widgetType == "trainingLoad")
         #expect(widgets[1].sortOrder == 1)
-        #expect(widgets[2].widgetType == "workoutInfo")
+        #expect(widgets[2].widgetType == "powerLevel")
         #expect(widgets[2].sortOrder == 2)
     }
 
     @Test func fetchAllReturnsSortedByOrder() throws {
         let context = try makeTestContext()
 
-        // Insert in reverse order
         context.insert(HomeWidget(widgetType: "weekStreak", sortOrder: 2))
         context.insert(HomeWidget(widgetType: "trainingLoad", sortOrder: 0))
-        context.insert(HomeWidget(widgetType: "workoutInfo", sortOrder: 1))
+        context.insert(HomeWidget(widgetType: "powerLevel", sortOrder: 1))
         try context.save()
 
         let widgets = HomeWidgetService.fetchAll(context: context)
         #expect(widgets[0].widgetType == "trainingLoad")
-        #expect(widgets[1].widgetType == "workoutInfo")
+        #expect(widgets[1].widgetType == "powerLevel")
         #expect(widgets[2].widgetType == "weekStreak")
     }
 
@@ -171,7 +166,7 @@ struct HomeWidgetServiceTests {
         let context = try makeTestContext()
 
         context.insert(HomeWidget(widgetType: "trainingLoad", sortOrder: 0))
-        context.insert(HomeWidget(widgetType: "workoutInfo", sortOrder: 1))
+        context.insert(HomeWidget(widgetType: "weekStreak", sortOrder: 1))
         try context.save()
 
         let widgets = HomeWidgetService.fetchAll(context: context)
@@ -181,6 +176,71 @@ struct HomeWidgetServiceTests {
 
         let remaining = HomeWidgetService.fetchAll(context: context)
         #expect(remaining.isEmpty)
+    }
+}
+
+// MARK: - WorkoutInfo Removal Migration Tests
+
+@Suite(.serialized)
+struct WorkoutInfoRemovalMigrationTests {
+
+    @Test func migration_removesWorkoutInfoWidget_andReindexes() throws {
+        let context = try makeTestContext()
+
+        context.insert(HomeWidget(widgetType: "trainingLoad", sortOrder: 0))
+        context.insert(HomeWidget(widgetType: "workoutInfo", sortOrder: 1))
+        context.insert(HomeWidget(widgetType: "weekStreak", sortOrder: 2))
+        try context.save()
+
+        let settings = UserSettings.shared
+        settings.hasMigratedWorkoutInfoRemoval = false
+
+        HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
+
+        let widgets = HomeWidgetService.fetchAll(context: context)
+        #expect(widgets.count == 2)
+        #expect(widgets[0].widgetType == "trainingLoad")
+        #expect(widgets[0].sortOrder == 0)
+        #expect(widgets[1].widgetType == "weekStreak")
+        #expect(widgets[1].sortOrder == 1)
+        #expect(settings.hasMigratedWorkoutInfoRemoval == true)
+    }
+
+    @Test func migration_isIdempotent() throws {
+        let context = try makeTestContext()
+
+        context.insert(HomeWidget(widgetType: "trainingLoad", sortOrder: 0))
+        context.insert(HomeWidget(widgetType: "workoutInfo", sortOrder: 1))
+        context.insert(HomeWidget(widgetType: "weekStreak", sortOrder: 2))
+        try context.save()
+
+        let settings = UserSettings.shared
+        settings.hasMigratedWorkoutInfoRemoval = false
+
+        HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
+        HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
+
+        let widgets = HomeWidgetService.fetchAll(context: context)
+        #expect(widgets.count == 2)
+    }
+
+    @Test func migration_noopWhenNoWorkoutInfoExists() throws {
+        let context = try makeTestContext()
+
+        context.insert(HomeWidget(widgetType: "trainingLoad", sortOrder: 0))
+        context.insert(HomeWidget(widgetType: "weekStreak", sortOrder: 1))
+        try context.save()
+
+        let settings = UserSettings.shared
+        settings.hasMigratedWorkoutInfoRemoval = false
+
+        HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
+
+        let widgets = HomeWidgetService.fetchAll(context: context)
+        #expect(widgets.count == 2)
+        #expect(widgets[0].sortOrder == 0)
+        #expect(widgets[1].sortOrder == 1)
+        #expect(settings.hasMigratedWorkoutInfoRemoval == true)
     }
 }
 

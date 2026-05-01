@@ -39,8 +39,9 @@ Icons displayed to the left of each option in the top-nav ellipsis (`…`) menus
 | Home | Add Widgets | `plus.rectangle.on.rectangle` |
 | Workouts | Create Workout Template | `square.and.pencil` |
 | Workouts | View Saved Templates | `doc.on.doc` |
-| Log Workout | Use workout template | `doc.badge.arrow.up` |
-| Log Workout | Save as workout template | `square.and.arrow.down` |
+| Log Workout (new mode) | Use workout template | `doc.badge.arrow.up` |
+| Log Workout (new mode) | Save as workout template | `square.and.arrow.down` |
+| Edit Workout (Strength / HIIT only) | Use Template | `doc.badge.arrow.up` |
 | Create Template (edit mode) | Share Template | `qrcode` |
 | Workout Detail (Strength/HIIT only) | Save as workout template | `square.and.arrow.down` |
 | Workout Detail (when `hiddenFromPlan == true`) | Show on Plan | `calendar.badge.plus` |
@@ -50,7 +51,7 @@ Icons displayed to the left of each option in the top-nav ellipsis (`…`) menus
 | Goals | Expand All | `rectangle.expand.vertical` |
 | Goals | Collapse All | `rectangle.compress.vertical` |
 
-**Shared-symbol consistency:** "Save as workout template" uses the same symbol (`square.and.arrow.down`) wherever it appears (Log Workout ellipsis, Workout Detail ellipsis). "Saved Templates" navigation uses the same symbol (`doc.on.doc`) on both the Workouts and Plan ellipsis menus.
+**Shared-symbol consistency:** "Save as workout template" uses the same symbol (`square.and.arrow.down`) wherever it appears (Log Workout ellipsis, Workout Detail ellipsis). "Saved Templates" navigation uses the same symbol (`doc.on.doc`) on both the Workouts and Plan ellipsis menus. "Use Template" / "Use workout template" uses the same symbol (`doc.badge.arrow.up`) on both Log Workout new-mode and Edit Workout (Strength / HIIT only) ellipsis menus — the Edit Workout label is shortened to "Use Template" since the ellipsis is screen-scoped to a single template-related action.
 
 **Goals Expand/Collapse toggle:** The symbol swaps alongside the label based on dominant card state — `rectangle.expand.vertical` when most cards are collapsed (label: "Expand All"), `rectangle.compress.vertical` when most are expanded (label: "Collapse All"). See SCREENS.md § Goals Ellipsis Menu.
 
@@ -62,12 +63,13 @@ Icons displayed to the left of each option in the long-press context menu on Hom
 
 | Widget | Option | SF Symbol |
 |--------|--------|-----------|
+| Today's Plan | Complete Workout | `checkmark.circle` |
 | Training Load | See Info | `info.circle` |
 | Power Level | See Info | `info.circle` |
 | Training Load | Configure Settings | `gear` |
 | Weekly Streak | Configure Settings | `gear` |
 
-"See Info" is conditional — rendered only on Training Load and Power Level widgets. "Configure Settings" is conditional — rendered only on configurable widgets (Training Load, Weekly Streak). "Reorder Widgets" and "Delete Widget" use no leading SF Symbols.
+"Complete Workout" is conditional — rendered only on the Today's Plan widget, and only when an uncompleted `ScheduledWorkout` exists for today (see SCREENS.md § Home Screen → Widget Context Menu). "See Info" is conditional — rendered only on Training Load and Power Level widgets. "Configure Settings" is conditional — rendered only on configurable widgets (Training Load, Weekly Streak). "Reorder Widgets" and "Delete Widget" use no leading SF Symbols.
 
 ---
 
@@ -322,6 +324,67 @@ The following HK types had plausible arguments for more than one FortiFit catego
 
 ---
 
+## HealthKit Strings
+
+Lives under `AppConstants.HealthKit.*`. Strings must be read from `AppConstants` — do not hardcode in views. SF symbols here are referenced by the Source Indicator Info Sheet redesign and the Log Workout edit-mode info popovers (see SCREENS.md § Workout Detail → Source Indicator Info Sheet, § Log Workout — HealthKit-Linked Workouts).
+
+### Source Indicator Info Sheet
+
+| Constant | Value |
+|---|---|
+| `infoSheetTitle` | "Imported from Apple Health" |
+| `infoSheetLead` | "This workout was imported from Apple Health." |
+| `infoSheetReadOnlyHeadline` | "Date, Start Time, Effort, and Duration are read-only here." |
+| `infoSheetReadOnlySubline` | "Edit in Apple Health, or unlink to edit in FitNavi." |
+| `infoSheetPermanentHeadline` | "Unlinking is permanent." |
+| `infoSheetPermanentSubline` | "Future Apple Health edits won't sync to this workout." |
+| `infoSheetDoneButton` | "Done" |
+| `infoSheetUnlinkLink` | "Unlink from Apple Health" |
+| `infoSheetActivityTypeLabel` | "Activity Type" |
+| `infoSheetSourceLabel` | "Source" |
+| `infoSheetImportedLabel` | "Imported" |
+| `infoSheetLastSyncedLabel` | "Last synced" |
+
+### Source Indicator Info Sheet — SF Symbols
+
+| Constant | SF Symbol | Usage |
+|---|---|---|
+| `infoSheetHeaderIcon` | `heart.fill` | Header brand mark, 32pt, HealthKit Pink |
+| `infoSheetReadOnlyIcon` | `pencil.slash` | Row 1 callout leading icon, 16pt, Muted Text |
+| `infoSheetPermanentIcon` | `arrow.uturn.backward.slash` | Row 2 callout leading icon, 16pt, Alert Red `#ef4444` |
+
+### Unlink Confirmation Dialog
+
+| Constant | Value |
+|---|---|
+| `unlinkConfirmTitle` | "Unlink this workout?" |
+| `unlinkConfirmMessage` | "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore." |
+| `unlinkConfirmDestructive` | "Unlink" |
+| `unlinkConfirmCancel` | "Cancel" |
+| `unlinkSuccessToast` | "Unlinked from Apple Health." |
+
+### Log Workout — HealthKit-Linked Field Popovers
+
+Inline `info.circle` icon (14pt, Muted Text) sits next to each disabled HK-owned field. Tap → SwiftUI `.popover` with the field-specific copy below. Popover dismisses on tap-outside.
+
+| Field | Popover Copy |
+|---|---|
+| Date | "Date is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi." |
+| Start Time | "Start time is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi." |
+| Duration | "Duration is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi." |
+| Distance | "Distance is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi." |
+
+Constant: `AppConstants.HealthKit.fieldPopoverCopy(for: HKOwnedField) -> String`. Single source of truth — UI references the function rather than the literal strings.
+
+### Source Name Display
+
+| Constant | Value | Notes |
+|---|---|---|
+| `appleWorkoutName` | "Apple Workout" | Display string for `com.apple.Health` (Apple Watch) source |
+| `unknownSourceName` | "another app" | Fallback when bundle ID resolution fails. Used in Source row, info sheet body, etc. |
+
+---
+
 ## Exercise Options (for Goals dropdown)
 
 ```swift
@@ -532,22 +595,23 @@ Goal cards use the **same long-press tease animation as Home screen widget cards
 ## Widget Types
 
 ```swift
-["trainingLoad", "workoutInfo", "weekStreak", "powerLevel", "todaysPlan"]
+["trainingLoad", "weekStreak", "powerLevel", "todaysPlan"]
 ```
 
 | Identifier | Display Name | Description |
 |------------|-------------|-------------|
 | `trainingLoad` | Training Load | Shows your accumulated training stress score and recovery readiness based on recent workout intensity, volume, and frequency. |
-| `workoutInfo` | Workout Info | Displays your most recent workout and total workout count at a glance. |
 | `weekStreak` | Week Streak | Tracks how many consecutive weeks you've met your weekly workout target. |
 | `powerLevel` | Power Level | Measures your average strength volume trend over the last 30 days across Strength Training and HIIT workouts. |
-| `todaysPlan` | Today's Plan | Shows your scheduled workout for today so you can jump straight into logging. |
+| `todaysPlan` | Today's Plan | Shows your scheduled workout for today so you can jump straight into logging. Long-press → "Complete Workout" opens the same compact confirmation sheet as the Plan tab. |
+
+> **Removed widgets:** `workoutInfo` (Workout Info) was retired in this revision. It duplicated the Recent Workouts list directly below the widget stack and offered no decision-relevant signal beyond a vanity Total Workouts count. See SERVICES.md § HomeWidgetService → One-time migration for the cleanup of existing `workoutInfo` records on the upgrade build.
 
 ### Default Home Widgets (first launch)
 ```swift
-["trainingLoad", "workoutInfo", "weekStreak"]
+["trainingLoad", "weekStreak"]
 ```
-Power Level not included by default.
+Power Level and Today's Plan not included by default — both available via Add Widgets menu.
 
 ---
 
