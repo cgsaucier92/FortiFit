@@ -446,6 +446,38 @@ final class ProgressViewModel {
         )
     }
 
+    // MARK: - Chart Summaries (Phase 6.1)
+
+    func chartSummary(for chartType: String, context: ModelContext) -> ChartSummary? {
+        let exerciseName: String?
+        let timeRangeDays: Int?
+
+        switch chartType {
+        case "strengthTracker":
+            exerciseName = selectedExercise
+            timeRangeDays = nil
+        case "personalRecords":
+            exerciseName = selectedPRExercise
+            timeRangeDays = nil
+        case "workoutVolume":
+            exerciseName = nil
+            timeRangeDays = selectedVolumeTimeRange.days
+        case "workoutTypeBreakdown":
+            exerciseName = nil
+            timeRangeDays = selectedBreakdownTimeRange.days
+        default:
+            exerciseName = nil
+            timeRangeDays = nil
+        }
+
+        return TrendsChartService.headerSummary(
+            for: chartType,
+            exerciseName: exerciseName,
+            timeRangeDays: timeRangeDays,
+            context: context
+        )
+    }
+
     // MARK: - Task 6A: Workout Volume
 
     private func computeVolumeData() {

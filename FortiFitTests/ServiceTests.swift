@@ -356,12 +356,19 @@ struct ExerciseSetSortOrderTests {
     }
 }
 
+// Fixed reference date for streak tests — mid-week Wednesday to avoid week-boundary races
+private let streakReferenceDate: Date = {
+    var calendar = Calendar(identifier: .iso8601)
+    calendar.firstWeekday = 2
+    let wednesday = calendar.date(byAdding: .day, value: 2, to: Date().startOfWeek)!
+    return calendar.date(bySettingHour: 12, minute: 0, second: 0, of: wednesday)!
+}()
+
 // MARK: - Helper: create a date for a specific weekday offset from a given Monday
 private func mondayAt(_ weeksAgo: Int) -> Date {
     var calendar = Calendar(identifier: .iso8601)
     calendar.firstWeekday = 2
-    let now = Date()
-    let currentWeekStart = now.startOfWeek
+    let currentWeekStart = streakReferenceDate.startOfWeek
     return calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: currentWeekStart)!
 }
 
@@ -390,7 +397,7 @@ struct StreakServiceTests {
         }
         UserSettings.shared.targetWorkoutsPerWeek = 3
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 0)
         #expect(result.tier == .dormant)
     }
@@ -409,7 +416,7 @@ struct StreakServiceTests {
         // Log some workouts anyway
         createWorkouts(count: 5, inWeekStarting: mondayAt(1), context: context)
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 0)
         #expect(result.tier == .dormant)
     }
@@ -427,7 +434,7 @@ struct StreakServiceTests {
 
         createWorkouts(count: 3, inWeekStarting: mondayAt(1), context: context)
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 1)
         #expect(result.tier == .building)
     }
@@ -447,7 +454,7 @@ struct StreakServiceTests {
             createWorkouts(count: 2, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 3)
         #expect(result.tier == .building)
     }
@@ -467,7 +474,7 @@ struct StreakServiceTests {
             createWorkouts(count: 2, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 4)
         #expect(result.tier == .committed)
     }
@@ -487,7 +494,7 @@ struct StreakServiceTests {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 7)
         #expect(result.tier == .committed)
     }
@@ -507,7 +514,7 @@ struct StreakServiceTests {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 8)
         #expect(result.tier == .elite)
     }
@@ -533,7 +540,7 @@ struct StreakServiceTests {
         createWorkouts(count: 2, inWeekStarting: mondayAt(4), context: context)
         createWorkouts(count: 2, inWeekStarting: mondayAt(5), context: context)
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 2)
     }
 
@@ -557,7 +564,7 @@ struct StreakServiceTests {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 2)
     }
 
@@ -582,7 +589,7 @@ struct StreakServiceTests {
         let w = Workout(name: "Sunday", date: sundayEvening, workoutType: "Yoga")
         WorkoutService.logWorkout(w, context: context)
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 1)
     }
 
@@ -602,7 +609,7 @@ struct StreakServiceTests {
         // Current week also meets target
         createWorkouts(count: 2, inWeekStarting: mondayAt(0), context: context)
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         // 1 (last week) + 1 (provisional current) = 2
         #expect(result.streak == 2)
     }
@@ -623,7 +630,7 @@ struct StreakServiceTests {
         // Current week has only 1 workout (below target of 3)
         createWorkouts(count: 1, inWeekStarting: mondayAt(0), context: context)
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 1) // no provisional extension
     }
 
@@ -644,12 +651,12 @@ struct StreakServiceTests {
 
         // With target=3, none of these weeks meet the target
         UserSettings.shared.targetWorkoutsPerWeek = 3
-        let highTarget = StreakService.calculateStreak(context: context)
+        let highTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(highTarget.streak == 0)
 
         // Lower target to 2: all 3 weeks now meet the target
         UserSettings.shared.targetWorkoutsPerWeek = 2
-        let lowTarget = StreakService.calculateStreak(context: context)
+        let lowTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(lowTarget.streak == 3)
     }
 
@@ -670,12 +677,12 @@ struct StreakServiceTests {
 
         // With target=2, all weeks meet target
         UserSettings.shared.targetWorkoutsPerWeek = 2
-        let lowTarget = StreakService.calculateStreak(context: context)
+        let lowTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(lowTarget.streak == 3)
 
         // Raise target to 5: no weeks meet the target
         UserSettings.shared.targetWorkoutsPerWeek = 5
-        let highTarget = StreakService.calculateStreak(context: context)
+        let highTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(highTarget.streak == 0)
     }
 
@@ -696,7 +703,7 @@ struct StreakServiceTests {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 3)
         #expect(UserSettings.shared.longestStreak == 3)
     }
@@ -716,7 +723,7 @@ struct StreakServiceTests {
         // Only 1 completed week → streak = 1, but longest should stay 10
         createWorkouts(count: 1, inWeekStarting: mondayAt(1), context: context)
 
-        let result = StreakService.calculateStreak(context: context)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(result.streak == 1)
         #expect(UserSettings.shared.longestStreak == 10)
     }
@@ -738,12 +745,12 @@ struct StreakServiceTests {
 
         // Target=3: week 2 misses → streak = 1 (only week 1)
         UserSettings.shared.targetWorkoutsPerWeek = 3
-        let high = StreakService.calculateStreak(context: context)
+        let high = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(high.streak == 1)
 
         // Target=2: all 3 weeks meet → streak = 3
         UserSettings.shared.targetWorkoutsPerWeek = 2
-        let low = StreakService.calculateStreak(context: context)
+        let low = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
         #expect(low.streak == 3)
     }
 }
@@ -1026,7 +1033,7 @@ struct StreakTierMessageTests {
     }
 
     @Test func messageForZeroStreak() {
-        #expect(StreakService.message(for: 0) == "Hit your weekly target to start a streak")
+        #expect(StreakService.message(for: 0) == "Hit your weekly target to start a streak.")
     }
 }
 

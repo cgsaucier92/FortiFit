@@ -26,10 +26,12 @@ struct HomeWidgetService {
     // MARK: - Seed Defaults
 
     /// Seeds the default Home screen widgets on first launch.
-    /// Idempotent — skips any widget type that already exists in the store.
+    /// Guarded by UserSettings flag — runs once, then never again.
     static func seedDefaultWidgets(context: ModelContext) {
-        // Migrate legacy widgets if present
         migrateLegacyWidgets(context: context)
+
+        let settings = UserSettings.shared
+        guard !settings.hasSeededDefaultHomeWidgets else { return }
 
         let existing = fetchAll(context: context)
         let existingTypes = Set(existing.map(\.widgetType))
@@ -43,6 +45,7 @@ struct HomeWidgetService {
             nextSort += 1
         }
         try? context.save()
+        settings.hasSeededDefaultHomeWidgets = true
     }
 
     /// Removes legacy "lastWorkout" and "totalWorkouts" widgets (retired in earlier versions).

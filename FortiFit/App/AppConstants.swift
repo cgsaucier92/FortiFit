@@ -1,6 +1,18 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Chart Visual Types
+
+enum ChartGradientAnchor {
+    case single(Color)
+    case horizontalSplit(leading: Color, trailing: Color)
+}
+
+struct ChartSummary {
+    let hero: String
+    let caption: String
+}
+
 enum AppConstants {
     static let workoutTypes = [
         "Strength Training",
@@ -150,26 +162,30 @@ enum AppConstants {
         "trainingLoad",
         "weekStreak",
         "powerLevel",
-        "todaysPlan"
+        "todaysPlan",
+        "appleActivity"
     ]
 
     static let defaultHomeWidgets = [
+        "todaysPlan",
         "trainingLoad",
-        "weekStreak"
+        "powerLevel"
     ]
 
     static let widgetDisplayNames: [String: String] = [
         "trainingLoad": "Training Load",
         "weekStreak": "Weekly Streak",
         "powerLevel": "Power Level",
-        "todaysPlan": "Today's Plan"
+        "todaysPlan": "Today's Plan",
+        "appleActivity": "Activity Rings"
     ]
 
     static let widgetDescriptions: [String: String] = [
         "trainingLoad": "Shows your accumulated training stress score and recovery readiness based on recent workout intensity, volume, and frequency.",
         "weekStreak": "Tracks how many consecutive weeks you've met your weekly workout target.",
         "powerLevel": "Measures your average strength volume trend over the last 30 days across Strength Training and HIIT workouts.",
-        "todaysPlan": "Shows your scheduled workout for today so you can jump straight into logging."
+        "todaysPlan": "Shows your scheduled workout for today so you can jump straight into logging.",
+        "appleActivity": "Tracks your daily Move, Exercise, and Stand rings. Requires an Apple Watch and Apple Health connected in Settings."
     ]
 
     // MARK: - Power Level
@@ -218,6 +234,40 @@ enum AppConstants {
         "sessionDuration": "Tracks your average workout duration per week to help you manage your time in the gym."
     ]
 
+    // MARK: - Trends Chart Visual Tokens
+
+    enum Trends {
+        static let captionLatest = "LATEST"
+        static let captionAvgLast8Weeks = "AVG / LAST 8 WEEKS"
+        static let captionLatestPR = "LATEST PR"
+        static let captionToday = "TODAY"
+        static let captionAvgPerSession = "AVG / SESSION"
+        static let captionWorkouts = "WORKOUTS"
+    }
+
+    static func chartGradientAnchor(for chartType: String) -> ChartGradientAnchor {
+        switch chartType {
+        case "strengthTracker":
+            return .single(FortiFitColors.chartPink)
+        case "trainingFrequency":
+            return .single(FortiFitColors.positive)
+        case "personalRecords":
+            return .horizontalSplit(leading: FortiFitColors.chartLightCyan, trailing: FortiFitColors.chartDeepBlue)
+        case "trainingLoadTrend":
+            return .single(FortiFitColors.primaryAccent)
+        case "workoutVolume":
+            return .single(FortiFitColors.chartPurple)
+        case "rpeTrend":
+            return .single(FortiFitColors.chartOrange)
+        case "workoutTypeBreakdown":
+            return .single(FortiFitColors.primaryAccent)
+        case "sessionDuration":
+            return .single(FortiFitColors.chartTeal)
+        default:
+            return .single(FortiFitColors.primaryAccent)
+        }
+    }
+
     // MARK: - Workout Type Chart Colors
 
     static let workoutTypeChartColors: [String: Color] = [
@@ -242,7 +292,7 @@ enum AppConstants {
                 ("Same-day floor", "If you've already trained today, the score won't drop low enough to suggest \"train hard\" — there's a built-in floor based on what you logged today that lifts on its own tomorrow."),
                 ("Zones", "- Low (1–30, green): well recovered\n- Moderate (31–55, yellow): some accumulated fatigue\n- High (56–80, dark yellow): significant fatigue\n- Peak (81–100, red): high stress, prioritize recovery"),
                 ("What's not counted", "Workouts logged with no exercises, no Effort rating, and no duration are skipped — they're treated as placeholder entries with no meaningful stress to add."),
-                ("Empty state", "If you haven't logged a workout in the last 10 days, the score sits at 0 (Resting) and the advisory shows \"No recent training stress.\"")
+                ("Minimum Data Threshold", "If you haven't logged a workout in the last 10 days, the score sits at 0 (Resting) and the advisory shows \"No recent training stress.\"")
             ]
         ),
         "powerLevel": ChartInfoCopy(
@@ -253,7 +303,19 @@ enum AppConstants {
                 ("What workouts count", "Only Strength Training and HIIT workouts. Cardio, yoga, pilates, and other types don't track exercise sets, so they don't contribute to a volume comparison."),
                 ("Bodyweight exercises", "Sets logged without a weight value count as if the weight were 1, since they still represent work performed. This keeps bodyweight volume from disappearing entirely from the comparison."),
                 ("Status thresholds", "- Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days\n- Steady (—, blue): within 10% in either direction — your volume is holding consistent\n- Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days"),
-                ("Empty state", "If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.")
+                ("Minimum Data Threshold", "If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.")
+            ]
+        ),
+        "appleActivity": ChartInfoCopy(
+            title: "About Activity Rings",
+            intro: "Activity Rings shows your daily Move, Exercise, and Stand progress pulled live from Apple Health, measured against goals you set in FitNavi. It's the same three-ring view you see on Apple Watch, brought into FitNavi so you can keep your activity tracking and your strength tracking in one place.",
+            sections: [
+                ("The three rings", "- **Move** (red): active calories burned today. Counts movement of any kind — walks, workouts, fidgeting at your desk. Goal default is 500 cal; you can set it 1–2000 in 10-cal increments.\n- **Exercise** (green): minutes of brisk activity today. The Watch decides what counts based on heart rate and motion. Goal default is 30 min; you can set it 1–240 in 5-min increments.\n- **Stand** (blue): hours where you stood and moved for at least one minute. Goal default is 12 hours; you can set it 1–24 in 1-hr increments."),
+                ("How goals are set", "When you first add the widget, FitNavi imports the goals you've already set in Apple Health. After that, your FitNavi goals are independent — change them in Configure Settings, or use the \"Import from Apple Health\" button to re-sync if you change them on your watch later."),
+                ("Workout contribution", "Below each ring's value, you'll see how much of today's progress came from a workout you logged in FitNavi (only workouts linked to Apple Watch contribute — manually-logged workouts that aren't HK-linked won't show up here, since their data isn't in HealthKit)."),
+                ("Weekly closure rate", "The chip below the rings tells you how many days this week you closed all three rings — a quick read on your week-over-week consistency."),
+                ("Tap the widget", "Tap the widget to open a detailed breakdown with sparklines and a calendar heatmap of which days you closed your rings (toggle between 7-day and 30-day views)."),
+                ("Requirements", "You'll need an Apple Watch and Apple Health enabled in FitNavi Settings. If either is missing, the widget shows a message explaining what to do next.")
             ]
         )
     ]
@@ -349,7 +411,7 @@ enum AppConstants {
     enum HealthKit {
         // Source Indicator Info Sheet
         static let infoSheetTitle = "Imported from Apple Health"
-        static let infoSheetLead = "This workout was imported from Apple Health."
+        static let infoSheetLead = "This workout's summary details are imported from Apple Health"
         static let infoSheetReadOnlyHeadline = "Date, Start Time, Effort, and Duration are read-only for this workout."
         static let infoSheetReadOnlySubline = "Edit in Apple Health, or unlink to edit in FitNavi."
         static let infoSheetPermanentHeadline = "Unlinking is permanent."
@@ -366,12 +428,17 @@ enum AppConstants {
         static let infoSheetReadOnlyIcon = "pencil.slash"
         static let infoSheetPermanentIcon = "arrow.uturn.backward"
 
-        // Unlink Confirmation Dialog
+        // Unlink Confirmation Dialog (Info Sheet)
         static let unlinkConfirmTitle = "Unlink this workout?"
         static let unlinkConfirmMessage = "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore."
         static let unlinkConfirmDestructive = "Unlink"
         static let unlinkConfirmCancel = "Cancel"
         static let unlinkSuccessToast = "Unlinked from Apple Health."
+
+        // Unlink Confirmation Alert (Ellipsis Menu)
+        static let ellipsisUnlinkConfirmTitle = "Unlink workout from Apple Health?"
+        static let ellipsisUnlinkConfirmMessage = "This can't be undone"
+        static let ellipsisUnlinkConfirmDestructive = "Unlink"
 
         // Source Name Display
         static let appleWorkoutName = "Apple Workout"
@@ -401,6 +468,72 @@ enum AppConstants {
     static let recurrenceLookaheadWeeks = 12
     static let recurrenceRegenerationThreshold = 4
 
+    // MARK: - Activity Rings
+
+    enum ActivityRings {
+        // Card States
+        static let cardHeader = "Activity Rings"
+        static let moveLabel = "MOVE"
+        static let exerciseLabel = "EXERCISE"
+        static let standLabel = "STAND"
+        static let moveUnit = "cal"
+        static let exerciseUnit = "min"
+        static let standUnit = "hours"
+
+        // Three Dynamic Card States
+        static let stateConnectAppleHealthMessage = "Connect Apple Health to track your activity rings."
+        static let stateConnectAppleHealthCTA = "Connect"
+        static let statePairAppleWatchMessage = "Pair an Apple Watch to see your Move, Exercise, and Stand activity here."
+
+        // Workout Contribution Caption
+        static func captionFromSingleWorkout(value: Int, unit: String, workoutName: String) -> String {
+            "+\(value) \(unit) from today's \(workoutName)"
+        }
+        static func captionFromMultipleWorkouts(value: Int, unit: String) -> String {
+            "+\(value) \(unit) from today's workouts"
+        }
+
+        // Weekly Closure Rate Chip
+        static func weeklyClosureChip(count: Int) -> String {
+            "Closed all rings \(count) \(count == 1 ? "day" : "days") this week."
+        }
+
+        // Settings Modal
+        static let settingsModalHeading = "Configure Activity Rings"
+        static let settingsModalMoveSliderLabel = "Move (calories)"
+        static let settingsModalExerciseSliderLabel = "Exercise (minutes)"
+        static let settingsModalStandSliderLabel = "Stand (hours)"
+        static let settingsModalResetButton = "Reset to defaults"
+        static let settingsModalImportButton = "Import from Apple Health"
+        static let settingsModalImportDisabledCaption = "Connect Apple Health to import your goals."
+
+        // Activity Detail Sheet
+        static let detailSheetHeading = "Activity"
+        static let detailSheetRangeToggle7d = "7 days"
+        static let detailSheetRangeToggle30d = "30 days"
+        static let detailSheetMoveSparklineLabel = "Move"
+        static let detailSheetExerciseSparklineLabel = "Exercise"
+        static let detailSheetStandSparklineLabel = "Stand"
+        static let detailSheetClosureHeatmapHeading = "Ring closure heatmap"
+        static let detailSheetEmptyMessage = "Not enough data yet — wear your Apple Watch and check back."
+
+        // Ring Chevron SF Symbols
+        static let moveChevron = "chevron.right"
+        static let exerciseChevron = "chevron.right.2"
+        static let standChevron = "chevron.up"
+
+        // Slider Ranges and Increments
+        static let moveRange: ClosedRange<Double> = 1...2000
+        static let moveIncrement: Double = 10
+        static let moveDefault = 500
+        static let exerciseRange: ClosedRange<Double> = 1...240
+        static let exerciseIncrement: Double = 5
+        static let exerciseDefault = 30
+        static let standRange: ClosedRange<Double> = 1...24
+        static let standIncrement: Double = 1
+        static let standDefault = 12
+    }
+
     // MARK: - Chart Info Modal Copy
 
     struct ChartInfoCopy {
@@ -417,7 +550,7 @@ enum AppConstants {
                 ("How it's calculated", "Each data point on the chart is the heaviest weight you lifted for the selected exercise on that date, taken from the top set across all of that day's matching workouts. If you trained the same exercise twice in one day, only the heavier of the two sets is plotted."),
                 ("Time range", "Toggle 30, 60, or 90 days to widen or narrow the view. The chart re-renders immediately on switch."),
                 ("What's tracked", "Only sets with a recorded weight count toward the trend. Bodyweight exercises (logged without a weight value) aren't included — they don't have a number to plot. Exercise names are matched case-insensitively, so \"Bench Press\" and \"bench press\" share the same line."),
-                ("Empty state", "At least 2 workouts containing the selected exercise with a recorded weight are needed before the chart can render. Until then, you'll see a prompt to log more sessions.")
+                ("Minimum Data Threshold", "At least 2 workouts containing the selected exercise with a recorded weight are needed before the chart can render. Until then, you'll see a prompt to log more sessions.")
             ]
         ),
         "trainingFrequency": ChartInfoCopy(
@@ -426,7 +559,7 @@ enum AppConstants {
             sections: [
                 ("How it's calculated", "Each bar is the count of workouts whose date falls within that calendar week (Monday 12:00 AM through Sunday 11:59 PM). Every workout type counts equally — a yoga session and a strength session each add one to the bar for that week."),
                 ("Time range", "The 8 most recent calendar weeks, including the current in-progress week. Older weeks roll off as new ones begin."),
-                ("Empty state", "You need at least one full Monday–Sunday week with at least one logged workout before the chart renders.")
+                ("Minimum Data Threshold", "You need at least one full Monday–Sunday week with at least one logged workout before the chart renders.")
             ]
         ),
         "personalRecords": ChartInfoCopy(
@@ -436,7 +569,7 @@ enum AppConstants {
                 ("What counts as a PR", "A PR is recorded the first time you exceed your previous heaviest weight for a given exercise. The very first time you log an exercise establishes your baseline — that workout isn't a PR by itself. Every subsequent workout that beats your highest weight to date logs a new PR event."),
                 ("How records are tracked", "PR events are calculated per exercise name (case-insensitive) and ordered chronologically by workout date. If you log the same exercise on multiple days at the same weight, no new PR is logged — the weight has to exceed the previous record. Bodyweight exercises (logged without a weight) aren't tracked because there's no number to compare."),
                 ("What you'll see", "The dropdown lists every exercise that has at least one PR event, sorted alphabetically. Selecting an exercise shows two bars: your previous record on the left and your most recent record on the right, with the date each was set."),
-                ("Empty state", "At least one exercise needs at least one PR event before the chart renders. If you've only ever lifted the same weight on a given exercise, no PR exists yet.")
+                ("Minimum Data Threshold", "At least one exercise needs at least one PR event before the chart renders. If you've only ever lifted the same weight on a given exercise, no PR exists yet.")
             ]
         ),
         "trainingLoadTrend": ChartInfoCopy(
@@ -446,7 +579,7 @@ enum AppConstants {
                 ("How training load is calculated", "Each day's score is a 0–100 rating that combines the volume, intensity, and recency of your recent workouts. Recent sessions count more than older ones — stress decays over about 10 days. Your experience level (set via long-press → Configure Settings on the Training Load widget) affects how quickly stress decays and how much load you can absorb before the score climbs."),
                 ("Zones", "Each dot is colored by its zone:\n- Low (1–30, green): well recovered\n- Moderate (31–55, yellow): some accumulated fatigue\n- High (56–80, dark yellow): significant fatigue\n- Peak (81–100, red): high stress, prioritize recovery"),
                 ("The 7-day average line", "The dashed blue line is your 7-day rolling average, smoothing out single-day spikes so you can see the underlying trend. A rising line over a flat dot pattern means your overall load is climbing; a falling line means you're tapering."),
-                ("Empty state", "At least 3 days with at least one workout each in the last 14 days are needed before the chart renders.")
+                ("Minimum Data Threshold", "At least 3 days with at least one workout each in the last 14 days are needed before the chart renders.")
             ]
         ),
         "workoutVolume": ChartInfoCopy(
@@ -456,7 +589,7 @@ enum AppConstants {
                 ("How volume is calculated", "For every set in a workout, volume is sets × reps × weight. Those values are summed across all exercises in the session to produce a single workout volume number. Bodyweight exercises (logged without a weight) count as if the weight were 1, since they still represent work performed."),
                 ("What's included", "Only Strength Training and HIIT workouts appear on the chart. Cardio, yoga, pilates, and other types don't track exercise sets the same way, so including them would distort the trend."),
                 ("Time range", "Toggle 30, 60, or 90 days. The chart re-renders immediately on switch."),
-                ("Empty state", "At least 2 Strength Training or HIIT workouts with at least one logged exercise set are needed before the chart renders.")
+                ("Minimum Data Threshold", "At least 2 Strength Training or HIIT workouts with at least one logged exercise set are needed before the chart renders.")
             ]
         ),
         "rpeTrend": ChartInfoCopy(
@@ -467,7 +600,7 @@ enum AppConstants {
                 ("The reference line", "The dashed line at Effort 7 marks the rough threshold between hard and very hard sessions. Several weeks averaging well above 7 in a row may signal it's time for a deload."),
                 ("Time range", "The 8 most recent calendar weeks, including the current in-progress week."),
                 ("Apple Health import", "If you record a workout on Apple Watch and rate its effort there (iOS 18 or later), that effort score imports into FitNavi automatically when the workout is linked — but only if you haven't already entered an effort rating yourself. Your manually entered ratings always win."),
-                ("Empty state", "At least one full Monday–Sunday week with at least one workout that has a recorded effort rating is needed before the chart renders.")
+                ("Minimum Data Threshold", "At least one full Monday–Sunday week with at least one workout that has a recorded effort rating is needed before the chart renders.")
             ]
         ),
         "workoutTypeBreakdown": ChartInfoCopy(
@@ -477,7 +610,7 @@ enum AppConstants {
                 ("How it's calculated", "Each segment of the donut is the count of workouts of that type within the selected time range, divided by your total workout count. A 50% Strength Training slice means half of all your sessions in the period were Strength Training."),
                 ("Workout types", "Six categories — Strength Training, HIIT, Cardio, Yoga, Pilates, and Other. Each has a fixed color shown in the legend. Workouts imported from Apple Health are mapped to one of these six based on their HealthKit activity type."),
                 ("Time range", "Toggle 30 days, 60 days, 90 days, or All Time. \"All Time\" includes every workout you've ever logged."),
-                ("Empty state", "At least 2 workouts of any type are needed before the chart renders.")
+                ("Minimum Data Threshold", "At least 2 workouts of any type are needed before the chart renders.")
             ]
         ),
         "sessionDuration": ChartInfoCopy(
@@ -487,7 +620,7 @@ enum AppConstants {
                 ("How it's calculated", "Each bar is the average duration in minutes of all logged workouts within that calendar week (Monday through Sunday). Workouts you didn't enter a duration for aren't counted — they don't have a number to average."),
                 ("Time range", "The 8 most recent calendar weeks, including the current in-progress week."),
                 ("Apple Health import", "Durations from Apple Watch and other Health-connected apps are imported automatically when you link a workout, so you don't need to re-enter them."),
-                ("Empty state", "At least one full Monday–Sunday week with at least one workout that has a recorded duration is needed before the chart renders.")
+                ("Minimum Data Threshold", "At least one full Monday–Sunday week with at least one workout that has a recorded duration is needed before the chart renders.")
             ]
         )
     ]

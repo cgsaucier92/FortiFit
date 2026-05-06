@@ -327,3 +327,133 @@
 | Root Cause | `FortiFitApp.swift` uses `.sheet(isPresented: $showMatchPrompt)` with an `if let match = currentPendingMatch` conditional inside the content closure. When `showMatchPrompt` becomes `true`, SwiftUI may render the sheet content before the `currentPendingMatch` state update has propagated through the view update cycle. The `if let` fails on the first render pass, producing an empty view (grey sheet), then succeeds on the next pass once the state catches up. This is a known SwiftUI timing issue with `@State` and conditional sheet content. |
 | Resolution | Replaced `.sheet(isPresented: $showMatchPrompt)` with `.sheet(item: $currentPendingMatch)`, which ties presentation directly to the data. The sheet only appears when the item is non-nil, and the item is passed directly to the content closure — no conditional unwrap, no race condition. Removed the now-unnecessary `showMatchPrompt` boolean. |
 | Status | Resolved |
+
+---
+
+### BUG-025
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-01 |
+| Phase | Phase 4 — Home Screen Widgets |
+| Description | The Weekly Streak widget reappears on the Home screen after the user deletes it, every time the app reopens or the Home tab is re-entered. Additionally, the Weekly Streak widget was incorrectly included in the default seed list, causing it to appear on first launch without user action. |
+| Root Cause | `HomeWidgetService.seedDefaultWidgets()` was called on every `HomeViewModel.loadData()` invocation (every Home screen appearance). The function relied on idempotency (skipping widget types that already exist in the store) rather than a one-time seeding flag. After the user hard-deletes a widget, the widget type no longer exists in SwiftData, so the next seeding pass re-creates it. The SERVICES.md spec documented a `hasSeededDefaultWidgets` UserSettings flag to gate seeding, but it was never implemented — an earlier version (BUG-002) was removed due to UserDefaults/SwiftData sync issues during schema migration, and the replacement idempotent approach introduced this inverse bug. |
+| Resolution | Added `hasSeededDefaultHomeWidgets` boolean to `UserSettings` (defaults to `false`). `seedDefaultWidgets()` now checks this flag and returns early if `true`; after seeding it sets the flag to `true`. Legacy widget migrations still run independently (they have their own idempotency). Removed `"weekStreak"` from `AppConstants.defaultHomeWidgets` so it is no longer seeded on first launch. |
+| Status | Resolved |
+
+---
+
+### BUG-026
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-03 |
+| Phase | Phase 8.6 — Activity Rings Widget (app crash on launch) |
+| Description | App crashes immediately on launch with `NSInvalidArgumentException: 'startDateComponents: Date components require a calendar.'` |
+| Root Cause | `DefaultHealthKitClient.fetchActivitySummary(for:)` and `fetchActivitySummaries(from:to:)` create `DateComponents` via `calendar.dateComponents([.year, .month, .day], from:)`, which does not set the `.calendar` property on the result. `HKQuery.predicate(forActivitySummariesBetweenStart:end:)` requires `.calendar` to be set, and throws an unrecoverable `NSInvalidArgumentException` when it is nil. |
+| Resolution | Added `components.calendar = calendar` after every `calendar.dateComponents(...)` call in both `fetchActivitySummary(for:)` and `fetchActivitySummaries(from:to:)` in `DefaultHealthKitClient.swift`. |
+| Status | Resolved |
+
+---
+
+### BUG-027
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-03 |
+| Phase | Phase 8.6 — Activity Rings Widget (observer query not delivering updates) |
+| Description | Activity ring values never update in real-time while the app is open. Changes in Apple Health data are not reflected until the app is relaunched. |
+| Root Cause | Two issues in `DefaultHealthKitClient.observeActivitySummaryChanges`: (1) The `HKObserverQuery` completion handler parameter was discarded with `_` — per Apple docs, not calling the completion handler prevents future update delivery. (2) Only `HKQuantityType(.activeEnergyBurned)` was observed; changes to exercise time or stand hours did not trigger a refresh. |
+| Resolution | Rewrote `observeActivitySummaryChanges` to observe all three contributing types (`activeEnergyBurned`, `appleExerciseTime`, `appleStandHour`) and call the `completionHandler()` in both the success and error paths. |
+| Status | Resolved |
+
+---
+
+### BUG-028
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-03 |
+| Phase | Phase 8.6 — Activity Rings Widget (activity rings always show zeros) |
+| Description | Activity ring values display 0/goal for all three rings despite Apple Fitness showing real progress (e.g., Move 250/690, Exercise 16/30, Stand 8/6). The widget reaches the Live Rings state (State 3) but never populates actual data. |
+| Root Cause | `DefaultHealthKitClient.readTypes` did not include `HKObjectType.activitySummaryType()`. Apple documentation for `activitySummaryType()` states: "Use this type to request permission to read HKActivitySummary objects from the HealthKit store." Without this type in the authorization request, `HKActivitySummaryQuery` silently returns empty results (HealthKit never reveals read-access denial). The individual types (`activeEnergyBurned`, `appleExerciseTime`, `appleStandHour`) authorize reading individual samples, not aggregated activity summaries. |
+| Resolution | Added `HKObjectType.activitySummaryType()` to the `readTypes` set in `DefaultHealthKitClient`. Users who previously authorized HealthKit will need to re-authorize (the system will automatically show the authorization dialog for the new type on the next `requestAuthorization()` call). |
+| Status | Resolved |
+
+---
+
+### BUG-029
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-03 |
+| Phase | Phase 8.6 — Activity Rings Widget (chevron icons overflow outside rings) |
+| Description | The three chevron icons (Stand, Exercise, Move) centered inside the activity rings overflow beyond the innermost (Stand) ring. The icons should fit entirely within the inner area of the stand ring. |
+| Root Cause | The chevron icons in `ActivityRingsCanvas` used a fixed `font(.system(size: 10))` and `VStack(spacing: 2)`, giving a total height of ~36pt. The inner diameter of the stand ring at the 100×100 widget size is only ~24pt (`standRadius - ringThickness/2` × 2 = 12 × 2). The fixed size did not account for the available inner space. |
+| Resolution | Replaced fixed icon size and spacing with dynamic calculation based on the stand ring's inner radius: `iconSize = max(standInnerRadius * 2 / 3.8, 5)` and `spacing: 0`. Also extracted `standRadius` as a shared `let` to avoid duplicating the formula. Icons now scale proportionally to the canvas size and stay within the innermost ring. |
+| Status | Resolved |
+
+---
+
+### BUG-030
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-04 |
+| Phase | Phase 8.6 — Activity Rings Integration Tests |
+| Description | `test_closedAllRingsDayCount_correctlyCountsClosedDays` failed with `XCTAssertEqual failed: ("7") is not equal to ("3")`. The service reported 7 closed-ring days instead of the expected 3 within the last week. |
+| Root Cause | `StubHealthKitClient.fetchActivitySummaries(from:to:)` returned all stored summaries without filtering by the requested date range. The test populated 21 days of summaries (7 of which had all rings closed), but only 3 of those fell within the last 7 days. The service's `refreshWeeklyClosure()` correctly requested a 7-day window, but the stub ignored the date parameters and returned all 21 summaries, causing the service to count all 7 closed days. |
+| Resolution | Updated `StubHealthKitClient.fetchActivitySummaries(from:to:)` in `TestFixtures.swift` to filter `activitySummariesToReturn` by the requested date range, matching real `HealthKitClient` behavior. |
+| Status | Resolved |
+
+---
+
+### BUG-031
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-04 |
+| Phase | Phase 3 — Tab Navigation (navigation stack pop flash on tab switch) |
+| Description | When switching tabs, the previous tab's navigation stack visibly pops back to its root view for a split second before the new tab appears. For example, viewing a workout detail on the Workouts tab and tapping Goals briefly shows the Workouts tab's NavigationStack popping back to the workout list. |
+| Root Cause | Each tab view has an `onChange(of: selectedTab)` handler that synchronously resets all navigation state (setting `isPresented` booleans to `false`, nilling out `item` bindings) when leaving the tab. These resets trigger `.navigationDestination` pops immediately. Because SwiftUI's `TabView` keeps the outgoing tab's view hierarchy alive in memory, the pop animation is briefly visible during the tab transition before the old tab moves offscreen. |
+| Resolution | Wrapped the navigation state resets in each tab's `onChange(of: selectedTab)` handler inside `DispatchQueue.main.async`, deferring them by one run loop cycle. By the time the resets fire, the tab transition has moved the old tab offscreen, making the pops invisible. |
+| Status | Resolved |
+
+---
+
+### BUG-032
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-06 |
+| Phase | Phase 6.1 — Trends Chart Visual Polish (FFA600 migration audit) |
+| Description | IMPLEMENTATION_PLAN.md required searching for any `#FFA600` / `0xFFA600` literals and migrating them to the `chartOrange` token (`#FFBF51`). A codebase search found one reference: `statCardCalorie` in `Colors.swift` uses `FFA600`. This is a semantically distinct color token for calorie stat cards (Phase 8.5), not the chart orange token. No migration needed. |
+| Root Cause | N/A — not a bug. Documenting the audit result per the Session Hygiene Checklist. |
+| Resolution | No code change required. `statCardCalorie` (`FFA600`) is intentionally different from `chartOrange` (`FFBF51`). |
+| Status | Resolved |
+
+---
+
+### BUG-033
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-06 |
+| Phase | Phase 6.1 — Trends Chart Visual Polish (PointMark series parameter) |
+| Description | Build failed at FortiFitProgressView.swift line ~615 with `Incorrect argument label in call (have 'x:y:series:', expected 'x:y:z:')` on a PointMark used for the Training Load Trend rolling-average highlight. |
+| Root Cause | `PointMark` does not accept a `series:` parameter. The code passed `series: .value("Series", "AvgHighlight")` by analogy with `LineMark`, but PointMark's API only supports `x:`, `y:`, and `z:`. |
+| Resolution | Removed the `series: .value("Series", "AvgHighlight")` argument from the PointMark. |
+| Status | Resolved |
+
+---
+
+### BUG-034
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-06 |
+| Phase | Phase 6.1 — Trends Chart Visual Polish (XCUI chart selection smoke tests) |
+| Description | Two smoke tests (`test_trendsChart_dataPointTap_revealsSelectionAnnotation`, `test_trendsChart_toggleChange_clearsSelection`) cannot verify the chart tap-to-select and toggle-clears-selection behaviors. The tests need to trigger SwiftUI Charts `.chartXSelection` gestures via XCUI, but XCUI tap, press, and drag gestures on chart coordinates do not activate the `.chartXSelection` binding. |
+| Root Cause | SwiftUI Charts renders marks in its own compositing layer. `.chartXSelection` uses an internal gesture recognizer that XCUI coordinate-based gestures (`.tap()`, `.press(forDuration:)`, `.press(forDuration:thenDragTo:)`) do not trigger. Chart mark `.accessibilityIdentifier()` modifiers create accessibility tree entries but these are not hittable XCUI elements. This is a known platform limitation of XCUI + Swift Charts. |
+| Resolution | Tests rewritten to verify achievable assertions: chart card renders with data (card + header summary identifiers exist), time range toggle responds without crashing. Full selection annotation verification deferred to manual QA (see IMPLEMENTATION_PLAN.md § Manual QA). |
+| Status | Open — pending platform support |

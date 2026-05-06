@@ -73,7 +73,7 @@ struct FortiFitButton: View {
 #Preview {
     VStack(spacing: 16) {
         FortiFitButton("Save Workout", style: .primary) {}
-        FortiFitButton("+ Log Workout", style: .outline) {}
+        FortiFitButton("Log Workout", style: .outline) {}
         FortiFitButton("Cancel", style: .secondary) {}
         FortiFitButton("Disabled", isEnabled: false) {}
     }

@@ -13,8 +13,9 @@ struct FortiFitApp: App {
     @State private var importPayload: TemplatePayload?
     @State private var showImportPrompt = false
     @State private var showImportError = false
-    @State private var healthKitMatcher = WorkoutMatcher()
-    @State private var healthKitSyncService: HealthKitSyncService?
+    @State private var healthKitMatcher: WorkoutMatcher
+    @State private var healthKitSyncService: HealthKitSyncService
+    @State private var appleActivityService: AppleActivityService
     @State private var currentPendingMatch: PendingMatch?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -59,7 +60,8 @@ struct FortiFitApp: App {
     }()
 
     init() {
-        if CommandLine.arguments.contains("--uitesting") {
+        let isUITesting = CommandLine.arguments.contains("--uitesting")
+        if isUITesting {
             UIView.setAnimationsEnabled(false)
         }
         if CommandLine.arguments.contains("--reset-state") {
@@ -67,99 +69,167 @@ struct FortiFitApp: App {
                 UserDefaults.standard.removePersistentDomain(forName: bundleId)
             }
         }
+        let client: HealthKitClient = isUITesting ? NoOpHealthKitClient() : DefaultHealthKitClient()
+        let matcher = WorkoutMatcher()
+        _healthKitMatcher = State(initialValue: matcher)
+        _healthKitSyncService = State(initialValue: HealthKitSyncService(client: client, matcher: matcher))
+        _appleActivityService = State(initialValue: AppleActivityService(client: client))
+    }
+
+    private var isUITesting: Bool {
+        CommandLine.arguments.contains("--uitesting")
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(healthKitSyncService ?? HealthKitSyncService(client: DefaultHealthKitClient(), matcher: healthKitMatcher))
-                .task {
-                    let syncService = HealthKitSyncService(client: DefaultHealthKitClient(), matcher: healthKitMatcher)
-                    healthKitSyncService = syncService
-                    let context = sharedModelContainer.mainContext
-                    WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
-                    HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
-                    syncService.setContext(context)
-                    if CommandLine.arguments.contains("--seed-hk-workout") {
-                        seedHealthKitLinkedWorkout(context: context)
-                    }
-                    if CommandLine.arguments.contains("--seed-hk-strava-workout") {
-                        seedStravaLinkedWorkout(context: context)
-                    }
-                    if CommandLine.arguments.contains("--seed-hk-unknown-workout") {
-                        seedUnknownSourceWorkout(context: context)
-                    }
-                    if CommandLine.arguments.contains("--seed-hk-pending-match") {
-                        seedPendingMatch(context: context)
-                        presentNextPendingMatch()
-                    }
-                    if UserSettings.shared.healthKitEnabled {
-                        await syncService.importPendingWorkouts(context: context)
-                        syncService.startObserving()
-                        syncService.registerBackgroundTask()
-                    }
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active {
-                        presentNextPendingMatch()
-                    }
-                }
-                .sheet(item: $currentPendingMatch, onDismiss: {
-                    presentNextPendingMatch()
-                }) { match in
-                    let context = sharedModelContainer.mainContext
-                    let workout = fetchWorkout(id: match.workoutId, context: context)
-                    MatchPromptSheetView(
-                        pendingMatch: match,
-                        workout: workout,
-                        onLink: {
-                            healthKitMatcher.resolvePending(
-                                workoutId: match.workoutId,
-                                snapshot: match.snapshot,
-                                decision: .link,
-                                context: context
-                            )
-                        },
-                        onKeepSeparate: {
-                            healthKitMatcher.resolvePending(
-                                workoutId: match.workoutId,
-                                snapshot: match.snapshot,
-                                decision: .keepSeparate,
-                                context: context
-                            )
-                        },
-                        onDecideLater: {
-                            healthKitMatcher.resolvePending(
-                                workoutId: match.workoutId,
-                                snapshot: match.snapshot,
-                                decision: .decideLater,
-                                context: context
-                            )
+            if isUITesting {
+                ContentView()
+                    .environment(healthKitSyncService)
+                    .environment(appleActivityService)
+                    .task {
+                        let context = sharedModelContainer.mainContext
+                        if CommandLine.arguments.contains("--seed-hk-workout") {
+                            seedHealthKitLinkedWorkout(context: context)
                         }
-                    )
-                }
-                .onOpenURL { url in
-                    guard url.scheme == "fitnavi", url.host == "template" else { return }
-                    if let payload = TemplateShareService.decodeTemplateURL(url: url) {
-                        importPayload = payload
-                        showImportError = false
-                    } else {
-                        importPayload = nil
-                        showImportError = true
+                        if CommandLine.arguments.contains("--seed-hk-strava-workout") {
+                            seedStravaLinkedWorkout(context: context)
+                        }
+                        if CommandLine.arguments.contains("--seed-hk-unknown-workout") {
+                            seedUnknownSourceWorkout(context: context)
+                        }
+                        if CommandLine.arguments.contains("--seed-hk-pending-match") {
+                            seedPendingMatch(context: context)
+                            presentNextPendingMatch()
+                        }
                     }
-                    showImportPrompt = true
-                }
-                .overlay {
-                    if showImportPrompt {
-                        TemplateImportView(
-                            payload: showImportError ? nil : importPayload
-                        ) {
-                            showImportPrompt = false
-                            importPayload = nil
+                    .sheet(item: $currentPendingMatch, onDismiss: {
+                        presentNextPendingMatch()
+                    }) { match in
+                        let context = sharedModelContainer.mainContext
+                        let workout = fetchWorkout(id: match.workoutId, context: context)
+                        MatchPromptSheetView(
+                            pendingMatch: match,
+                            workout: workout,
+                            onLink: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .link,
+                                    context: context
+                                )
+                            },
+                            onKeepSeparate: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .keepSeparate,
+                                    context: context
+                                )
+                            },
+                            onDecideLater: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .decideLater,
+                                    context: context
+                                )
+                            }
+                        )
+                    }
+            } else {
+                ContentView()
+                    .environment(healthKitSyncService)
+                    .environment(appleActivityService)
+                    .task {
+                        let context = sharedModelContainer.mainContext
+                        WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
+                        HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
+                        healthKitSyncService.setContext(context)
+                        if CommandLine.arguments.contains("--seed-hk-workout") {
+                            seedHealthKitLinkedWorkout(context: context)
+                        }
+                        if CommandLine.arguments.contains("--seed-hk-strava-workout") {
+                            seedStravaLinkedWorkout(context: context)
+                        }
+                        if CommandLine.arguments.contains("--seed-hk-unknown-workout") {
+                            seedUnknownSourceWorkout(context: context)
+                        }
+                        if CommandLine.arguments.contains("--seed-hk-pending-match") {
+                            seedPendingMatch(context: context)
+                            presentNextPendingMatch()
+                        }
+                        if UserSettings.shared.healthKitEnabled {
+                            try? await DefaultHealthKitClient().requestAuthorization()
+                            await healthKitSyncService.importPendingWorkouts(context: context)
+                            healthKitSyncService.startObserving()
+                            healthKitSyncService.registerBackgroundTask()
+                            appleActivityService.startObserving()
+                            appleActivityService.refresh()
+                            appleActivityService.refreshWorkoutContributions(context: context)
+                        }
+                    }
+                    .onChange(of: scenePhase) { _, newPhase in
+                        if newPhase == .active {
+                            presentNextPendingMatch()
+                        }
+                    }
+                    .sheet(item: $currentPendingMatch, onDismiss: {
+                        presentNextPendingMatch()
+                    }) { match in
+                        let context = sharedModelContainer.mainContext
+                        let workout = fetchWorkout(id: match.workoutId, context: context)
+                        MatchPromptSheetView(
+                            pendingMatch: match,
+                            workout: workout,
+                            onLink: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .link,
+                                    context: context
+                                )
+                            },
+                            onKeepSeparate: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .keepSeparate,
+                                    context: context
+                                )
+                            },
+                            onDecideLater: {
+                                healthKitMatcher.resolvePending(
+                                    workoutId: match.workoutId,
+                                    snapshot: match.snapshot,
+                                    decision: .decideLater,
+                                    context: context
+                                )
+                            }
+                        )
+                    }
+                    .onOpenURL { url in
+                        guard url.scheme == "fitnavi", url.host == "template" else { return }
+                        if let payload = TemplateShareService.decodeTemplateURL(url: url) {
+                            importPayload = payload
                             showImportError = false
+                        } else {
+                            importPayload = nil
+                            showImportError = true
+                        }
+                        showImportPrompt = true
+                    }
+                    .overlay {
+                        if showImportPrompt {
+                            TemplateImportView(
+                                payload: showImportError ? nil : importPayload
+                            ) {
+                                showImportPrompt = false
+                                importPayload = nil
+                                showImportError = false
+                            }
                         }
                     }
-                }
+            }
         }
         .modelContainer(sharedModelContainer)
     }

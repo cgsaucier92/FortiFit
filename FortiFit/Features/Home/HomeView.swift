@@ -11,7 +11,10 @@ struct HomeView: View {
     @State private var seeInfoWidgetType: String?
     @State private var showTrainingLoadSettings = false
     @State private var showStreakSettings = false
+    @State private var showActivityRingsSettings = false
+    @State private var showActivityDetailSheet = false
     @State private var settings = UserSettings.shared
+    @Environment(AppleActivityService.self) private var activityService
     @State private var headerHeight: CGFloat = 0
     var selectedTab: Int = 0
 
@@ -63,7 +66,7 @@ struct HomeView: View {
 
                                 if viewModel.recentWorkouts.isEmpty {
                                     Text("Log your first workout to see it here")
-                                        .font(FortiFitTypography.note)
+                                        .font(FortiFitTypography.bodySmall)
                                         .foregroundStyle(FortiFitColors.mutedText)
                                 } else {
                                     ForEach(viewModel.recentWorkouts) { workout in
@@ -129,6 +132,16 @@ struct HomeView: View {
                         activeWidgetTypes: viewModel.activeWidgetTypes,
                         onAdd: { widgetType in
                             viewModel.addWidget(widgetType: widgetType, context: modelContext)
+                            if widgetType == "appleActivity" {
+                                let settings = UserSettings.shared
+                                if settings.targetMoveCalories == nil || settings.targetExerciseMinutes == nil || settings.targetStandHours == nil {
+                                    Task {
+                                        await activityService.importGoalsFromAppleHealth()
+                                        activityService.refresh()
+                                        activityService.refreshWorkoutContributions(context: modelContext)
+                                    }
+                                }
+                            }
                         }
                     )
                     .transition(.opacity)
@@ -145,25 +158,42 @@ struct HomeView: View {
                     streakSettingsModal
                         .transition(.opacity)
                 }
+
+                // Activity Rings Settings Modal
+                if showActivityRingsSettings {
+                    ActivityRingsSettingsModal(
+                        activityService: activityService,
+                        onDismiss: { dismissActivityRingsSettings() }
+                    )
+                    .transition(.opacity)
+                }
             }
             .animation(.easeInOut(duration: 0.2), value: viewModel.showAddWidgetMenu)
             .animation(.easeInOut(duration: 0.2), value: showTrainingLoadSettings)
             .animation(.easeInOut(duration: 0.2), value: showStreakSettings)
+            .animation(.easeInOut(duration: 0.2), value: showActivityRingsSettings)
             #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
             #endif
-            .onAppear { viewModel.loadData(context: modelContext) }
+            .onAppear {
+                viewModel.loadData(context: modelContext)
+                activityService.refreshWorkoutContributions(context: modelContext)
+            }
             .onDisappear { viewModel.isEditMode = false }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 0 else { return }
-                showSettings = false
-                workoutVM.showLogWorkout = false
-                workoutVM.selectedWorkout = nil
-                showPlanCompletion = false
-                viewModel.showAddWidgetMenu = false
-                viewModel.isEditMode = false
-                showTrainingLoadSettings = false
-                showStreakSettings = false
+                DispatchQueue.main.async {
+                    showSettings = false
+                    workoutVM.showLogWorkout = false
+                    workoutVM.selectedWorkout = nil
+                    showPlanCompletion = false
+                    viewModel.showAddWidgetMenu = false
+                    viewModel.isEditMode = false
+                    showTrainingLoadSettings = false
+                    showStreakSettings = false
+                    showActivityRingsSettings = false
+                    showActivityDetailSheet = false
+                }
             }
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView()
@@ -216,6 +246,12 @@ struct HomeView: View {
                         .presentationDragIndicator(.visible)
                 }
             }
+            .sheet(isPresented: $showActivityDetailSheet) {
+                ActivityDetailSheet(activityService: activityService)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(FortiFitColors.cardSurface)
+            }
         }
     }
 
@@ -226,7 +262,11 @@ struct HomeView: View {
             if viewModel.isEditMode {
                 widgetContent(for: widget)
             } else {
-                Button(action: {}) {
+                Button(action: {
+                    if widget.widgetType == "appleActivity" && activityService.widgetState == .liveRings {
+                        showActivityDetailSheet = true
+                    }
+                }) {
                     widgetContent(for: widget)
                 }
                 .buttonStyle(PressableCardButtonStyle())
@@ -269,7 +309,7 @@ struct HomeView: View {
                     .accessibilityIdentifier(AccessibilityID.homeWidget_todaysPlan_completeWorkoutMenuItem)
                 }
 
-                if widget.widgetType == "trainingLoad" || widget.widgetType == "powerLevel" {
+                if widget.widgetType == "trainingLoad" || widget.widgetType == "powerLevel" || widget.widgetType == "appleActivity" {
                     Button {
                         seeInfoWidgetType = widget.widgetType
                     } label: {
@@ -278,7 +318,9 @@ struct HomeView: View {
                     .accessibilityIdentifier(
                         widget.widgetType == "trainingLoad"
                             ? AccessibilityID.homeWidget_trainingLoad_seeInfo
-                            : AccessibilityID.homeWidget_powerLevel_seeInfo
+                            : widget.widgetType == "powerLevel"
+                                ? AccessibilityID.homeWidget_powerLevel_seeInfo
+                                : AccessibilityID.homeWidget_appleActivity_seeInfo
                     )
                 }
 
@@ -298,6 +340,15 @@ struct HomeView: View {
                         Label("Configure Settings", systemImage: AppConstants.configureSettingsIcon)
                     }
                     .accessibilityIdentifier(AccessibilityID.homeWidget_weeklyStreak_configureSettings)
+                }
+
+                if widget.widgetType == "appleActivity" {
+                    Button {
+                        showActivityRingsSettings = true
+                    } label: {
+                        Label("Configure Settings", systemImage: AppConstants.configureSettingsIcon)
+                    }
+                    .accessibilityIdentifier(AccessibilityID.homeWidget_appleActivity_configureSettings)
                 }
 
                 Button {
@@ -340,6 +391,14 @@ struct HomeView: View {
 
         case "todaysPlan":
             todaysPlanWidget
+
+        case "appleActivity":
+            ActivityRingsWidget(
+                activityService: activityService,
+                isReorderMode: viewModel.isEditMode,
+                onTapConnect: { showSettings = true },
+                onTapWidget: { showActivityDetailSheet = true }
+            )
 
         default:
             EmptyView()
@@ -697,6 +756,11 @@ struct HomeView: View {
         viewModel.loadData(context: modelContext)
     }
 
+    private func dismissActivityRingsSettings() {
+        showActivityRingsSettings = false
+        activityService.refresh()
+    }
+
     // MARK: - Recent Workout Row
 
     private func recentWorkoutRow(_ workout: Workout) -> some View {
@@ -722,7 +786,9 @@ struct HomeView: View {
                                 .font(FortiFitTypography.bodySmall)
                                 .foregroundStyle(FortiFitColors.mutedText)
                         }
-                        FortiFitHealthGlyph()
+                        Text("Apple Workout")
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
                     }
                 }
             }
@@ -788,4 +854,5 @@ extension Notification.Name {
 #Preview {
     HomeView()
         .modelContainer(for: [Workout.self, ExerciseSet.self, Goal.self, HomeWidget.self], inMemory: true)
+        .environment(AppleActivityService(client: DefaultHealthKitClient()))
 }

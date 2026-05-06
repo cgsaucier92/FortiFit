@@ -93,7 +93,7 @@ struct SavedTemplatesListView: View {
                 }
             }
         } message: {
-            Text("This can't be undone.")
+            Text("This can't be undone")
         }
         #if os(iOS)
         .overlay {

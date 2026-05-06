@@ -28,6 +28,7 @@ struct TodayCalendarSquareView: View {
             Text(dayAbbreviation)
                 .font(.system(size: 11, weight: .black))
                 .kerning(2)
+                .padding(.trailing, -2)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
@@ -43,9 +44,11 @@ struct TodayCalendarSquareView: View {
 
             // Body — month, date number + dots
             VStack(spacing: 4) {
+                Spacer().frame(height: 2)
                 Text(monthAbbreviation)
                     .font(.system(size: 11, weight: .bold))
                     .kerning(1)
+                    .padding(.trailing, -1)
                     .foregroundStyle(FortiFitColors.mutedText)
 
                 Text("\(dateNumber)")

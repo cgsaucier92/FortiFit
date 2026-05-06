@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSHealthShareUsageDescription</key>
+	<string>FortiFit uses your Apple Health workout data to automatically log sessions recorded on Apple Watch or other connected apps, and reads your daily Move, Exercise, and Stand activity to display your activity rings inside FortiFit.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

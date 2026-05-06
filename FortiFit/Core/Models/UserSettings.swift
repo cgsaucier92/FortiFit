@@ -21,6 +21,10 @@ final class UserSettings {
         static let hasMigratedSprintsToCardio = "hasMigratedSprintsToCardio"
         static let healthKitAuthorizationRequested = "healthKitAuthorizationRequested"
         static let hasMigratedWorkoutInfoRemoval = "hasMigratedWorkoutInfoRemoval"
+        static let hasSeededDefaultHomeWidgets = "hasSeededDefaultHomeWidgets"
+        static let targetMoveCalories = "targetMoveCalories"
+        static let targetExerciseMinutes = "targetExerciseMinutes"
+        static let targetStandHours = "targetStandHours"
     }
 
     var useLbs: Bool {
@@ -79,6 +83,40 @@ final class UserSettings {
         didSet { defaults.set(hasMigratedWorkoutInfoRemoval, forKey: Keys.hasMigratedWorkoutInfoRemoval) }
     }
 
+    var hasSeededDefaultHomeWidgets: Bool {
+        didSet { defaults.set(hasSeededDefaultHomeWidgets, forKey: Keys.hasSeededDefaultHomeWidgets) }
+    }
+
+    var targetMoveCalories: Int? {
+        didSet {
+            if let value = targetMoveCalories {
+                defaults.set(value, forKey: Keys.targetMoveCalories)
+            } else {
+                defaults.removeObject(forKey: Keys.targetMoveCalories)
+            }
+        }
+    }
+
+    var targetExerciseMinutes: Int? {
+        didSet {
+            if let value = targetExerciseMinutes {
+                defaults.set(value, forKey: Keys.targetExerciseMinutes)
+            } else {
+                defaults.removeObject(forKey: Keys.targetExerciseMinutes)
+            }
+        }
+    }
+
+    var targetStandHours: Int? {
+        didSet {
+            if let value = targetStandHours {
+                defaults.set(value, forKey: Keys.targetStandHours)
+            } else {
+                defaults.removeObject(forKey: Keys.targetStandHours)
+            }
+        }
+    }
+
     private init() {
         // Register defaults for first launch
         defaults.register(defaults: [
@@ -93,7 +131,8 @@ final class UserSettings {
             Keys.healthKitEnabled: false,
             Keys.hasMigratedSprintsToCardio: false,
             Keys.healthKitAuthorizationRequested: false,
-            Keys.hasMigratedWorkoutInfoRemoval: false
+            Keys.hasMigratedWorkoutInfoRemoval: false,
+            Keys.hasSeededDefaultHomeWidgets: false
         ])
 
         self.useLbs = defaults.bool(forKey: Keys.useLbs)
@@ -110,5 +149,9 @@ final class UserSettings {
         self.hasMigratedSprintsToCardio = defaults.bool(forKey: Keys.hasMigratedSprintsToCardio)
         self.healthKitAuthorizationRequested = defaults.bool(forKey: Keys.healthKitAuthorizationRequested)
         self.hasMigratedWorkoutInfoRemoval = defaults.bool(forKey: Keys.hasMigratedWorkoutInfoRemoval)
+        self.hasSeededDefaultHomeWidgets = defaults.bool(forKey: Keys.hasSeededDefaultHomeWidgets)
+        self.targetMoveCalories = defaults.object(forKey: Keys.targetMoveCalories) as? Int
+        self.targetExerciseMinutes = defaults.object(forKey: Keys.targetExerciseMinutes) as? Int
+        self.targetStandHours = defaults.object(forKey: Keys.targetStandHours) as? Int
     }
 }

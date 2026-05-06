@@ -14,6 +14,7 @@ struct WorkoutDetailView: View {
     @State private var saveAsTemplateName = ""
     @State private var showTemplateSavedToast = false
     @State private var showShowOnPlanToast = false
+    @State private var showUnlinkAlert = false
     @State private var showHealthSourceInfoSheet = false
     @State private var headerHeight: CGFloat = 0
     @State private var activeMetric: WorkoutMetric?
@@ -94,7 +95,7 @@ struct WorkoutDetailView: View {
                                 }
                                 if workout.isHealthKitLinked {
                                     Button(role: .destructive) {
-                                        WorkoutService.unlink(workout, context: modelContext)
+                                        showUnlinkAlert = true
                                     } label: {
                                         Label("Unlink from Apple Health", systemImage: "heart.slash")
                                     }
@@ -200,7 +201,18 @@ struct WorkoutDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("This can't be undone.")
+            Text("This can't be undone")
+        }
+        .alert(
+            AppConstants.HealthKit.ellipsisUnlinkConfirmTitle,
+            isPresented: $showUnlinkAlert
+        ) {
+            Button("Cancel", role: .cancel) {}
+            Button(AppConstants.HealthKit.ellipsisUnlinkConfirmDestructive, role: .destructive) {
+                WorkoutService.unlink(workout, context: modelContext)
+            }
+        } message: {
+            Text(AppConstants.HealthKit.ellipsisUnlinkConfirmMessage)
         }
         .alert("Name Template", isPresented: $showSaveAsTemplatePrompt) {
             TextField("Template name", text: $saveAsTemplateName)

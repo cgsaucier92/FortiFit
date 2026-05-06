@@ -26,7 +26,7 @@ final class SmokeTests: XCTestCase {
     /// SwiftUI TabView `.accessibilityIdentifier()` applies to the content view,
     /// not the tab bar button. XCUI can only find tab buttons by their label text.
     enum Tab: String {
-        case home = "HOME"
+        case home = "DASHBOARD"
         case workouts = "WORKOUTS"
         case plan = "PLAN"
         case trends = "TRENDS"
@@ -48,6 +48,9 @@ final class SmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons[Tab.home.rawValue].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     // MARK: - Smoke 1: App Launch
@@ -736,6 +739,115 @@ final class SmokeTests: XCTestCase {
             "Apple Health description text should be visible"
         )
     }
+
+    // MARK: - Phase 6.1: Trends Chart Visual Polish
+
+    private func logStrengthWorkoutQuick(name: String, weight: String) {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+        app.buttons["logWorkoutCTA"].tap()
+
+        let nameField = app.textFields["workoutNameInput"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.tap()
+        nameField.typeText(name)
+
+        app.buttons["addExerciseButton"].tap()
+        let exerciseField = app.textFields["exerciseNameInput_0"]
+        XCTAssertTrue(exerciseField.waitForExistence(timeout: 2))
+        exerciseField.tap()
+        exerciseField.typeText("Bench Press\n")
+
+        app.textFields["setsInput_0_0"].tap()
+        app.textFields["setsInput_0_0"].typeText("3")
+        app.textFields["repsInput_0_0"].tap()
+        app.textFields["repsInput_0_0"].typeText("8")
+        app.textFields["weightInput_0_0"].tap()
+        app.textFields["weightInput_0_0"].typeText(weight)
+
+        app.buttons["saveWorkoutButton"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 3))
+    }
+
+    func test_trendsScreen_seededChartsRenderHeaderSummaryIdentifier() {
+        logStrengthWorkoutQuick(name: "Trend1", weight: "100")
+        logStrengthWorkoutQuick(name: "Trend2", weight: "120")
+
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+
+        let summary = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_headerSummary").firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 5),
+                      "Strength Tracker header summary should appear with 2+ workouts")
+    }
+
+    func test_trendsScreen_workoutTypeBreakdown_centerLabelIdentifier() {
+        logStrengthWorkoutQuick(name: "Breakdown1", weight: "80")
+        logStrengthWorkoutQuick(name: "Breakdown2", weight: "90")
+
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+
+        app.buttons["trendsEllipsisMenu"].tap()
+        app.buttons["trendsAddChartsMenuItem"].tap()
+        XCTAssertTrue(app.staticTexts["Add Charts"].waitForExistence(timeout: 2))
+
+        let addButtons = app.buttons.matching(NSPredicate(format: "label == 'Add'"))
+        let breakdownAdd = addButtons.element(boundBy: 2)
+        XCTAssertTrue(breakdownAdd.waitForExistence(timeout: 2))
+        breakdownAdd.tap()
+
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+
+        app.swipeUp()
+
+        let centerLabel = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_workoutTypeBreakdown_centerLabel").firstMatch
+        XCTAssertTrue(centerLabel.waitForExistence(timeout: 5),
+                      "Workout Type Breakdown center label should be present")
+    }
+
+    /// Chart card renders with data and is non-empty when threshold is met.
+    /// Selection annotation testing deferred — see BUG-034: XCUI cannot trigger
+    /// SwiftUI Charts .chartXSelection gestures (tap, press, drag all fail).
+    func test_trendsChart_dataPointTap_revealsSelectionAnnotation() {
+        logStrengthWorkoutQuick(name: "Select1", weight: "100")
+        logStrengthWorkoutQuick(name: "Select2", weight: "150")
+
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+
+        let chartCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_card").firstMatch
+        XCTAssertTrue(chartCard.waitForExistence(timeout: 5),
+                      "Strength Tracker chart card should exist with seeded data")
+
+        let summary = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_headerSummary").firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 3),
+                      "Header summary confirms chart has data (non-empty state)")
+    }
+
+    /// Toggle tap doesn't crash and clears any prior state.
+    /// Selection annotation testing deferred — see BUG-034.
+    func test_trendsChart_toggleChange_clearsSelection() {
+        logStrengthWorkoutQuick(name: "Toggle1", weight: "100")
+        logStrengthWorkoutQuick(name: "Toggle2", weight: "150")
+
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+
+        let chartCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_card").firstMatch
+        XCTAssertTrue(chartCard.waitForExistence(timeout: 5))
+
+        let toggleButton = app.buttons["60D"]
+        XCTAssertTrue(toggleButton.waitForExistence(timeout: 2),
+                      "Time range toggle should exist on the chart card")
+        toggleButton.tap()
+
+        let summary = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_headerSummary").firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 3),
+                      "Chart should still render after toggle change")
+    }
 }
 
 // MARK: - HealthKit Smoke Tests (Seeded Data)
@@ -756,6 +868,9 @@ final class HealthKitSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     /// Waits for the seed to be visible on the Home screen, then navigates
@@ -835,8 +950,12 @@ final class HealthKitSmokeTests: XCTestCase {
         XCTAssertTrue(unlinkButton.waitForExistence(timeout: 3))
         unlinkButton.tap()
 
+        let confirmButton = app.buttons["sourceInfoSheet_unlinkConfirmButton"]
+        XCTAssertTrue(confirmButton.waitForExistence(timeout: 3), "Unlink confirmation dialog should appear")
+        confirmButton.tap()
+
         XCTAssertFalse(
-            app.buttons["workoutDetail_healthSourceIndicator"].waitForExistence(timeout: 2),
+            app.buttons["workoutDetail_healthSourceIndicator"].waitForExistence(timeout: 3),
             "Source indicator should disappear after unlinking"
         )
     }
@@ -851,23 +970,23 @@ final class HealthKitSmokeTests: XCTestCase {
         XCTAssertTrue(editButton.waitForExistence(timeout: 3))
         editButton.tap()
 
-        let durationHelper = app.buttons["logWorkout_durationReadOnlyHelper"]
+        let durationHelper = app.buttons["logWorkout_hkFieldInfoIcon_duration"]
         XCTAssertTrue(durationHelper.waitForExistence(timeout: 3), "Duration read-only helper should be visible")
 
-        let distanceHelper = app.buttons["logWorkout_distanceReadOnlyHelper"]
+        let distanceHelper = app.buttons["logWorkout_hkFieldInfoIcon_distance"]
         XCTAssertTrue(distanceHelper.exists, "Distance read-only helper should be visible")
     }
 
-    // MARK: - Smoke HK-6: Health Glyph on Home Screen
+    // MARK: - Smoke HK-6: Apple Workout Label on Home Screen
 
-    /// HK-linked Apple Watch workout shows the health glyph trailing the date row on the Home screen.
-    func test_hkLinkedWorkout_showsHealthGlyphOnHome() {
+    /// HK-linked Apple Watch workout shows "Apple Workout" text trailing the date row on the Home screen.
+    func test_hkLinkedWorkout_showsAppleWorkoutLabelOnHome() {
         // Wait for seed to complete on Home
         let seedLabel = app.staticTexts["HK Smoke Test Run"]
         XCTAssertTrue(seedLabel.waitForExistence(timeout: 5), "Seeded HK workout should appear on Home")
 
-        let glyphImage = app.images["healthGlyph"]
-        XCTAssertTrue(glyphImage.exists, "Health glyph should be visible trailing the date row for Apple Watch workout on Home")
+        let appleWorkoutLabel = app.staticTexts["Apple Workout"]
+        XCTAssertTrue(appleWorkoutLabel.exists, "Apple Workout label should be visible trailing the date row for Apple Watch workout on Home")
     }
 }
 
@@ -889,6 +1008,9 @@ final class MatchPromptSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     // MARK: - Smoke MP-1: Match Prompt Appears
@@ -921,7 +1043,7 @@ final class MatchPromptSmokeTests: XCTestCase {
 
         // "Decide later" keeps the match in the queue, so the sheet may
         // re-present. Verify the app is still functional by checking tabs.
-        let homeTab = app.tabBars.buttons["HOME"]
+        let homeTab = app.tabBars.buttons["DASHBOARD"]
         XCTAssertTrue(homeTab.waitForExistence(timeout: 3), "App should remain functional after Decide Later")
     }
 
@@ -972,6 +1094,9 @@ final class WorkoutDetailRedesignSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     private func navigateToSeededWorkoutDetail() {
@@ -1056,8 +1181,8 @@ final class WorkoutDetailRedesignSmokeTests: XCTestCase {
 
     // MARK: - Glyph on Workouts Tab
 
-    /// Apple Watch workout shows glyph trailing the date row on the Workouts tab.
-    func test_workoutsTab_appleWatchWorkout_showsGlyphTrailing_inDateRow() {
+    /// Apple Watch workout shows "Apple Workout" label trailing the date row on the Workouts tab.
+    func test_workoutsTab_appleWatchWorkout_showsAppleWorkoutLabel_inDateRow() {
         let seedLabel = app.staticTexts["HK Smoke Test Run"]
         XCTAssertTrue(seedLabel.waitForExistence(timeout: 5))
 
@@ -1066,8 +1191,8 @@ final class WorkoutDetailRedesignSmokeTests: XCTestCase {
         XCTAssertTrue(typeCard.waitForExistence(timeout: 3))
         typeCard.tap()
 
-        let glyphImage = app.images["healthGlyph"]
-        XCTAssertTrue(glyphImage.waitForExistence(timeout: 3), "Health glyph should be visible on the Workouts preview row for Apple Watch workout")
+        let appleWorkoutLabel = app.staticTexts["Apple Workout"]
+        XCTAssertTrue(appleWorkoutLabel.waitForExistence(timeout: 3), "Apple Workout label should be visible on the Workouts preview row for Apple Watch workout")
     }
 }
 
@@ -1088,11 +1213,14 @@ final class ExercisesHeaderSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     /// Log a Strength workout without exercises; verify no "Exercises" header appears.
     func test_workoutDetail_exercisesHeaderHidden_whenNoExerciseSets() {
-        app.tabBars.buttons["HOME"].tap()
+        app.tabBars.buttons["DASHBOARD"].tap()
         app.buttons["logWorkoutCTA"].tap()
 
         let nameField = app.textFields["workoutNameInput"]
@@ -1130,11 +1258,14 @@ final class EffortDropdownSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     /// Effort dropdown options use "Label (Number)" format.
     func test_logWorkout_effortDropdown_rendersLabelAndNumberFormat() {
-        app.tabBars.buttons["HOME"].tap()
+        app.tabBars.buttons["DASHBOARD"].tap()
         app.buttons["logWorkoutCTA"].tap()
 
         let nameField = app.textFields["workoutNameInput"]
@@ -1172,6 +1303,9 @@ final class StravaSourceSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     private func navigateToSeededStravaWorkoutDetail() {
@@ -1206,8 +1340,8 @@ final class StravaSourceSmokeTests: XCTestCase {
         )
     }
 
-    /// Strava workout on the Workouts tab shows no glyph on the preview row.
-    func test_workoutsTab_stravaWorkout_showsNoGlyph() {
+    /// Strava workout on the Workouts tab shows no "Apple Workout" label on the preview row.
+    func test_workoutsTab_stravaWorkout_showsNoAppleWorkoutLabel() {
         let seedLabel = app.staticTexts["HK Strava Ride"]
         XCTAssertTrue(seedLabel.waitForExistence(timeout: 5))
 
@@ -1217,8 +1351,8 @@ final class StravaSourceSmokeTests: XCTestCase {
         typeCard.tap()
 
         XCTAssertFalse(
-            app.images["healthGlyph"].exists,
-            "Health glyph should NOT appear on Workouts preview row for Strava workout"
+            app.staticTexts["Apple Workout"].exists,
+            "Apple Workout label should NOT appear on Workouts preview row for Strava workout"
         )
     }
 }
@@ -1240,6 +1374,9 @@ final class UnknownSourceSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     /// Source indicator info sheet shows "another app", never a raw bundle ID.
@@ -1290,12 +1427,15 @@ final class EditWorkoutTemplateSmokeTests: XCTestCase {
             alert.buttons.firstMatch.tap()
             return true
         }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
     }
 
     /// Logs a Strength workout, saves it as a template, then navigates to
     /// edit mode on that workout. Returns after entering edit mode.
     private func logStrengthWorkoutAndCreateTemplate() {
-        app.tabBars.buttons["HOME"].tap()
+        app.tabBars.buttons["DASHBOARD"].tap()
         app.buttons["logWorkoutCTA"].tap()
 
         let nameField = app.textFields["workoutNameInput"]
@@ -1355,7 +1495,7 @@ final class EditWorkoutTemplateSmokeTests: XCTestCase {
     // MARK: - Edit Cardio workout: no ellipsis
 
     func test_editCardioWorkout_doesNotShowEllipsis() {
-        app.tabBars.buttons["HOME"].tap()
+        app.tabBars.buttons["DASHBOARD"].tap()
         app.buttons["logWorkoutCTA"].tap()
 
         let nameField = app.textFields["workoutNameInput"]
@@ -1380,6 +1520,188 @@ final class EditWorkoutTemplateSmokeTests: XCTestCase {
         XCTAssertFalse(
             ellipsis.waitForExistence(timeout: 2),
             "Ellipsis should NOT appear in edit mode for Cardio workout"
+        )
+    }
+}
+
+// MARK: - Activity Rings Widget Smoke Tests
+
+/// Tests for the Phase 8.6 Activity Rings Widget. Since the widget depends
+/// on HealthKit authorization and Apple Watch detection that can't be
+/// simulated in XCUI tests, these tests focus on the Add Widgets menu
+/// integration and context menu structure.
+final class ActivityRingsWidgetSmokeTests: XCTestCase {
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state"]
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
+            alert.buttons.firstMatch.tap()
+            return true
+        }
+
+        XCTAssertTrue(app.tabBars.buttons["DASHBOARD"].waitForExistence(timeout: 5),
+                       "Tab bar must be ready before tests run")
+    }
+
+    // MARK: - Smoke AR-1: Add Activity Rings Widget
+
+    /// Add the Activity Rings widget from the Add Widgets menu and confirm the description matches spec.
+    func test_addActivityRingsWidget_rowDescriptionMatchesSpec() {
+        app.tabBars.buttons["DASHBOARD"].tap()
+        app.buttons["homeEllipsisMenu"].tap()
+        app.buttons["addWidgetsMenuItem"].tap()
+
+        let addButton = app.buttons["addWidgetRow_appleActivity"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 3), "Activity Rings row should appear in Add Widgets menu")
+
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Tracks your daily Move, Exercise, and Stand rings")).firstMatch.exists,
+            "Widget description should match spec copy"
+        )
+
+        addButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Activity Rings"].waitForExistence(timeout: 3),
+            "Activity Rings widget should appear on Home after adding"
+        )
+    }
+
+    // MARK: - Smoke AR-2: State 1 — HK Disabled (default state)
+
+    /// With HK off (default), the widget shows the Connect Apple Health state.
+    func test_activityRingsWidget_state1_connectAppleHealthPresent() {
+        app.tabBars.buttons["DASHBOARD"].tap()
+        app.buttons["homeEllipsisMenu"].tap()
+        app.buttons["addWidgetsMenuItem"].tap()
+        app.buttons["addWidgetRow_appleActivity"].tap()
+
+        let connectState = app.otherElements["homeWidget_appleActivity_state_connectAppleHealth"]
+        XCTAssertTrue(
+            connectState.waitForExistence(timeout: 3),
+            "State 1 (Connect Apple Health) should be displayed when HK is disabled"
+        )
+
+        let connectButton = app.buttons["homeWidget_appleActivity_connectButton"]
+        XCTAssertTrue(connectButton.exists, "Connect button should be visible in State 1")
+    }
+
+    // MARK: - Smoke AR-3: Long-Press Context Menu
+
+    /// Long-pressing the Activity Rings widget reveals the expected context menu items.
+    func test_activityRingsWidget_longPress_showsFourItemContextMenu() {
+        app.tabBars.buttons["DASHBOARD"].tap()
+
+        app.buttons["homeEllipsisMenu"].tap()
+        app.buttons["addWidgetsMenuItem"].tap()
+        app.buttons["addWidgetRow_appleActivity"].tap()
+
+        let widgetHeader = app.staticTexts["Activity Rings"]
+        XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
+
+        widgetHeader.press(forDuration: 1.0)
+
+        let seeInfoButton = app.buttons["homeWidget_appleActivity_seeInfo"]
+        XCTAssertTrue(seeInfoButton.waitForExistence(timeout: 3), "See Info should appear in context menu")
+
+        let configureButton = app.buttons["homeWidget_appleActivity_configureSettings"]
+        XCTAssertTrue(configureButton.exists, "Configure Settings should appear in context menu")
+
+        let reorderButton = app.buttons["Reorder Widgets"]
+        XCTAssertTrue(reorderButton.exists, "Reorder Widgets should appear in context menu")
+
+        let deleteButton = app.buttons["Delete Widget"]
+        XCTAssertTrue(deleteButton.exists, "Delete Widget should appear in context menu")
+    }
+
+    // MARK: - Smoke AR-4: See Info Modal
+
+    /// Long-pressing the Activity Rings widget and tapping See Info opens the info modal.
+    func test_activityRingsWidget_seeInfo_opensModal() {
+        app.tabBars.buttons["DASHBOARD"].tap()
+
+        app.buttons["homeEllipsisMenu"].tap()
+        app.buttons["addWidgetsMenuItem"].tap()
+        app.buttons["addWidgetRow_appleActivity"].tap()
+
+        let widgetHeader = app.staticTexts["Activity Rings"]
+        XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
+
+        widgetHeader.press(forDuration: 1.0)
+
+        let seeInfoButton = app.buttons["homeWidget_appleActivity_seeInfo"]
+        XCTAssertTrue(seeInfoButton.waitForExistence(timeout: 3))
+        seeInfoButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["About Activity Rings"].waitForExistence(timeout: 3),
+            "See Info Modal should open with Activity Rings content"
+        )
+    }
+
+    // MARK: - Smoke AR-5: Configure Settings Modal
+
+    /// Opening Configure Settings from context menu shows sliders, Reset, and Import buttons.
+    func test_activityRingsWidget_configureSettings_showsSlidersAndButtons() {
+        app.tabBars.buttons["DASHBOARD"].tap()
+
+        app.buttons["homeEllipsisMenu"].tap()
+        app.buttons["addWidgetsMenuItem"].tap()
+        app.buttons["addWidgetRow_appleActivity"].tap()
+
+        let widgetHeader = app.staticTexts["Activity Rings"]
+        XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
+
+        widgetHeader.press(forDuration: 1.0)
+
+        let configureButton = app.buttons["homeWidget_appleActivity_configureSettings"]
+        XCTAssertTrue(configureButton.waitForExistence(timeout: 3))
+        configureButton.tap()
+
+        let moveSlider = app.sliders["activityRingsSettings_moveSlider"]
+        XCTAssertTrue(moveSlider.waitForExistence(timeout: 3), "Move slider should be present")
+
+        let exerciseSlider = app.sliders["activityRingsSettings_exerciseSlider"]
+        XCTAssertTrue(exerciseSlider.exists, "Exercise slider should be present")
+
+        let standSlider = app.sliders["activityRingsSettings_standSlider"]
+        XCTAssertTrue(standSlider.exists, "Stand slider should be present")
+
+        let resetButton = app.buttons["activityRingsSettings_resetButton"]
+        XCTAssertTrue(resetButton.exists, "Reset to defaults button should be present")
+
+        let importButton = app.buttons["activityRingsSettings_importButton"]
+        XCTAssertTrue(importButton.exists, "Import from Apple Health button should be present")
+    }
+
+    // MARK: - Smoke AR-6: Delete Widget
+
+    /// Deleting the Activity Rings widget removes it from the Home screen.
+    func test_activityRingsWidget_deleteViaContextMenu_removesFromHome() {
+        app.tabBars.buttons["DASHBOARD"].tap()
+
+        app.buttons["homeEllipsisMenu"].tap()
+        app.buttons["addWidgetsMenuItem"].tap()
+        app.buttons["addWidgetRow_appleActivity"].tap()
+
+        let widgetHeader = app.staticTexts["Activity Rings"]
+        XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
+
+        widgetHeader.press(forDuration: 1.0)
+
+        let deleteButton = app.buttons["Delete Widget"]
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 3))
+        deleteButton.tap()
+
+        XCTAssertFalse(
+            app.staticTexts["Activity Rings"].waitForExistence(timeout: 2),
+            "Activity Rings widget should be removed after delete"
         )
     }
 }

@@ -1,6 +1,10 @@
 # CONSTANTS.md: FitNavi Constants & Reference Values
 
 > All values to define in `AppConstants.swift` and `Design/Theme/`. Do not invent additional options or modify these lists without updating this document.
+>
+> **Two large reference sets live in companion files:**
+> - **`HK_MAPPING.md`** — `HKWorkoutActivityType` → FortiFit `workoutType` lookup table (~80 entries) and ambiguous-mapping notes
+> - **`INFO_COPY.md`** — Chart Info Modal Copy and Widget Info Modal Copy (the user-facing strings rendered in See Info modals)
 
 ---
 
@@ -22,12 +26,12 @@
 | Positive (Green) | `#10b981` | Low load, PR indicators, weekly frequency goal |
 | Alert (Red) | `#ef4444` | Peak load, high-intensity warnings |
 | Chart (Purple) | `#4B2893` | A potential color for chart lines or bars |
-| Chart (Orange) | `#FFA600` | A potential color for chart lines or bars |
+| Chart (Orange) | `#FFBF51` | A potential color for chart lines or bars |
 | Chart (Teal) |`#289193`| A potential color for chart lines or bars |
 | Chart (Pink) | `#BB2BC0` | A potential color for chart lines or bars |
 | Chart (Light Cyan) | `#8​FE6​F6` | A potential color for chart lines or bars |
 | Chart (Deep Blue) | `#0845​AD` | A potential color for chart lines or bars |
-| HealthKit Pink | `#FF2D55` | Source indicator heart icon on Workout Detail, peripheral glyphs on Home/Workouts/Plan, info sheet accents. Matches Apple's system pink used in the Health app. See HEALTHKIT.md § 15. |
+| HealthKit Pink | `#FF2D55` | Source indicator heart icon and leading glyph on Workout Detail, info sheet accents. Matches Apple's system pink used in the Health app. See HEALTHKIT.md § 15. |
 ---
 
 ## Ellipsis Menu SF Symbols
@@ -174,7 +178,6 @@ Three-color collapse of the 5-band Effort Label Mapping (§ Effort Label Mapping
 
 "Other" is a catch-all for HealthKit imports whose activity type doesn't cleanly map to one of the first five categories (see § HealthKit Mapping below). It is also user-selectable in the Log Workout type dropdown, though most users will use it only for imported workouts.
 
-**Sprints removed:** Prior versions of FortiFit included a "Sprints" workout type. Phase 8 removes it and runs a one-time migration that rewrites all existing Sprints workouts to Cardio (see HEALTHKIT.md § 18).
 
 ### Workout Type Modifiers (Training Load)
 
@@ -206,121 +209,7 @@ Icons rendered to the left of the workout type name on Workout Type cards (Worko
 
 ## HealthKit Mapping
 
-Static lookup table mapping every `HKWorkoutActivityType` enum case to a FortiFit `workoutType` plus a friendly display string (stored on `Workout.healthKitActivityType`). Used by `HealthKitSyncService` at import time. See HEALTHKIT.md § 6 for the architectural rationale; see § 9 for where this table is consulted.
-
-**Rules:**
-- Every currently defined `HKWorkoutActivityType` has an explicit entry.
-- Unknown types (introduced by future iOS versions after this table was authored) fall through to `Other` with the raw enum case name as the display string (Claude Code implements this as a `default` case in the mapping function).
-- For activity types with indoor/outdoor variants (`running`, `cycling`, `rowing`, etc.), the display string is the base name; the `workout.indoor` flag layers on "Indoor"/"Outdoor" prefixing at display time in the UI (see SCREENS.md § Workout Detail).
-- Static table. Not user-configurable.
-
-### Mapping Table
-
-| HKWorkoutActivityType | Display String | FortiFit `workoutType` |
-|---|---|---|
-| `americanFootball` | American Football | Other |
-| `archery` | Archery | Other |
-| `australianFootball` | Australian Rules Football | Other |
-| `badminton` | Badminton | Other |
-| `barre` | Barre | Other |
-| `baseball` | Baseball | Other |
-| `basketball` | Basketball | Other |
-| `bowling` | Bowling | Other |
-| `boxing` | Boxing | Other |
-| `cardioDance` | Cardio Dance | Cardio |
-| `climbing` | Climbing | Other |
-| `cooldown` | Cooldown | Other |
-| `coreTraining` | Core Training | Strength Training |
-| `cricket` | Cricket | Other |
-| `crossCountrySkiing` | Cross-Country Skiing | Cardio |
-| `crossTraining` | Cross Training | HIIT |
-| `curling` | Curling | Other |
-| `cycling` | Cycling | Cardio |
-| `discSports` | Disc Sports | Other |
-| `downhillSkiing` | Downhill Skiing | Cardio |
-| `elliptical` | Elliptical | Cardio |
-| `equestrianSports` | Equestrian Sports | Other |
-| `fencing` | Fencing | Other |
-| `fishing` | Fishing | Other |
-| `fitnessGaming` | Fitness Gaming | HIIT |
-| `flexibility` | Flexibility | Other |
-| `functionalStrengthTraining` | Functional Strength Training | Strength Training |
-| `golf` | Golf | Other |
-| `gymnastics` | Gymnastics | Other |
-| `handCycling` | Hand Cycling | Cardio |
-| `handball` | Handball | Other |
-| `highIntensityIntervalTraining` | HIIT | HIIT |
-| `hiking` | Hiking | Cardio |
-| `hockey` | Hockey | Other |
-| `hunting` | Hunting | Other |
-| `jumpRope` | Jump Rope | Other |
-| `kickboxing` | Kickboxing | Other |
-| `lacrosse` | Lacrosse | Other |
-| `martialArts` | Martial Arts | Other |
-| `mindAndBody` | Mind and Body | Other |
-| `mixedCardio` | Mixed Cardio | Cardio |
-| `mixedMetabolicCardioTraining` | Mixed Metabolic Cardio Training | Cardio |
-| `paddleSports` | Paddle Sports | Cardio |
-| `pickleball` | Pickleball | Other |
-| `pilates` | Pilates | Pilates |
-| `play` | Play | Other |
-| `preparationAndRecovery` | Preparation and Recovery | Other |
-| `racquetball` | Racquetball | Other |
-| `rowing` | Rowing | Cardio |
-| `rugby` | Rugby | Other |
-| `running` | Running | Cardio |
-| `sailing` | Sailing | Other |
-| `skatingSports` | Skating Sports | Cardio |
-| `snowSports` | Snow Sports | Cardio |
-| `snowboarding` | Snowboarding | Cardio |
-| `soccer` | Soccer | Other |
-| `socialDance` | Social Dance | Cardio |
-| `softball` | Softball | Other |
-| `squash` | Squash | Other |
-| `stairClimbing` | Stair Climbing | Cardio |
-| `stairs` | Stairs | Cardio |
-| `stepTraining` | Step Training | Cardio |
-| `surfingSports` | Surfing | Cardio |
-| `swimBikeRun` | Swim Bike Run | Cardio |
-| `swimming` | Swimming | Cardio |
-| `tableTennis` | Table Tennis | Other |
-| `taiChi` | Tai Chi | Other |
-| `tennis` | Tennis | Other |
-| `trackAndField` | Track and Field | Cardio |
-| `traditionalStrengthTraining` | Traditional Strength Training | Strength Training |
-| `transition` | Transition | Cardio |
-| `underwaterDiving` | Underwater Diving | Other |
-| `volleyball` | Volleyball | Other |
-| `walking` | Walking | Cardio |
-| `waterFitness` | Water Fitness | Cardio |
-| `waterPolo` | Water Polo | Other |
-| `waterSports` | Water Sports | Cardio |
-| `wheelchairRunPace` | Wheelchair Run Pace | Cardio |
-| `wheelchairWalkPace` | Wheelchair Walk Pace | Cardio |
-| `wrestling` | Wrestling | Other |
-| `yoga` | Yoga | Yoga |
-| `other` | Other | Other |
-| *(unknown future types)* | *raw enum name* | Other |
-
-### Ambiguous Mappings (Judgment Calls)
-
-The following HK types had plausible arguments for more than one FortiFit category. The selections above were made based on the activity's typical stress profile and the user's likely mental model. Flagged here so the call can be reviewed and changed if needed — the mapping is authoritative in the table above; this list is informational.
-
-| HK Type | Chosen | Alternative | Rationale |
-|---|---|---|---|
-| `crossTraining` | HIIT | Strength Training | CrossFit-style mixed workouts blend both, but the metabolic intensity leans HIIT. |
-| `fitnessGaming` | HIIT | Cardio | Wide variance, but most (Ring Fit, Beat Saber fitness modes) are interval-based. |
-| `stepTraining` | Cardio | HIIT | Step aerobics is sustained moderate-intensity. |
-| `wrestling` | Other | Strength Training | Team/competitive context dominates over strength character for most users. |
-| `martialArts` | Other | HIIT | Huge variance (Krav Maga would be HIIT, Aikido would be closer to Other); "Other" is the safest default. |
-| `trackAndField` | Cardio | Other | Most tracked events (running, sprinting) are cardio; field events are rare. |
-| `paddleSports` | Cardio | Other | Kayaking/canoeing are sustained cardiovascular activity. |
-| `surfingSports` | Cardio | Other | Active paddling and balance work; net cardiovascular demand. |
-| `waterSports` | Cardio | Other | Generic water activities; leans cardio. |
-
-**Resolved to Other by design:** `barre`, `boxing`, `kickboxing`, `jumpRope`, `gymnastics`, `mindAndBody`, `taiChi`, `flexibility`, `cooldown`, `preparationAndRecovery`. Earlier drafts placed several of these in Pilates, HIIT, Strength Training, or Yoga; during spec review they were moved to Other to keep the five primary categories tight and to avoid muddying their Training Load modifiers with activities that have high stress variance.
-
-**Changing a mapping:** edit the table above, then verify the HK-to-category mapping unit test in `FortiFitTests` still passes (the test iterates every enum case and asserts the expected category — see TESTING.md § HealthKit Test Strategy).
+> **Moved to `HK_MAPPING.md`.** The full `HKWorkoutActivityType` → FortiFit `workoutType` lookup table (~80 entries), ambiguous-mapping judgment calls, and the "changing a mapping" workflow live there. Architectural rationale stays in HEALTHKIT.md § 6.
 
 ---
 
@@ -382,6 +271,111 @@ Constant: `AppConstants.HealthKit.fieldPopoverCopy(for: HKOwnedField) -> String`
 |---|---|---|
 | `appleWorkoutName` | "Apple Workout" | Display string for `com.apple.Health` (Apple Watch) source |
 | `unknownSourceName` | "another app" | Fallback when bundle ID resolution fails. Used in Source row, info sheet body, etc. |
+
+---
+
+## Activity Rings (Apple Health)
+
+Constants for the `appleActivity` Home widget — see SCREENS.md § Home Screen → Activity Rings widget, SERVICES.md § AppleActivityService, and HEALTHKIT.md § 20.
+
+### Ring Colors
+
+| Ring | Color | Constant |
+|---|---|---|
+| Move (outermost) | `#ef4444` | `FortiFitColors.activityMoveRing` |
+| Exercise (middle) | `#10b981` | `FortiFitColors.activityExerciseRing` |
+| Stand (innermost) | `#0845AD` | `FortiFitColors.activityStandRing` |
+
+When a ring closes (progress ≥ 100%), the ring continues drawing past 100% as a second arc on top of the filled ring — same Apple Watch behavior. Implementation: render two `Circle().trim(...).stroke(...)` layers per ring, where the second layer's `from` value increments past 1.0 visually rotates the over-fill.
+
+### Ring Chevron SF Symbols
+
+Icons rendered inline next to each label in the left column (10pt bold, ring color, 4pt spacing before label text).
+
+| Ring | SF Symbol | Notes |
+|---|---|---|
+| Move | `chevron.right` | Single rightward chevron |
+| Exercise | `chevron.right.2` | Double rightward chevrons |
+| Stand | `chevron.up` | Single upward chevron |
+
+Chevron color matches its ring color at full opacity. The ring center displays today's date (abbreviated month + day number) in Muted Text instead of chevron icons.
+
+### Slider Ranges and Increments (Configure Settings Modal)
+
+| Metric | Range | Increment | FitNavi Default (when HK has no value) |
+|---|---|---|---|
+| Move | 1–2000 cal | 10 cal | 500 cal |
+| Exercise | 1–240 min | 5 min | 30 min |
+| Stand | 1–24 hrs | 1 hr | 12 hrs |
+
+### Widget Strings
+
+Lives under `AppConstants.ActivityRings.*`.
+
+#### Card States
+
+| Constant | Value |
+|---|---|
+| `cardHeader` | "Activity Rings" |
+| `moveLabel` | "Move" |
+| `exerciseLabel` | "Exercise" |
+| `standLabel` | "Stand" |
+| `moveUnit` | "cal" |
+| `exerciseUnit` | "min" |
+| `standUnit` | "hours" |
+
+Headline value format on the widget left column: `{numerator}/{denominator} {unit}` — e.g., `500/1000 cal`, `30/60 min`, `14/16 hours`. Both numerator and denominator render in the ring's accent color at 20pt heavy weight.
+
+#### Three Dynamic Card States (see SCREENS.md § Home Screen → Activity Rings widget)
+
+| Constant | Value |
+|---|---|
+| `stateConnectAppleHealthMessage` | "Connect Apple Health to track your activity rings." |
+| `stateConnectAppleHealthCTA` | "Connect" |
+| `statePairAppleWatchMessage` | "Pair an Apple Watch to see your Move, Exercise, and Stand activity here." |
+
+#### Workout Contribution Caption
+
+Renders below each fraction on the widget when the corresponding metric has at least one HK-linked workout contribution today.
+
+| Constant | Value (template) |
+|---|---|
+| `captionFromSingleWorkout` | "+{value} from today's {workoutName}" |
+| `captionFromMultipleWorkouts` | "+{value} from today's workouts" |
+
+Threshold for "single" vs. "multiple": one HK-linked `Workout` logged today → single (use the workout's name); two or more → multiple (suppress names, sum values).
+
+#### Weekly Closure Rate Chip
+
+| Constant | Value (template) |
+|---|---|
+| `weeklyClosureChip` | "Closed all rings {n} day(s) this week" |
+
+Renders below the rings (or as an overline above, depending on layout — see SCREENS.md). Computed from `AppleActivityService.closedAllRingsDayCount`.
+
+### Settings Modal Strings
+
+| Constant | Value |
+|---|---|
+| `settingsModalHeading` | "Configure Activity Rings" |
+| `settingsModalMoveSliderLabel` | "Move (calories)" |
+| `settingsModalExerciseSliderLabel` | "Exercise (minutes)" |
+| `settingsModalStandSliderLabel` | "Stand (hours)" |
+| `settingsModalResetButton` | "Reset to defaults" |
+| `settingsModalImportButton` | "Import from Apple Health" |
+| `settingsModalImportDisabledCaption` | "Connect Apple Health to import your goals." |
+
+### Activity Detail Sheet Strings
+
+| Constant | Value |
+|---|---|
+| `detailSheetHeading` | "Activity" |
+| `detailSheetRangeToggle7d` | "7 days" |
+| `detailSheetRangeToggle30d` | "30 days" |
+| `detailSheetMoveSparklineLabel` | "Move" |
+| `detailSheetExerciseSparklineLabel` | "Exercise" |
+| `detailSheetStandSparklineLabel` | "Stand" |
+| `detailSheetClosureHeatmapHeading` | "Ring closure heatmap" |
 
 ---
 
@@ -463,7 +457,7 @@ Integers 1 through 10. Stored on `workout.rpe`; display layer renders the descri
 
 ## Effort Label Mapping
 
-Maps the integer 1–10 effort score to a descriptive label. Used on the Workout Detail stat-card grid (label-only display, no number), the Metric Detail Sheet hero block (label + integer in parens), the Log Workout dropdown (`Label (Number)` format per option), the Share Image Card stat-card grid (label-only), and the Match Prompt Sheet FortiFit-side card metadata (`Effort: Label (Number)`).
+Maps the integer 1–10 effort score to a descriptive label. Used on the Workout Detail stat-card grid (label-only display, no number), the Metric Detail Sheet hero block (label + integer in parens), the Log Workout dropdown (`Label (Number)` format per option), the Share Image Card stat-card grid (label-only), and the Match Prompt Sheet FitNavi-side card metadata (`Effort: Label (Number)`).
 
 | Score | Label |
 |---|---|
@@ -595,7 +589,7 @@ Goal cards use the **same long-press tease animation as Home screen widget cards
 ## Widget Types
 
 ```swift
-["trainingLoad", "weekStreak", "powerLevel", "todaysPlan"]
+["trainingLoad", "weekStreak", "powerLevel", "todaysPlan", "appleActivity"]
 ```
 
 | Identifier | Display Name | Description |
@@ -604,14 +598,15 @@ Goal cards use the **same long-press tease animation as Home screen widget cards
 | `weekStreak` | Week Streak | Tracks how many consecutive weeks you've met your weekly workout target. |
 | `powerLevel` | Power Level | Measures your average strength volume trend over the last 30 days across Strength Training and HIIT workouts. |
 | `todaysPlan` | Today's Plan | Shows your scheduled workout for today so you can jump straight into logging. Long-press → "Complete Workout" opens the same compact confirmation sheet as the Plan tab. |
+| `appleActivity` | Activity Rings | Tracks your daily Move, Exercise, and Stand rings. Requires an Apple Watch and Apple Health connected in Settings. |
 
 > **Removed widgets:** `workoutInfo` (Workout Info) was retired in this revision. It duplicated the Recent Workouts list directly below the widget stack and offered no decision-relevant signal beyond a vanity Total Workouts count. See SERVICES.md § HomeWidgetService → One-time migration for the cleanup of existing `workoutInfo` records on the upgrade build.
 
 ### Default Home Widgets (first launch)
 ```swift
-["trainingLoad", "weekStreak"]
+["todaysPlan", "trainingLoad", "powerLevel"]
 ```
-Power Level and Today's Plan not included by default — both available via Add Widgets menu.
+Week Streak and Activity Rings are add-only — available via the Add Widgets menu but not seeded on first launch.
 
 ---
 
@@ -651,6 +646,113 @@ Workout Volume, Effort Trend, Workout Type Breakdown, and Session Duration are a
 | Other | Caution Yellow | `#C4F648` |
 
 Used by the Workout Type Breakdown chart.
+
+---
+
+## Trends Chart Visual Tokens
+
+Visual styling values for the Trends screen's chart cards. Consumed by `FortiFitChartCard` (see SCREENS.md § Standard Patterns → Trends Chart Card Visual Treatment) and the individual chart views in `Features/Progress/`. All hex values reference tokens already defined in § Colors and § Workout Type Chart Colors — no new color tokens.
+
+### Gradient Anchor by Chart Type
+
+Each Trends chart card paints a subtle background gradient behind its plot area, color-matched to the chart's data marks. Single-color anchors render a vertical fade; the Personal Records anchor uses a horizontal split mirroring its two-bar layout, layered with the same vertical fade-to-transparent.
+
+| Chart (id) | Anchor Color(s) | Treatment |
+|---|---|---|
+| `strengthTracker` | `#BB2BC0` (Chart Pink) | Single-color, vertical fade |
+| `trainingFrequency` | `#10b981` (Positive Green) | Single-color, vertical fade |
+| `personalRecords` | `#8FE6F6` leading → `#0845AD` trailing | Horizontal split + vertical fade-to-transparent |
+| `trainingLoadTrend` | `#3b82f6` (Primary Accent Blue) | Single-color, vertical fade |
+| `workoutVolume` | `#4B2893` (Chart Purple) | Single-color, vertical fade |
+| `rpeTrend` | `#FFBF51` (Chart Orange) | Single-color, vertical fade |
+| `workoutTypeBreakdown` | `#3b82f6` (Primary Accent Blue) | Single-color, vertical fade |
+| `sessionDuration` | `#289193` (Chart Teal) | Single-color, vertical fade |
+
+**Helper function** in `AppConstants` — `static func chartGradientAnchor(for: ChartType) -> ChartGradientAnchor` returns either `.single(Color)` or `.horizontalSplit(leading: Color, trailing: Color)`. Views must never hardcode the mapping; pull from `AppConstants` everywhere.
+
+### Gradient Treatment
+
+| Property | Value |
+|---|---|
+| Type | `LinearGradient` |
+| Vertical fade | Anchor color at 20% opacity (top) → 0% (bottom) |
+| Horizontal split (Personal Records only) | Leading color (left) → trailing color (right) at full anchor saturation, composed beneath the vertical fade-to-transparent |
+| Layer order (back → front) | Card surface → gradient → inner hairline → plot marks |
+| Inset | Gradient fills the plot area only (inside the inner hairline) — never the chart title, header summary, controls row, or footer |
+
+### Inner Plot Hairline
+
+| Property | Value |
+|---|---|
+| Stroke | 1px Border `#404040` |
+| Corner radius | 8pt |
+| Inset | Bounds the plot area; does not enclose the chart title, header summary, toggles, or footer/legend |
+| Empty state | Hairline hidden (along with gradient and header summary) |
+
+### Header Summary Block
+
+Hero value + caption rendered above the plot area on every chart card when its data threshold (§ Chart Data Thresholds) is met. Hidden on empty states.
+
+| Property | Value |
+|---|---|
+| Hero value typography | 28px, 900 weight |
+| Hero value color | Anchor color (single-color charts); Primary Text `#e5e5e5` for `personalRecords` (which uses a two-color anchor) |
+| Caption typography | 12px, 700 weight, Muted Text `#737373`, uppercase, 2px letter-spacing |
+| Spacing | 4pt between hero and caption; 12pt below caption before plot area |
+
+#### Per-Chart Hero / Caption Formula
+
+| Chart (id) | Hero Value | Caption |
+|---|---|---|
+| `strengthTracker` | `{latest weight} {unit}` (e.g., `225 lbs`) | `LATEST` |
+| `trainingFrequency` | `{avg sessions/week, 1 dp}` | `AVG / LAST 8 WEEKS` |
+| `personalRecords` | `+{delta} {unit}` (current − previous) | `LATEST PR` |
+| `trainingLoadTrend` | `{today's score, integer}` | `TODAY` |
+| `workoutVolume` | `{avg session volume, formatted with K/M suffix}` | `AVG / SESSION` |
+| `rpeTrend` | `{avg rpe, 1 dp}` | `AVG / LAST 8 WEEKS` |
+| `workoutTypeBreakdown` | *(rendered inside donut center — see § Donut Center Label below; header summary slot suppressed)* | — |
+| `sessionDuration` | `{avg duration} min` | `AVG / SESSION` |
+
+**Helper function** in `TrendsChartService` — `func headerSummary(for: ChartType, exerciseName: String?) -> ChartSummary?` returns `nil` when below the chart's data threshold; the view renders the empty state instead. `exerciseName` is required only for `strengthTracker` and `personalRecords`. `ChartSummary` is a value type with `hero: String` and `caption: String`. Strings live in `AppConstants` — captions never hardcoded in views.
+
+### Latest Data-Point Highlight
+
+Applies to line charts only (`strengthTracker`, `workoutVolume`, and the rolling-average line on `trainingLoadTrend`). Mirrors the existing Metric Detail Sheet sparkline convention (§ Stat Card Colors → "current workout's data point" treatment).
+
+| Property | Value |
+|---|---|
+| Shape | Filled circle |
+| Diameter | 6pt |
+| Fill | Anchor color |
+| Glow | 4pt outer blur at 60% anchor opacity |
+| Position | Last data point on the line (most recent x value) |
+
+Non-latest points retain their existing 3pt circle treatment (or no point marker, where the chart had none before).
+
+### Bar Top Corner Radius
+
+Applies to all `BarMark` charts (`trainingFrequency`, `personalRecords`, `rpeTrend`, `sessionDuration`).
+
+| Property | Value |
+|---|---|
+| Top corners | 5pt radius |
+| Bottom corners | 0pt — bars sit flush on the x-axis baseline |
+| Implementation | `UnevenRoundedRectangle(topLeadingRadius: 5, topTrailingRadius: 5)` |
+
+### Line Interpolation
+
+All `LineMark`s on Trends charts use `.interpolationMethod(.catmullRom)`. Softens jagged data without distorting trend direction. No exception charts.
+
+### Donut Center Label (Workout Type Breakdown only)
+
+Renders inside the donut hole when the chart's data threshold is met. Replaces the chart's header summary block on this card.
+
+| Property | Value |
+|---|---|
+| Hero value | Total workout count across the active range (30D / 60D / 90D / All Time), Primary Text `#e5e5e5`, 24px, 900 weight |
+| Caption | `WORKOUTS`, Muted Text `#737373`, 11px, 700 weight, 2px letter-spacing |
+| Layout | Centered horizontally and vertically inside the donut hole; both lines stack with 2pt vertical spacing |
+| Empty state | Center label hidden alongside the chart's other empty-state behavior |
 
 ---
 
@@ -737,176 +839,13 @@ Thresholds: < −10% = Deloading, −10% to +10% = Steady, > +10% = Rising.
 
 ## Chart Info Modal Copy
 
-User-facing strings rendered in the Chart Info Modal (see SCREENS.md § Trends → Chart Info Modal). One entry per chart type. Each entry has a title, an intro paragraph, and an ordered list of named sections (each section a heading + body paragraph). Stored in `AppConstants` as a static dictionary keyed by `chartType` — never hardcoded in views. Sections render in the order listed below.
-
-### Strength Tracker (`strengthTracker`)
-
-**Title:** About Strength Tracker
-
-**Intro:** Strength Tracker shows how the heaviest weight you lift for a single exercise changes over time. Pick an exercise from the dropdown to see how your top set has trended in recent sessions.
-
-**How it's calculated:** Each data point on the chart is the heaviest weight you lifted for the selected exercise on that date, taken from the top set across all of that day's matching workouts. If you trained the same exercise twice in one day, only the heavier of the two sets is plotted.
-
-**Time range:** Toggle 30, 60, or 90 days to widen or narrow the view. The chart re-renders immediately on switch.
-
-**What's tracked:** Only sets with a recorded weight count toward the trend. Bodyweight exercises (logged without a weight value) aren't included — they don't have a number to plot. Exercise names are matched case-insensitively, so "Bench Press" and "bench press" share the same line.
-
-**Empty state:** At least 2 workouts containing the selected exercise with a recorded weight are needed before the chart can render. Until then, you'll see a prompt to log more sessions.
-
-### Training Frequency (`trainingFrequency`)
-
-**Title:** About Training Frequency
-
-**Intro:** Training Frequency shows how many workouts you've completed each week over the last 8 weeks, side by side with your weekly target.
-
-**How it's calculated:** Each bar is the count of workouts whose date falls within that calendar week (Monday 12:00 AM through Sunday 11:59 PM). Every workout type counts equally — a yoga session and a strength session each add one to the bar for that week.
-
-**Your target line:** The dashed blue line is your target workouts per week, set on the Weekly Streak widget via long-press → Configure Settings. Bars at or above the line mean you hit your target that week; bars below it mean you didn't.
-
-**Time range:** The 8 most recent calendar weeks, including the current in-progress week. Older weeks roll off as new ones begin.
-
-**Empty state:** You need at least one full Monday–Sunday week with at least one logged workout before the chart renders.
-
-### Personal Records (`personalRecords`)
-
-**Title:** About Personal Records
-
-**Intro:** Personal Records compares your most recent PR for an exercise against the PR before it, so you can see how much you improved on your latest breakthrough.
-
-**What counts as a PR:** A PR is recorded the first time you exceed your previous heaviest weight for a given exercise. The very first time you log an exercise establishes your baseline — that workout isn't a PR by itself. Every subsequent workout that beats your highest weight to date logs a new PR event.
-
-**How records are tracked:** PR events are calculated per exercise name (case-insensitive) and ordered chronologically by workout date. If you log the same exercise on multiple days at the same weight, no new PR is logged — the weight has to exceed the previous record. Bodyweight exercises (logged without a weight) aren't tracked because there's no number to compare.
-
-**What you'll see:** The dropdown lists every exercise that has at least one PR event, sorted alphabetically. Selecting an exercise shows two bars: your previous record on the left and your most recent record on the right, with the date each was set.
-
-**Empty state:** At least one exercise needs at least one PR event before the chart renders. If you've only ever lifted the same weight on a given exercise, no PR exists yet.
-
-### Training Load Trend (`trainingLoadTrend`)
-
-**Title:** About Training Load Trend
-
-**Intro:** Training Load Trend plots your daily training load score over the last 14 days, color-coded by zone, so you can spot overtraining patterns and recovery windows at a glance.
-
-**How training load is calculated:** Each day's score is a 0–100 rating that combines the volume, intensity, and recency of your recent workouts. Recent sessions count more than older ones — stress decays over about 10 days. Your experience level (set via long-press → Configure Settings on the Training Load widget) affects how quickly stress decays and how much load you can absorb before the score climbs.
-
-**Zones:** Each dot is colored by its zone:
-- Low (1–30, green): well recovered
-- Moderate (31–55, yellow): some accumulated fatigue
-- High (56–80, dark yellow): significant fatigue
-- Peak (81–100, red): high stress, prioritize recovery
-
-**The 7-day average line:** The dashed blue line is your 7-day rolling average, smoothing out single-day spikes so you can see the underlying trend. A rising line over a flat dot pattern means your overall load is climbing; a falling line means you're tapering.
-
-**Empty state:** At least 3 days with at least one workout each in the last 14 days are needed before the chart renders.
-
-### Workout Volume (`workoutVolume`)
-
-**Title:** About Workout Volume
-
-**Intro:** Workout Volume tracks the total weight you've moved per session over time. Each data point is one workout — together they show whether you're progressively overloading.
-
-**How volume is calculated:** For every set in a workout, volume is `sets × reps × weight`. Those values are summed across all exercises in the session to produce a single workout volume number. Bodyweight exercises (logged without a weight) count as if the weight were 1, since they still represent work performed.
-
-**What's included:** Only Strength Training and HIIT workouts appear on the chart. Cardio, yoga, pilates, and other types don't track exercise sets the same way, so including them would distort the trend.
-
-**Time range:** Toggle 30, 60, or 90 days. The chart re-renders immediately on switch.
-
-**Empty state:** At least 2 Strength Training or HIIT workouts with at least one logged exercise set are needed before the chart renders.
-
-### Effort Trend (`rpeTrend`)
-
-**Title:** About Effort Trend
-
-**Intro:** Effort Trend shows your average perceived effort per week, so you can see whether your training intensity is creeping up, holding steady, or trending down.
-
-**How it's calculated:** Effort uses a 1–10 scale where 1 is barely a warm-up and 10 is an all-out max effort. Each bar is the average of every effort rating you logged within that calendar week (Monday through Sunday). Workouts you didn't rate aren't counted — they don't pull the average up or down.
-
-**The reference line:** The dashed line at Effort 7 marks the rough threshold between hard and very hard sessions. Several weeks averaging well above 7 in a row may signal it's time for a deload.
-
-**Time range:** The 8 most recent calendar weeks, including the current in-progress week.
-
-**Apple Health import:** If you record a workout on Apple Watch and rate its effort there (iOS 18 or later), that effort score imports into FortiFit automatically when the workout is linked — but only if you haven't already entered an effort rating yourself. Your manually entered ratings always win.
-
-**Empty state:** At least one full Monday–Sunday week with at least one workout that has a recorded effort rating is needed before the chart renders.
-
-### Workout Type Breakdown (`workoutTypeBreakdown`)
-
-**Title:** About Workout Type Breakdown
-
-**Intro:** Workout Type Breakdown shows how your training is distributed across workout types, so you can see whether your routine is balanced or concentrated in one area.
-
-**How it's calculated:** Each segment of the donut is the count of workouts of that type within the selected time range, divided by your total workout count. A 50% Strength Training slice means half of all your sessions in the period were Strength Training.
-
-**Workout types:** Six categories — Strength Training, HIIT, Cardio, Yoga, Pilates, and Other. Each has a fixed color shown in the legend. Workouts imported from Apple Health are mapped to one of these six based on their HealthKit activity type.
-
-**Time range:** Toggle 30 days, 60 days, 90 days, or All Time. "All Time" includes every workout you've ever logged.
-
-**Empty state:** At least 2 workouts of any type are needed before the chart renders.
-
-### Session Duration (`sessionDuration`)
-
-**Title:** About Session Duration
-
-**Intro:** Session Duration shows how long your workouts have been on average each week, so you can manage your time and pacing.
-
-**How it's calculated:** Each bar is the average duration in minutes of all logged workouts within that calendar week (Monday through Sunday). Workouts you didn't enter a duration for aren't counted — they don't have a number to average.
-
-**The target line:** The dashed line is your target workout duration, set via long-press → Configure Settings on the Training Load widget. It's the same value FortiFit uses as a fallback in your training load score when a workout has no duration entered.
-
-**Time range:** The 8 most recent calendar weeks, including the current in-progress week.
-
-**Apple Health import:** Durations from Apple Watch and other Health-connected apps are imported automatically when you link a workout, so you don't need to re-enter them.
-
-**Empty state:** At least one full Monday–Sunday week with at least one workout that has a recorded duration is needed before the chart renders.
+> **Moved to `INFO_COPY.md` § Chart Info Modal Copy.** All chart-type entries (Strength Tracker, Training Frequency, Personal Records, Training Load Trend, Workout Volume, Effort Trend, Workout Type Breakdown, Session Duration) live there. Stored in `AppConstants` as a static dictionary keyed by `chartType`.
 
 ---
 
 ## Widget Info Modal Copy
 
-User-facing strings rendered in the See Info Modal (see SCREENS.md § Standard Patterns → See Info Modal) when invoked from a Home widget's long-press → "See Info". Mirrors the structure of § Chart Info Modal Copy. One entry per configurable widget (Training Load, Power Level). Stored in `AppConstants` as a static dictionary keyed by `widgetType`. Sections render in the order listed below.
-
-### Training Load (`trainingLoad`)
-
-**Title:** About Training Load
-
-**Intro:** Training Load is a 0–100 score that summarizes how much training stress you've accumulated over the past 10 days. The zone label and advisory beneath it suggest whether to push, ease off, or rest today.
-
-**How it's calculated:** Each workout you've logged in the last 10 days contributes a stress value based on your Effort rating for that session, how long it lasted, the workout type, and the volume you put in (sets × reps for Strength and HIIT). Recent sessions count more than older ones — stress decays over about 10 days.
-
-**Your experience level:** Set via long-press → Configure Settings on the widget. Beginner, Intermediate, and Advanced each have a different recovery rate and stress capacity. Higher experience means stress decays faster and you can absorb more training before the score climbs into peak territory.
-
-**Consecutive training days:** Stacking training days back-to-back adds a small multiplier to your score, up to 32% extra at five or more consecutive days. Take a rest day and the multiplier resets.
-
-**Same-day floor:** If you've already trained today, the score won't drop low enough to suggest "train hard" — there's a built-in floor based on what you logged today that lifts on its own tomorrow.
-
-**Zones:**
-- Low (1–30, green): well recovered
-- Moderate (31–55, yellow): some accumulated fatigue
-- High (56–80, dark yellow): significant fatigue
-- Peak (81–100, red): high stress, prioritize recovery
-
-**What's not counted:** Workouts logged with no exercises, no Effort rating, and no duration are skipped — they're treated as placeholder entries with no meaningful stress to add.
-
-**Empty state:** If you haven't logged a workout in the last 10 days, the score sits at 0 (Resting) and the advisory shows "No recent training stress."
-
-### Power Level (`powerLevel`)
-
-**Title:** About Power Level
-
-**Intro:** Power Level shows whether your strength training volume is rising, holding steady, or trending down compared to where you were a month ago. It answers "am I progressing?" at a glance.
-
-**How it's calculated:** FortiFit averages your workout volume across the last 30 days and compares it to your average across the prior 30 days. Volume per workout is sets × reps × weight, summed across every exercise in the session.
-
-**What workouts count:** Only Strength Training and HIIT workouts. Cardio, yoga, pilates, and other types don't track exercise sets, so they don't contribute to a volume comparison.
-
-**Bodyweight exercises:** Sets logged without a weight value count as if the weight were 1, since they still represent work performed. This keeps bodyweight volume from disappearing entirely from the comparison.
-
-**Status thresholds:**
-- Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days
-- Steady (—, blue): within 10% in either direction — your volume is holding consistent
-- Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days
-
-**Empty state:** If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.
+> **Moved to `INFO_COPY.md` § Widget Info Modal Copy.** Entries for Training Load, Power Level, and Activity Rings live there. Stored in `AppConstants` as a static dictionary keyed by `widgetType`.
 
 ---
 

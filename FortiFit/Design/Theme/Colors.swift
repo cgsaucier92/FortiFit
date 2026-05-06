@@ -26,6 +26,19 @@ enum FortiFitColors {
     static let goalDistanceRing = Color(hex: "4B2893")    // Purple — outer ring (distance)
     static let goalDurationRing = Color(hex: "8FE6F6")    // Light Cyan — inner ring (duration)
 
+    // MARK: - Activity Rings
+    static let activityMoveRing = Color(hex: "ef4444")
+    static let activityExerciseRing = Color(hex: "10b981")
+    static let activityStandRing = Color(hex: "0845AD")
+
+    // MARK: - Chart Colors
+    static let chartPink = Color(hex: "BB2BC0")
+    static let chartOrange = Color(hex: "FFBF51")
+    static let chartTeal = Color(hex: "289193")
+    static let chartPurple = Color(hex: "4B2893")
+    static let chartLightCyan = Color(hex: "8FE6F6")
+    static let chartDeepBlue = Color(hex: "0845AD")
+
     // MARK: - Goal Colors (cycled by colorIndex % 4)
     static let goalColors: [Color] = [
         Color(hex: "FFBF51"),   // Orange

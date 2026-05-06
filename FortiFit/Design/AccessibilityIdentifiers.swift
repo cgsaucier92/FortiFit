@@ -160,6 +160,37 @@ enum AccessibilityID {
     static let matchPromptSheetKeepSeparateButton = "matchPromptSheet_keepSeparateButton"
     static let matchPromptSheetDecideLaterButton = "matchPromptSheet_decideLaterButton"
 
+    // MARK: - Activity Rings Widget
+
+    static let homeWidget_appleActivity_card = "homeWidget_appleActivity_card"
+    static let homeWidget_appleActivity_state_connectAppleHealth = "homeWidget_appleActivity_state_connectAppleHealth"
+    static let homeWidget_appleActivity_state_pairAppleWatch = "homeWidget_appleActivity_state_pairAppleWatch"
+    static let homeWidget_appleActivity_connectButton = "homeWidget_appleActivity_connectButton"
+    static let homeWidget_appleActivity_moveRing = "homeWidget_appleActivity_moveRing"
+    static let homeWidget_appleActivity_exerciseRing = "homeWidget_appleActivity_exerciseRing"
+    static let homeWidget_appleActivity_standRing = "homeWidget_appleActivity_standRing"
+    static let homeWidget_appleActivity_weeklyClosureChip = "homeWidget_appleActivity_weeklyClosureChip"
+    static let homeWidget_appleActivity_seeInfo = "homeWidget_appleActivity_seeInfo"
+    static let homeWidget_appleActivity_configureSettings = "homeWidget_appleActivity_configureSettings"
+
+    // MARK: - Activity Rings Settings Modal
+
+    static let activityRingsSettings_moveSlider = "activityRingsSettings_moveSlider"
+    static let activityRingsSettings_exerciseSlider = "activityRingsSettings_exerciseSlider"
+    static let activityRingsSettings_standSlider = "activityRingsSettings_standSlider"
+    static let activityRingsSettings_resetButton = "activityRingsSettings_resetButton"
+    static let activityRingsSettings_importButton = "activityRingsSettings_importButton"
+
+    // MARK: - Activity Detail Sheet
+
+    static let activityDetailSheet_closeButton = "activityDetailSheet_closeButton"
+    static let activityDetailSheet_range7d = "activityDetailSheet_range7d"
+    static let activityDetailSheet_range30d = "activityDetailSheet_range30d"
+    static let activityDetailSheet_moveSparkline = "activityDetailSheet_moveSparkline"
+    static let activityDetailSheet_exerciseSparkline = "activityDetailSheet_exerciseSparkline"
+    static let activityDetailSheet_standSparkline = "activityDetailSheet_standSparkline"
+    static let activityDetailSheet_closureHeatmap = "activityDetailSheet_closureHeatmap"
+
     // MARK: - Trends
 
     static let trendsEllipsisMenu = "trendsEllipsisMenu"
@@ -167,6 +198,26 @@ enum AccessibilityID {
     static let addChartsMenuOverlay = "addChartsMenuOverlay"
     static let trendsChart_seeInfoMenuItem = "trendsChart_seeInfoMenuItem"
     static let seeInfoModal_closeButton = "seeInfoModal_closeButton"
+
+    // MARK: - Trends Chart Cards (Phase 6.1)
+
+    static func trendsChartCard(_ chartId: String) -> String {
+        "trendsChart_\(chartId)_card"
+    }
+
+    static func trendsChartHeaderSummary(_ chartId: String) -> String {
+        "trendsChart_\(chartId)_headerSummary"
+    }
+
+    static func trendsChartDataPoint(_ chartId: String, index: Int) -> String {
+        "trendsChart_\(chartId)_dataPoint_\(index)"
+    }
+
+    static let trendsChart_workoutTypeBreakdown_centerLabel = "trendsChart_workoutTypeBreakdown_centerLabel"
+
+    static func trendsChartSelectionAnnotation(_ chartId: String) -> String {
+        "trendsChart_\(chartId)_selectionAnnotation"
+    }
 
     // MARK: - Helpers
 

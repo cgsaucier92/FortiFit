@@ -80,18 +80,20 @@ struct PlanView: View {
             }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 2 else { return }
-                showSavedTemplates = false
-                workoutVM.showLogWorkout = false
-                viewModel.showWorkoutDetail = false
-                viewModel.selectedWorkoutForDetail = nil
-                viewModel.showScheduleSheet = false
-                viewModel.showCompletionSheet = false
-                viewModel.showDateResolutionPrompt = false
-                viewModel.showRemoveConfirmation = false
-                viewModel.showRecurringRemovePrompt = false
-                viewModel.showCompletedToast = false
-                viewModel.showRemovedFromPlanToast = false
-                viewModel.itemToRemove = nil
+                DispatchQueue.main.async {
+                    showSavedTemplates = false
+                    workoutVM.showLogWorkout = false
+                    viewModel.showWorkoutDetail = false
+                    viewModel.selectedWorkoutForDetail = nil
+                    viewModel.showScheduleSheet = false
+                    viewModel.showCompletionSheet = false
+                    viewModel.showDateResolutionPrompt = false
+                    viewModel.showRemoveConfirmation = false
+                    viewModel.showRecurringRemovePrompt = false
+                    viewModel.showCompletedToast = false
+                    viewModel.showRemovedFromPlanToast = false
+                    viewModel.itemToRemove = nil
+                }
             }
             .onChange(of: viewModel.dayOffset) { _, _ in
                 viewModel.loadWorkoutsForCurrentView(context: modelContext)
@@ -145,17 +147,21 @@ struct PlanView: View {
 
     private var planZStack: some View {
         ZStack {
-            GeometryReader { geo in
             ZStack(alignment: .top) {
-                ScrollView {
-                    VStack(spacing: FortiFitSpacing.gapMedium) {
-                        if viewModel.showEmptyState {
-                            Text("Schedule your first workout to start planning.")
-                                .font(FortiFitTypography.body)
-                                .foregroundStyle(FortiFitColors.mutedText)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity, minHeight: geo.size.height * 0.6)
-                        } else {
+                if viewModel.showEmptyState {
+                    VStack {
+                        Spacer()
+                        Text("Schedule your first workout to start planning")
+                            .font(FortiFitTypography.body)
+                            .foregroundStyle(FortiFitColors.mutedText)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, FortiFitSpacing.screenHorizontal)
+                        Spacer()
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: FortiFitSpacing.gapMedium) {
                             FortiFitSegmentedToggle(
                                 options: ["Week", "Month"],
                                 selected: $calendarModeString
@@ -178,12 +184,12 @@ struct PlanView: View {
 
                             dayDetailSection
                         }
+                        .padding(.horizontal, FortiFitSpacing.screenHorizontal)
+                        .padding(.top, headerHeight)
+                        .padding(.bottom, FortiFitSpacing.gapXLarge)
                     }
-                    .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                    .padding(.top, headerHeight)
-                    .padding(.bottom, FortiFitSpacing.gapXLarge)
+                    .scrollClipDisabled()
                 }
-                .scrollClipDisabled()
 
                 FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
@@ -216,7 +222,6 @@ struct PlanView: View {
                 }
             }
             .background(FortiFitColors.background)
-            } // GeometryReader
 
             // Toast
             if viewModel.showCompletedToast {

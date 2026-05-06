@@ -229,7 +229,7 @@ struct LogWorkoutView: View {
                 onDeleteWorkout?()
             }
         } message: {
-            Text("This can't be undone.")
+            Text("This can't be undone")
         }
     }
 
@@ -352,6 +352,7 @@ struct LogWorkoutView: View {
                 RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
                     .stroke(FortiFitColors.border, lineWidth: 1)
             )
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier(
                 viewModel.isEditMode
                     ? AccessibilityID.editWorkoutTemplateSelectorOverlay

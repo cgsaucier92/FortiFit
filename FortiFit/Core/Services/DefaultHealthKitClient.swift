@@ -8,6 +8,7 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
     private var readTypes: Set<HKObjectType> {
         var types: Set<HKObjectType> = [
             HKObjectType.workoutType(),
+            HKObjectType.activitySummaryType(),
             HKQuantityType(.heartRate),
             HKQuantityType(.activeEnergyBurned),
             HKQuantityType(.basalEnergyBurned),
@@ -15,7 +16,8 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
             HKQuantityType(.distanceCycling),
             HKQuantityType(.distanceSwimming),
             HKQuantityType(.flightsClimbed),
-            HKQuantityType(.appleExerciseTime)
+            HKQuantityType(.appleExerciseTime),
+            HKCategoryType(.appleStandHour)
         ]
         if #available(iOS 18.0, *) {
             types.insert(HKQuantityType(.workoutEffortScore))
@@ -136,6 +138,125 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
             }
         }
         return "another app"
+    }
+
+    // MARK: - Activity Rings
+
+    func fetchActivitySummary(for date: Date) async throws -> ActivitySummarySnapshot? {
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.calendar = calendar
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: components, end: components)
+            let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let summary = summaries?.first else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: self.makeActivitySnapshot(from: summary, date: date))
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    func fetchActivitySummaries(from start: Date, to end: Date) async throws -> [ActivitySummarySnapshot] {
+        let calendar = Calendar.current
+        var startComponents = calendar.dateComponents([.year, .month, .day], from: start)
+        startComponents.calendar = calendar
+        var endComponents = calendar.dateComponents([.year, .month, .day], from: end)
+        endComponents.calendar = calendar
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: startComponents, end: endComponents)
+            let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let results = (summaries ?? []).compactMap { summary -> ActivitySummarySnapshot? in
+                    guard let date = calendar.date(from: summary.dateComponents(for: calendar)) else { return nil }
+                    return self.makeActivitySnapshot(from: summary, date: date)
+                }
+                continuation.resume(returning: results.sorted { $0.date < $1.date })
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    func observeActivitySummaryChanges(handler: @escaping @Sendable () -> Void) {
+        let types: [HKSampleType] = [
+            HKQuantityType(.activeEnergyBurned),
+            HKQuantityType(.appleExerciseTime),
+            HKCategoryType(.appleStandHour)
+        ]
+        for sampleType in types {
+            let query = HKObserverQuery(
+                sampleType: sampleType,
+                predicate: nil
+            ) { _, completionHandler, error in
+                guard error == nil else {
+                    completionHandler()
+                    return
+                }
+                handler()
+                completionHandler()
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    func hasAppleWatchData(within days: Int = 7) async throws -> Bool {
+        let calendar = Calendar.current
+        let cutoff = calendar.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        let datePredicate = HKQuery.predicateForSamples(withStart: cutoff, end: Date(), options: .strictStartDate)
+
+        let appleWatchPredicate = NSPredicate(format: "metadata.%K == YES", HKMetadataKeyWasUserEntered)
+        let sourcePredicate = HKQuery.predicateForObjects(from: HKSource.default())
+
+        let energyType = HKQuantityType(.activeEnergyBurned)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: energyType,
+                predicate: datePredicate,
+                limit: 10,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let hasWatch = (samples ?? []).contains { sample in
+                    sample.sourceRevision.source.bundleIdentifier.hasPrefix("com.apple.health")
+                }
+                continuation.resume(returning: hasWatch)
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    private func makeActivitySnapshot(from summary: HKActivitySummary, date: Date) -> ActivitySummarySnapshot {
+        let moveCal = summary.activeEnergyBurned.doubleValue(for: .kilocalorie())
+        let exerciseMin = summary.appleExerciseTime.doubleValue(for: .minute())
+        let standHrs = Int(summary.appleStandHours.doubleValue(for: .count()))
+        let moveGoal = summary.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie())
+        let exerciseGoal = summary.appleExerciseTimeGoal.doubleValue(for: .minute())
+        let standGoal = Int(summary.appleStandHoursGoal.doubleValue(for: .count()))
+
+        return ActivitySummarySnapshot(
+            date: date,
+            moveCalories: moveCal,
+            exerciseMinutes: exerciseMin,
+            standHours: standHrs,
+            moveGoal: moveGoal,
+            exerciseGoal: exerciseGoal,
+            standGoal: standGoal
+        )
     }
 
     // MARK: - Helpers

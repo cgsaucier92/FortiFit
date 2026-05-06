@@ -19,7 +19,7 @@ struct GoalsView: View {
                     VStack {
                         Spacer()
                         VStack(spacing: FortiFitSpacing.gapMedium) {
-                            Text("Set your first goal to start tracking.")
+                            Text("Set your first goal to start tracking")
                                 .font(FortiFitTypography.body)
                                 .foregroundStyle(FortiFitColors.mutedText)
                                 .frame(maxWidth: .infinity)
@@ -27,7 +27,6 @@ struct GoalsView: View {
                         .padding(.horizontal, FortiFitSpacing.screenHorizontal)
                         Spacer()
                     }
-                    .padding(.top, headerHeight)
                 } else {
                     ScrollView {
                         VStack(spacing: FortiFitSpacing.elementSpacing * 2) {
@@ -42,7 +41,10 @@ struct GoalsView: View {
                                                     .padding(.trailing, FortiFitSpacing.cardPadding)
                                             }
                                     } else {
-                                        goalCard(goal)
+                                        Button(action: {}) {
+                                            goalCard(goal)
+                                        }
+                                        .buttonStyle(PressableCardButtonStyle())
                                     }
                                 }
                                 .animation(.easeInOut(duration: 0.2), value: viewModel.isReorderMode)
@@ -154,14 +156,16 @@ struct GoalsView: View {
             }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 4 else { return }
-                viewModel.showAddGoal = false
-                viewModel.isReorderMode = false
-                viewModel.showDeleteConfirmation = false
-                viewModel.showResetConfirmation = false
-                viewModel.goalToDelete = nil
-                viewModel.goalToReset = nil
-                viewModel.dismissLegendTooltip()
-                draggingGoalID = nil
+                DispatchQueue.main.async {
+                    viewModel.showAddGoal = false
+                    viewModel.isReorderMode = false
+                    viewModel.showDeleteConfirmation = false
+                    viewModel.showResetConfirmation = false
+                    viewModel.goalToDelete = nil
+                    viewModel.goalToReset = nil
+                    viewModel.dismissLegendTooltip()
+                    draggingGoalID = nil
+                }
             }
             .navigationDestination(isPresented: $viewModel.showAddGoal) {
                 AddGoalView(viewModel: viewModel)
@@ -184,7 +188,7 @@ struct GoalsView: View {
                     }
                 }
             } message: {
-                Text("This cannot be undone.")
+                Text("This can't be undone")
             }
             .alert(
                 "Reset \(viewModel.goalToReset?.title ?? "") progress to zero?",
@@ -200,7 +204,7 @@ struct GoalsView: View {
                     }
                 }
             } message: {
-                Text("This cannot be undone.")
+                Text("This can't be undone")
             }
         }
     }

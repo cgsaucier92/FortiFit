@@ -35,8 +35,8 @@ final class SettingsViewModel {
         }
     }
 
-    init(client: HealthKitClient = DefaultHealthKitClient(), syncService: HealthKitSyncService) {
-        self.client = client
+    init(client: HealthKitClient? = nil, syncService: HealthKitSyncService) {
+        self.client = client ?? DefaultHealthKitClient()
         self.syncService = syncService
     }
 

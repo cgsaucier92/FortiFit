@@ -493,6 +493,11 @@ final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
     var sourceNameToReturn: String = "Apple Workout"
     var authorizationRequested = false
 
+    // Activity Rings stubs
+    var activitySummaryToReturn: ActivitySummarySnapshot? = nil
+    var activitySummariesToReturn: [ActivitySummarySnapshot] = []
+    var hasAppleWatchDataToReturn: Bool = false
+
     func requestAuthorization() async throws {
         authorizationRequested = true
     }
@@ -515,5 +520,26 @@ final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
 
     func sourceName(for bundleID: String) -> String {
         sourceNameToReturn
+    }
+
+    // Activity Rings methods
+    func fetchActivitySummary(for date: Date) async throws -> ActivitySummarySnapshot? {
+        activitySummaryToReturn
+    }
+
+    func fetchActivitySummaries(from start: Date, to end: Date) async throws -> [ActivitySummarySnapshot] {
+        let calendar = Calendar.current
+        let startDay = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: end) ?? end)
+        return activitySummariesToReturn.filter { summary in
+            let day = calendar.startOfDay(for: summary.date)
+            return day >= startDay && day < endDay
+        }
+    }
+
+    func observeActivitySummaryChanges(handler: @escaping @Sendable () -> Void) {}
+
+    func hasAppleWatchData(within days: Int) async throws -> Bool {
+        hasAppleWatchDataToReturn
     }
 }

@@ -19,7 +19,6 @@ struct WorkoutListView: View {
             ZStack(alignment: .top) {
                 if viewModel.workouts.isEmpty {
                     emptyState
-                        .padding(.top, headerHeight)
                 } else {
                     workoutTypeList
                 }
@@ -71,19 +70,21 @@ struct WorkoutListView: View {
             .onAppear { viewModel.loadWorkouts(context: modelContext) }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 1 else { return }
-                viewModel.showLogWorkout = false
-                viewModel.selectedWorkout = nil
-                viewModel.showCreateTemplate = false
-                viewModel.showSavedTemplates = false
-                viewModel.showDeleteConfirmation = false
-                viewModel.showDeleteTypeConfirmation = false
-                viewModel.showCustomDateRangePicker = false
-                viewModel.workoutToDelete = nil
-                viewModel.workoutTypeToDelete = nil
-                showRPEFilterSheet = false
-                activeSwipeWorkoutID = nil
-                if viewModel.isReorderMode {
-                    viewModel.exitReorderMode()
+                DispatchQueue.main.async {
+                    viewModel.showLogWorkout = false
+                    viewModel.selectedWorkout = nil
+                    viewModel.showCreateTemplate = false
+                    viewModel.showSavedTemplates = false
+                    viewModel.showDeleteConfirmation = false
+                    viewModel.showDeleteTypeConfirmation = false
+                    viewModel.showCustomDateRangePicker = false
+                    viewModel.workoutToDelete = nil
+                    viewModel.workoutTypeToDelete = nil
+                    showRPEFilterSheet = false
+                    activeSwipeWorkoutID = nil
+                    if viewModel.isReorderMode {
+                        viewModel.exitReorderMode()
+                    }
                 }
             }
             .navigationDestination(isPresented: $viewModel.showLogWorkout) {
@@ -116,7 +117,7 @@ struct WorkoutListView: View {
                     }
                 }
             } message: {
-                Text("This can't be undone.")
+                Text("This can't be undone")
             }
             .alert(
                 "Delete all \(viewModel.workoutTypeToDelete ?? "") workouts?",
@@ -134,7 +135,7 @@ struct WorkoutListView: View {
             } message: {
                 if let workoutType = viewModel.workoutTypeToDelete {
                     let count = viewModel.workoutsByType[workoutType]?.count ?? 0
-                    Text("This will permanently delete all \(count) \(workoutType) workouts. This can't be undone.")
+                    Text("This will permanently delete all \(count) \(workoutType) workouts. This can't be undone")
                 }
             }
             .sheet(isPresented: $viewModel.showCustomDateRangePicker) {
@@ -152,11 +153,11 @@ struct WorkoutListView: View {
         VStack {
             Spacer()
             VStack(spacing: FortiFitSpacing.gapMedium) {
-                Text("Log your first workout to see it here.")
-                    .font(FortiFitTypography.note)
+                Text("Log your first workout to see it here")
+                    .font(FortiFitTypography.body)
                     .foregroundStyle(FortiFitColors.mutedText)
                     .frame(maxWidth: .infinity)
-                FortiFitButton("+ Log Workout", style: .outline) {
+                FortiFitButton("Log Workout", style: .outline) {
                     #if os(iOS)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     #endif
@@ -687,7 +688,9 @@ struct WorkoutListView: View {
                             .font(FortiFitTypography.bodySmall)
                             .foregroundStyle(FortiFitColors.mutedText)
                     }
-                    FortiFitHealthGlyph()
+                    Text("Apple Workout")
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(FortiFitColors.mutedText)
                 }
             }
         }

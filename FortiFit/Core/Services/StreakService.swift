@@ -18,7 +18,7 @@ struct StreakService {
 
     /// Calculates the consecutive-week workout streak per the PRD algorithm.
     /// Called on app launch, after each workout save/edit/delete, and after Settings changes.
-    static func calculateStreak(context: ModelContext) -> StreakResult {
+    static func calculateStreak(context: ModelContext, referenceDate: Date = Date()) -> StreakResult {
         let settings = UserSettings.shared
         let target = settings.targetWorkoutsPerWeek
 
@@ -32,8 +32,7 @@ struct StreakService {
         var calendar = Calendar(identifier: .iso8601)
         calendar.firstWeekday = 2 // Monday
 
-        let now = Date()
-        let currentWeekStart = now.startOfWeek
+        let currentWeekStart = referenceDate.startOfWeek
 
         // Step 1: Walk backward from the most recently completed week
         var streak = 0

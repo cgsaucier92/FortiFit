@@ -294,19 +294,16 @@ Called from the long-press context menu "Reset Goal Progress" option on individu
 Any time a workout is logged, edited, deleted, or batch-deleted via workout type deletion, the following cascade runs against the resulting workout set. HealthKit import (auto-create or link — see HEALTHKIT.md § 10, § 12) and HealthKit upstream update (see § HealthKit Upstream Update below) route through the same cascade entry points (`WorkoutService.log()` and `WorkoutService.update()` respectively) — there is no separate HealthKit cascade. Individual cascade sections below reference this block rather than restating it.
 
 **Recalculations:**
-- **PR timeline** — remove PRs without supporting data; recompute from remaining workout data.
+- **PR timeline** — remove unsupported PRs; recompute from remaining data.
 - **Training Load score** — remove affected workouts from the 10-day window; `consecutive_days` may change.
-- **Home screen** — Recent Workouts list, Training Load widget, Today's Plan widget (left-column workout name, silhouette, and Complete Workout context-menu visibility) refresh.
-- **Strength Tracker chart** — data points reflect current state.
-- **Training Frequency chart** — affected week(s) re-count.
-- **Strength PR goals** — recalculate `currentValueKg` for matching goals across remaining in-scope workouts (per § Reset Scoping). No in-scope matches → 0.
-- **Repetitions PR goals** — recalculate `currentReps` for matching goals across remaining in-scope workouts. No in-scope matches → 0.
-- **Speed and Distance goals** — recalculate `currentDistanceKm` and `currentDurationMinutes` per § Speed and Distance Goals (best-ever within scope) across remaining in-scope matching-type workouts. No in-scope matches → both current values = 0.
-- **GoalSnapshot records** — for each affected goal, recompute snapshots on the affected date(s) per § GoalSnapshotService § Per-Workout Value Computation. If no remaining in-scope matching workouts exist on a given date, delete that goal's snapshot for that date.
+- **Home screen** — Recent Workouts list, Training Load widget, Today's Plan widget refresh. **Activity Rings widget** refreshes only when the workout has `healthKitUUID != nil` (manual logs can't have changed HK daily totals — see § AppleActivityService).
+- **Charts** — Strength Tracker reflects current state; Training Frequency re-counts affected week(s); every chart card's header summary value (and Workout Type Breakdown's donut center label) recomputes per § TrendsChartService → Header Summary Computation.
+- **Goal auto-update** — recompute Strength PR (`currentValueKg`), Reps PR (`currentReps`), and Speed/Distance (`currentDistanceKm` + `currentDurationMinutes`) per § Goal Auto-Update across remaining in-scope workouts. No in-scope matches → reset to 0.
+- **GoalSnapshot records** — recompute snapshots on affected date(s) per § GoalSnapshotService. If no in-scope matching workouts remain on a given date, delete that goal's snapshot for that date.
 - **Weekly streak** — recalculate across affected weeks.
 - **Power Level** — recalculate if Strength Training or HIIT was involved.
-- **Workout Type card** — update count. If the last workout of a type is gone, remove the card and delete the WorkoutTypeOrder record (see § Workout Type Deletion for the batch case).
-- **Scheduled workout linkage** — if a deleted workout's ID matches any `ScheduledWorkout.completedWorkoutId`, set that field to nil and revert status to "planned".
+- **Workout Type card** — update count. If last workout of a type is gone, remove the card and delete the WorkoutTypeOrder record.
+- **Scheduled workout linkage** — if the deleted workout's ID matches any `ScheduledWorkout.completedWorkoutId`, null that field and revert status to "planned".
 
 ### Workout Deletion
 Apply the Workout Cascade to remaining data.
@@ -349,31 +346,26 @@ Remove `ScheduledWorkout` record. No effect on any other data (no Workout is cre
 When `WorkoutMatcher` returns a high-confidence match (auto-link) or when no match exists and `HealthKitSyncService` creates a new `Workout` from an HK import (auto-create), the Workout Cascade fires via `WorkoutService.log()`. See HEALTHKIT.md § 10, § 12. No HK-specific cascade rules beyond the shared definition — all algorithms recalculate exactly as they would for any manually logged workout.
 
 ### HealthKit Upstream Update
-When `HealthKitSyncService` detects that an HK-linked workout's HK-owned fields have changed upstream (e.g., user edited duration in Apple's Health app), apply the changes via `WorkoutService.update()`. HK wins on HK-owned fields (see HEALTHKIT.md § 7 for ownership rules): `date`, `durationMinutes`, `distanceKm`, `avgHeartRate`, `maxHeartRate`, `activeEnergyKcal`, `totalEnergyBurnedKcal`, `elevationAscendedMeters`, `exerciseMinutes`, `indoor`, `healthKitActivityType`. User-owned fields (`name`, `note`, `time`, `ExerciseSets`, `rpe`) are not touched.
-
-`lastModifiedDate` bumps to `.now`. Full Workout Cascade fires against the updated record. Edit-specific rules from § Workout Edit apply — in particular, if `date` changed, the cascade runs against both the old and new `workout.date`.
+HK-linked workout's HK-owned fields changed upstream (e.g., duration edited in the Health app) → apply via `WorkoutService.update()`. HK wins on HK-owned fields, user-owned fields untouched (see HEALTHKIT.md § 7 for the ownership list). Bump `lastModifiedDate = .now`; fire full Workout Cascade. Date-change rule from § Workout Edit applies.
 
 ### HealthKit Upstream Delete
-When `HealthKitSyncService` receives a `deletedObjectHandler` callback for an HK workout matching an existing FortiFit `Workout.healthKitUUID`:
+`deletedObjectHandler` fires for an HK workout matching an existing `Workout.healthKitUUID`:
 
-1. Clear `healthKitUUID`, `healthKitSourceBundleID`, and `healthKitActivityType` to nil.
-2. Retain all HK-sourced numeric values (duration, distance, HR, calories, elevation, exercise minutes, indoor flag) as-is — they become regular editable fields on a now-manual workout.
-3. Bump `workout.lastModifiedDate = .now`. This re-scopes the workout against any goal `resetDate` (see § Reset Scoping).
-4. **Do NOT fire the deletion cascade.** This is not a deletion — the workout is being promoted to manual.
+1. Clear the three HK pointer fields (`healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`) to nil.
+2. Retain all HK-sourced numeric values as-is — workout is promoted to manual, fields become editable.
+3. Bump `lastModifiedDate = .now` (re-scopes against goal `resetDate` per § Reset Scoping).
+4. **Do NOT fire the deletion cascade** — this is a promotion to manual, not a delete.
 
-See HEALTHKIT.md § 11 for rationale. This is a non-destructive operation: the user retains their training history even if they clean up HealthKit data upstream.
+See HEALTHKIT.md § 11 for rationale. Non-destructive: user keeps training history even if they clean up HK upstream.
 
 ### HealthKit Unlink (user-initiated, one-way)
-Triggered by the user via Workout Detail's ellipsis menu or the source indicator info sheet. Always gated by a `.confirmationDialog` (see HEALTHKIT.md § 14 Confirmation).
+Triggered from Workout Detail's ellipsis menu or the source indicator info sheet. Always gated by `.confirmationDialog` (HEALTHKIT.md § 14).
 
-Behavior:
-1. Capture `healthKitUUID` into a local before clearing.
-2. Clear the three pointer fields (`healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`) — sets to nil.
-3. Retain numeric values (duration, distance, HR, calories, elevation, exercise minutes, indoor flag) as-is.
-4. Bump `workout.lastModifiedDate = .now`.
-5. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. This makes unlink one-way:
-   - `WorkoutMatcher.findCandidates(for:)` will skip this exact `(uuid, workoutId)` pair forever.
-   - If the same HK UUID re-imports later, auto-create proceeds normally as a new workout — but auto-link to *this* FortiFit workout is short-circuited.
+1. Capture `healthKitUUID` into a local.
+2. Clear the three HK pointer fields to nil.
+3. Retain HK-sourced numeric values as-is.
+4. Bump `lastModifiedDate = .now`.
+5. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. Makes unlink one-way — matcher will skip this `(uuid, workoutId)` pair forever. Re-import of the same HK UUID auto-creates a new workout; auto-link to *this* FitNavi workout is short-circuited.
 6. Do NOT fire the deletion cascade.
 
 See HEALTHKIT.md § 14 for rationale.
@@ -387,7 +379,7 @@ CRUD wrapper for workouts via SwiftData:
 - **Retrieve:** Sorted by date (newest first).
 - **Update:** Full workout (name, date, time, RPE, duration, distance, add/modify/delete ExerciseSets). Set `workout.lastModifiedDate = .now` on every update regardless of which fields changed (including cosmetic edits — see § Workout Edit cascade). Trigger PR recalc and goal auto-update. **HK-linked workouts:** when `workout.healthKitUUID != nil`, `durationMinutes`, `distanceKm`, and `date` are read-only at the UI layer (see SCREENS.md § Log Workout). Update must still tolerate these values being non-nil (they are populated by HK sync, not the user). HK upstream updates flow through this same method — see § HealthKit Upstream Update.
 - **Update notes:** Inline note edit. Sets `workout.lastModifiedDate = .now` (cosmetic edit per § Reset Scoping).
-- **Delete:** Cascade-delete all ExerciseSets. Trigger all cascading recalculations (see Deletion Behavior above). If the deleted workout is linked to a `ScheduledWorkout` (via `completedWorkoutId`), notify PlanService to revert that slot to "planned". **HK-linked workouts delete normally** — deletion removes the FortiFit record but does not propagate to HealthKit (no write-back in MVP). Orphan `WorkoutMatchRejection` records pointing at the deleted workout are retained; harmless.
+- **Delete:** Cascade-delete all ExerciseSets. Trigger all cascading recalculations (see Deletion Behavior above). If the deleted workout is linked to a `ScheduledWorkout` (via `completedWorkoutId`), notify PlanService to revert that slot to "planned". **HK-linked workouts delete normally** — deletion removes the FitNavi record but does not propagate to HealthKit (no write-back in MVP). Orphan `WorkoutMatchRejection` records pointing at the deleted workout are retained; harmless.
 - **Delete all for type:** Accept a workoutType string, fetch all workouts matching that type, cascade-delete each with ExerciseSets, then trigger all cascading recalculations once (see Workout Type Deletion above). Remove the corresponding WorkoutTypeOrder record. Revert any linked ScheduledWorkout slots to "planned".
 - **Unlink (HK-linked workouts):** Invoked via Workout Detail's ellipsis menu or the source indicator info sheet. See § HealthKit Unlink for data behavior.
 
@@ -395,7 +387,7 @@ CRUD wrapper for workouts via SwiftData:
 
 ## HealthKitClient (HealthKitClient.swift)
 
-**Purpose:** Protocol abstraction over Apple's HealthKit framework. All HealthKit access in FortiFit goes through this protocol. The concrete implementation (`DefaultHealthKitClient`) is the only file in the codebase that imports `HealthKit`. Integration tests inject `StubHealthKitClient` from `TestFixtures.swift` instead (see TESTING.md § HealthKit Test Strategy).
+**Purpose:** Protocol abstraction over Apple's HealthKit framework. All HealthKit access in FitNavi goes through this protocol. The concrete implementation (`DefaultHealthKitClient`) is the only file in the codebase that imports `HealthKit`. Integration tests inject `StubHealthKitClient` from `TestFixtures.swift` instead (see TESTING.md § HealthKit Test Strategy).
 
 See HEALTHKIT.md § 4 for the architectural rationale.
 
@@ -414,7 +406,7 @@ The protocol defines the following operations (exact Swift signatures to be fina
 
 ### HealthKitWorkoutSnapshot
 
-A plain Swift struct (not an `HKWorkout`) containing exactly the fields FortiFit cares about. Returned by `fetchWorkouts`. Keeps the protocol boundary free of Apple framework types so the stub and tests don't need to construct real `HKWorkout` instances.
+A plain Swift struct (not an `HKWorkout`) containing exactly the fields FitNavi cares about. Returned by `fetchWorkouts`. Keeps the protocol boundary free of Apple framework types so the stub and tests don't need to construct real `HKWorkout` instances.
 
 Fields: `uuid`, `activityTypeRawValue`, `activityTypeDisplayString`, `sourceBundleID`, `startDate`, `endDate`, `durationMinutes`, `distanceKm?`, `avgHeartRate?`, `maxHeartRate?`, `activeEnergyKcal?`, `totalEnergyBurnedKcal?`, `elevationAscendedMeters?`, `exerciseMinutes?`, `indoor?`, `isDeleted` (flag indicating this entry represents an upstream delete rather than an addition/update).
 
@@ -423,14 +415,6 @@ Fields: `uuid`, `activityTypeRawValue`, `activityTypeDisplayString`, `sourceBund
 - **No other service imports `HealthKit`.** Only `DefaultHealthKitClient` does. Enforced by convention in code review and by TESTING.md § HealthKit Test Strategy.
 - **Threading is the client's contract.** The protocol methods may be called from any actor. The concrete implementation marshals internal HK framework calls appropriately. Callers assume results are returned on the calling actor.
 - **Authorization is fire-and-forget.** `requestAuthorization()` completes when the user responds to the iOS prompt. The client does not cache the result — callers re-query `authorizationStatus()` as needed.
-
-### File Dependencies
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `HealthKitClient.swift` | `Core/Services/` | Protocol definition + `HealthKitWorkoutSnapshot` struct |
-| `DefaultHealthKitClient.swift` | `Core/Services/` | Concrete implementation using Apple's `HealthKit` framework |
-| `StubHealthKitClient.swift` | `FortiFitIntegrationTests/` | Test stub (see TESTING.md § Shared Test Fixtures) |
 
 ---
 
@@ -466,10 +450,10 @@ See HEALTHKIT.md § 9 for the sync lifecycle overview.
 
 For each `HealthKitWorkoutSnapshot` returned by the anchored query:
 
-1. **If `snapshot.isDeleted == true` → Upstream Delete handler.** Find the FortiFit `Workout` with matching `healthKitUUID`. If found, apply § HealthKit Upstream Delete rules (null out pointer fields, bump `lastModifiedDate`, no cascade). If not found, no-op.
-2. **Else if a FortiFit `Workout` exists with `healthKitUUID == snapshot.uuid` → Upstream Update handler.** Apply § HealthKit Upstream Update rules via `WorkoutService.update()`. HK wins on HK-owned fields; user-owned fields untouched. Full cascade fires.
+1. **If `snapshot.isDeleted == true` → Upstream Delete handler.** Find the FitNavi `Workout` with matching `healthKitUUID`. If found, apply § HealthKit Upstream Delete rules (null out pointer fields, bump `lastModifiedDate`, no cascade). If not found, no-op.
+2. **Else if a FitNavi `Workout` exists with `healthKitUUID == snapshot.uuid` → Upstream Update handler.** Apply § HealthKit Upstream Update rules via `WorkoutService.update()`. HK wins on HK-owned fields; user-owned fields untouched. Full cascade fires.
 3. **Else (new HK workout) → Matcher path.** Call `WorkoutMatcher.findMatch(forIncomingHKWorkout: snapshot)`. Three possible outcomes:
-   - **High-confidence match:** matcher auto-links the snapshot to the existing FortiFit `Workout` (see WorkoutMatcher § Link Application below). No new `Workout` created.
+   - **High-confidence match:** matcher auto-links the snapshot to the existing FitNavi `Workout` (see WorkoutMatcher § Link Application below). No new `Workout` created.
    - **Lower-confidence match:** matcher queues the pairing for the Match Prompt Sheet. No new `Workout` created yet. Pairing waits for user decision.
    - **No match:** proceed to step 4.
 4. **Auto-create.** If `snapshot.durationMinutes < 2`, skip entirely (minimum-duration floor — see HEALTHKIT.md § 9). Otherwise, build a new `Workout` with the default field values from HEALTHKIT.md § 10 and route through `WorkoutService.log()`. Full cascade fires.
@@ -490,21 +474,12 @@ All `WorkoutService` and `ModelContext` calls execute on `@MainActor`. Observer 
 - **Anchored query failure:** log to `BUGS.md` if recurring. Retry on next trigger. Anchor not updated on failure (next sync re-attempts from the last good anchor).
 - **Individual snapshot processing failure:** log, skip that snapshot, continue processing remaining snapshots. Do not abort the full sync for a single bad record.
 
-### File Dependencies
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `HealthKitSyncService.swift` | `Core/Services/` | Orchestration logic |
-| `HealthKitClient.swift` | `Core/Services/` | Protocol dependency (injected) |
-| `WorkoutService.swift` | `Core/Services/` | Entry point for log/update/unlink |
-| `WorkoutMatcher.swift` | `Core/Services/` | Dedup lookup |
-| `UserSettings.swift` | `Core/Models/` | Anchor, enabled flag, last sync timestamp |
 
 ---
 
 ## WorkoutMatcher (WorkoutMatcher.swift)
 
-**Purpose:** Bidirectional deduplication between HealthKit-imported workouts and manually logged FortiFit workouts. Determines whether an incoming workout should be auto-linked to an existing record, prompt the user for resolution, or proceed as a separate record.
+**Purpose:** Bidirectional deduplication between HealthKit-imported workouts and manually logged FitNavi workouts. Determines whether an incoming workout should be auto-linked to an existing record, prompt the user for resolution, or proceed as a separate record.
 
 See HEALTHKIT.md § 12 for the architectural overview.
 
@@ -534,7 +509,7 @@ Enum with three cases:
 ### Matching Rules
 
 **High-confidence (auto-link):**
-- Same FortiFit `workoutType` (after HK-to-category mapping for the HK side — see CONSTANTS.md § HealthKit Mapping).
+- Same FortiFit `workoutType` (after HK-to-category mapping for the HK side — see HK_MAPPING.md).
 - `|startA − startB| ≤ 5 minutes` AND `|endA − endB| ≤ 5 minutes`.
 
 **Lower-confidence (prompt):**
@@ -581,14 +556,6 @@ Queue API: `pendingMatches()`, `resolvePending(workoutId: UUID, snapshot: Health
 - `.keepSeparate` → create a `WorkoutMatchRejection(healthKitUUID: snapshot.uuid, workoutId: workoutId, rejectedDate: .now)`; remove from queue.
 - `.decideLater` → leave in queue; re-surface on next foreground.
 
-### File Dependencies
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `WorkoutMatcher.swift` | `Core/Services/` | Matching logic, link application, prompt queue |
-| `WorkoutMatchRejection.swift` | `Core/Models/` | Persisted rejection records |
-| `WorkoutService.swift` | `Core/Services/` | Entry point for save/update after link |
-| `MatchPromptSheetView.swift` | `Design/Components/` | UI surface (see SCREENS.md § Match Prompt Sheet) |
 
 ---
 
@@ -645,13 +612,6 @@ Callers pass the enum case rather than a field name string. Each case maps to a 
 
 **None.** This service does not modify any data. The detail sheet re-queries on every open, so changes elsewhere (workout edits, deletes) are reflected automatically without invalidation logic.
 
-### File Dependencies
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `WorkoutMetricService.swift` | `Core/Services/` | The service implementation + `WorkoutMetric` enum |
-| `Workout.swift` | `Core/Models/` | Source of truth for queried fields |
-| `FortiFitMetricDetailSheet.swift` | `Design/Components/` | Sole consumer of this service today (see SCREENS.md § Metric Detail Sheet) |
 
 ---
 
@@ -766,8 +726,8 @@ When a `Workout` that is linked to a `ScheduledWorkout` (via `completedWorkoutId
 
 ## HomeWidgetService (HomeWidgetService.swift)
 
-- **Seed defaults:** On first launch (hasSeededDefaultWidgets = false), create HomeWidget records for Training Load, Week Streak in that order. Set hasSeededDefaultWidgets = true. (Workout Info was previously seeded between Training Load and Week Streak; it has been removed from the product entirely — see § One-time migration below.)
-- **Add:** Create HomeWidget at max sortOrder + 1. No duplicate widgetType allowed. Add Widgets menu lists every entry in CONSTANTS.md § Widget Types not currently present on the user's home — `workoutInfo` is no longer in that list.
+- **Seed defaults:** On first launch (hasSeededDefaultWidgets = false), create HomeWidget records for **Today's Plan, Training Load, Power Level** in that order. Set hasSeededDefaultWidgets = true. Add-only widgets (not in the default seed) are **Week Streak** and **Activity Rings**. The historical Workout Info widget has been removed from the product entirely — see § One-time migration below.
+- **Add:** Create HomeWidget at max sortOrder + 1. No duplicate widgetType allowed. Add Widgets menu lists every entry in CONSTANTS.md § Widget Types not currently present on the user's home — `workoutInfo` is no longer in that list. The `appleActivity` row is **always listed** regardless of HealthKit / Apple Watch availability — gating moved into the widget card itself (see SCREENS.md § Home Screen → Activity Rings widget for the three dynamic states).
 - **Delete:** Remove HomeWidget record. Re-index remaining sortOrder.
 - **Reorder:** Accept array of widgetType strings, re-index sortOrder starting from 0.
 
@@ -784,6 +744,83 @@ The Today's Plan widget exposes a "Complete Workout" item in its long-press cont
 
 ---
 
+## AppleActivityService (AppleActivityService.swift)
+
+**Purpose:** Owns daily Move / Exercise / Stand totals for the Activity Rings widget and the Activity Detail Sheet. Routes all HK access through `HealthKitClient` (see HEALTHKIT.md § 20 for the read methods and source-detection helper). Exposed as `@Observable` so the widget binds reactively.
+
+### Responsibilities
+
+- Fetch today's `HKActivitySummary` and expose Move (`activeEnergyKcal`), Exercise (minutes), Stand (hours) as derived properties.
+- Subscribe to `HealthKitClient.observeActivitySummaryChanges` and refresh derived state on each fire.
+- Detect Apple Watch presence via `HealthKitClient.hasAppleWatchData(within:)` and expose a derived `appleWatchDetected: Bool` (cached for the lifetime of an app foreground; refreshed on every foreground transition).
+- Compute the **weekly closure rate** (`closedAllRingsDayCount: Int` over the last 7 calendar days) by iterating `fetchActivitySummaries(from:to:)` results.
+- Compute **per-workout ring contribution** for the widget caption — sums `activeEnergyKcal` and `exerciseMinutes` across today's `Workout` records where `healthKitUUID != nil`. Manual logs without HK linkage do not contribute.
+- Provide the `importGoalsFromAppleHealth()` flow used on first config and on the manual "Import from Apple Health" button (see HEALTHKIT.md § 20 → First-Config Goal Import).
+
+### Derived State (read-only, reactive)
+
+```swift
+@Observable
+final class AppleActivityService {
+    // From HKActivitySummary (today)
+    var moveCalories: Int           // current / numerator for Move ring
+    var exerciseMinutes: Int        // current / numerator for Exercise ring
+    var standHours: Int             // current / numerator for Stand ring
+
+    // From UserSettings (configurable; nil → fall back to defaults)
+    var moveGoal: Int               // denominator
+    var exerciseGoal: Int           // denominator
+    var standGoal: Int              // denominator
+
+    // Derived
+    var moveProgress: Double        // moveCalories / moveGoal (0.0 — uncapped, can exceed 1.0)
+    var exerciseProgress: Double
+    var standProgress: Double
+    var allRingsClosedToday: Bool   // all three >= 1.0
+    var closedAllRingsDayCount: Int // last 7 days
+
+    // Workout-side contributions (today's HK-linked workouts)
+    var todayMoveContributionFromWorkouts: Int   // sum of activeEnergyKcal across HK-linked workouts logged today
+    var todayExerciseContributionFromWorkouts: Int
+
+    // Watch detection
+    var appleWatchDetected: Bool    // true if HK has any Watch-sourced sample in the last 7 days
+}
+```
+
+### Goal Import
+
+`importGoalsFromAppleHealth() async`:
+1. Call `HealthKitClient.fetchActivitySummary(for: .now)`.
+2. If returned summary has non-zero `*Goal` fields, write them into `UserSettings.targetMoveCalories`, `targetExerciseMinutes`, `targetStandHours` after rounding to the slider increment (10 / 5 / 1 respectively).
+3. If HK returns no summary or all goals are zero, write FitNavi defaults: 500 / 30 / 12.
+4. Persist UserSettings.
+
+Called from two places: (a) the first time the Activity Rings widget is added (`HomeWidgetService.add(.appleActivity)` triggers this for any goal field still nil), (b) the manual "Import from Apple Health" button in the Activity Rings Settings Modal (which always overwrites whatever is currently in UserSettings).
+
+### Day Boundary
+
+Local midnight. At rollover, the next observer-query fire (or the next foreground transition) refetches today's summary and renders 0/goal across all three rings until movement registers.
+
+### Refresh Triggers
+
+- **App foreground:** existing HK catch-up sync triggers a refetch via the observer query handler.
+- **Activity-summary observer query fires:** standard observer pattern (see HEALTHKIT.md § 20).
+- **Workout Cascade fires AND the saved/edited workout has `healthKitUUID != nil`:** explicit refresh hook in `WorkoutService.log()` and `WorkoutService.update()` paths checks the flag and calls `AppleActivityService.refresh()` only when true. See § Workout Cascade.
+
+### Apple Watch Empty-State Detection
+
+`appleWatchDetected` is recomputed on every app foreground transition (cached for the active session). The widget renders one of three states based on the combination of `UserSettings.healthKitEnabled` and `appleWatchDetected`:
+
+| `healthKitEnabled` | `appleWatchDetected` | State |
+|---|---|---|
+| false | (any) | "Connect Apple Health" — see SCREENS.md § Activity Rings widget States |
+| true | false | "Pair an Apple Watch" — see SCREENS.md |
+| true | true | Live rings — see SCREENS.md |
+
+
+---
+
 ## TrendsChartService (TrendsChartService.swift)
 
 Mirrors `HomeWidgetService` for the Trends screen.
@@ -792,6 +829,32 @@ Mirrors `HomeWidgetService` for the Trends screen.
 - **Add:** Create TrendsChart at max sortOrder + 1. No duplicate chartType allowed.
 - **Delete:** Remove TrendsChart record. Re-index remaining sortOrder. No underlying workout data affected.
 - **Reorder:** Accept array of chartType strings, re-index sortOrder starting from 0.
+
+### Header Summary Computation
+
+Phase 6.1 adds per-chart hero + caption values that render above each chart's plot area (see CONSTANTS.md § Trends Chart Visual Tokens → Header Summary Block and SCREENS.md § Standard Patterns → Trends Chart Card Visual Treatment). The service exposes one entry point and one computation per chart type.
+
+- **`func headerSummary(for chartType: ChartType, exerciseName: String? = nil) -> ChartSummary?`** — entry point. Returns `nil` when the chart's data threshold (CONSTANTS.md § Chart Data Thresholds) is not met; the view renders the empty state instead. `exerciseName` is required only for `strengthTracker` and `personalRecords` (whose values depend on the active exercise dropdown selection).
+- **`ChartSummary`** — value type with `hero: String` and `caption: String`. Caption strings live in `AppConstants` (e.g., `AppConstants.Trends.captionLatest`, `captionAvgPerSession`, etc.) — never hardcoded in views.
+
+#### Per-Chart Calculation
+
+| Chart (id) | Source data | Hero formula | Notes |
+|---|---|---|---|
+| `strengthTracker` | All ExerciseSets matching `exerciseName` (case-insensitive), chronologically | Latest non-nil `weightKg`, formatted per `useLbs` with unit | Threshold: ≥ 2 workouts with the exercise + recorded weight |
+| `trainingFrequency` | Last 8 full Mon–Sun weeks | Mean workouts per week, 1 decimal place | Threshold: ≥ 1 full Mon–Sun week with ≥ 1 workout |
+| `personalRecords` | PR timeline for `exerciseName` per § Goal Auto-Update | `+{current − previous} {unit}` formatted per `useLbs`. If only baseline + first PR, delta = first PR − baseline. | Threshold: 1 exercise with ≥ 1 PR event |
+| `trainingLoadTrend` | Today's Training Load score (per § Training Load Algorithm) | Integer score, no unit suffix | Threshold: ≥ 3 days with ≥ 1 workout in last 14 days |
+| `workoutVolume` | Last 30/60/90 days (per active toggle) of Strength + HIIT workouts | Mean session volume (sets × reps × weightKg, summed per workout, averaged across workouts), formatted with `K`/`M` suffix when ≥ 1,000 / ≥ 1,000,000; weight unit per `useLbs` | Threshold: ≥ 2 Strength/HIIT workouts with ≥ 1 ExerciseSet |
+| `rpeTrend` | Last 8 full Mon–Sun weeks of workouts with non-nil `rpe` | Mean RPE across all qualifying workouts, 1 decimal place | Threshold: ≥ 1 full Mon–Sun week with ≥ 1 workout with recorded RPE |
+| `workoutTypeBreakdown` | Workouts within active toggle (30D / 60D / 90D / All Time) | Total workout count (integer); rendered inside the donut center, NOT the header summary slot | Threshold: ≥ 2 workouts of any type. Caption is `WORKOUTS` per CONSTANTS.md § Donut Center Label. |
+| `sessionDuration` | Last 8 full Mon–Sun weeks of workouts with non-nil `durationMinutes` | `{mean duration} min`, integer minutes | Threshold: ≥ 1 full Mon–Sun week with ≥ 1 workout with recorded duration. Workouts without recorded duration are excluded from the average. |
+
+#### Cascade Behavior
+
+Header summary values are computed on demand by the view (no persistent cache). The Workout Cascade (§ Workout Cascade) lists "every chart card's header summary value" under its **Charts** bullet — this is informational; in practice the chart views observe SwiftData changes and rebuild via `headerSummary(for:)` on the next render. No service-level recompute method is required.
+
+For `strengthTracker` and `personalRecords`, the view also rebuilds when the user changes the exercise dropdown selection. For charts with toggles (`workoutVolume`, `workoutTypeBreakdown`), the view rebuilds on toggle change.
 
 ---
 
@@ -874,12 +937,6 @@ For a given goal and calendar date, the snapshot `value` is computed from all **
 - **fetchSnapshots(goalId, days: 30, context) → [GoalSnapshot]:** Returns snapshots for the given goal within the last N days, sorted by date ascending.
 - **deleteSnapshots(goalId, context):** Removes all snapshots for a given goal. Called on goal deletion cascade and on Reset Goal Progress.
 
-### File Dependencies
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `GoalSnapshotService.swift` | `Core/Services/` | Snapshot CRUD and retrieval |
-| `GoalSnapshot.swift` | `Core/Models/` | SwiftData model |
 
 ---
 
@@ -906,13 +963,6 @@ For a given goal and calendar date, the snapshot `value` is computed from all **
 
 If `ImageRenderer` returns nil (render failure), show a brief toast: "Couldn't generate image. Try again." (auto-dismiss ~2s, matching existing toast pattern). Do not present the share sheet.
 
-### File Dependencies
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `WorkoutShareService.swift` | `Core/Services/` | Orchestrates render + share sheet presentation |
-| `WorkoutShareCardView.swift` | `Design/Components/` | Pure SwiftUI view used as `ImageRenderer` input |
-| `ShareSheet.swift` | `Core/Utilities/` | `UIActivityViewController` wrapper (UIViewControllerRepresentable) |
 
 ---
 
@@ -990,10 +1040,3 @@ The app must register `fitnavi` as a custom URL scheme in Info.plist. In `FortiF
 2. If decoding succeeds → present the Template Import Prompt (see `SCREENS.md` § Template Import Prompt).
 3. If decoding fails → present the error modal with "This QR code couldn't be read." message.
 
-### File Dependencies
-
-| File | Location | Purpose |
-|------|----------|---------|
-| `TemplateShareService.swift` | `Core/Services/` | Encode/decode/QR generation/import logic |
-| `TemplateQRModalView.swift` | `Design/Components/` | QR code modal (used by Saved Templates List and Edit Template) |
-| `TemplateImportView.swift` | `Features/Workout/` | Import confirmation prompt (triggered by deep link) |

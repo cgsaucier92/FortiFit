@@ -15,78 +15,69 @@ These patterns are referenced throughout. Implement once, reuse everywhere.
 
 **Long-Press Tease:** Cards that support long-press context menus (Workout Type cards, Home widgets, Goal cards, Trends chart cards, Saved Template cards, Scheduled Workout cards) share a single tease animation — a slight lift/scale on press hold that signals an imminent context menu. Implementation reuses the Home widget tease — do not invent a new animation curve.
 
-**Standard Reorder Edit Mode:** Activated from a context menu option named "Reorder [Items]". Behavior:
-- Drag handles (≡) appear on the right side of each card (muted #737373, 16px).
-- Long-press anywhere on a card (handle or body) to pick up. Held card elevates with shadow; other cards animate to make room (0.2s ease). Drop snaps the card into place.
-- New order saved automatically — the corresponding `sortOrder` field is re-indexed starting from 0 and persisted to SwiftData on drop.
-- Cards maintain full styling during reorder mode and drag.
-- Long-press context menu is disabled during reorder mode (no accidental delete while dragging).
-- Exit by tapping anywhere outside a card. Drag handles disappear. No "Done" button.
-- With a single card, reorder mode can be entered but drag has no visible effect.
+**Standard Reorder Edit Mode:** Activated from a context menu "Reorder [Items]". Drag handles (≡, muted, 16px) appear on the right of each card. Long-press anywhere on a card to pick up — held card elevates with shadow, others animate to make room (0.2s ease), drop snaps into place. `sortOrder` re-indexes from 0 and persists on drop. Long-press context menu disabled during reorder. Exit by tapping outside any card (no "Done" button). Single-card case: enterable but drag has no visible effect.
 
-Home widgets use a variant of this pattern that combines delete + drag in a single edit mode — see § Home Screen (Widget Edit Mode).
+Home widgets use a delete + drag combined variant — see § Home Screen → Widget Edit Mode.
 
-**Standard Sortable Card System:** The Home widget grid and the Trends chart list are both sortable card systems backed by SwiftData records (`HomeWidget`, `TrendsChart`) with a `sortOrder` field. Shared behavior:
-- On first launch (no records exist), default cards are seeded in a defined order. After seeding, the user has full control.
+**Standard Sortable Card System:** Backs Home widgets and Trends charts (SwiftData records — `HomeWidget`, `TrendsChart` — with `sortOrder`). Shared behavior:
+- First launch seeds default cards in a defined order; user controls afterward.
 - Cards render vertically in ascending `sortOrder`.
-- **Add Menu:** Opened from the screen's ellipsis menu. Centered overlay with dimmed background. Scrollable list of all card types from AppConstants. Each row: display name (primary text), brief description (muted), "Add" button. Already-added types show a muted "Added" label instead. Tapping "Add" creates a record at max `sortOrder` + 1, dismisses the overlay, and renders the card immediately with live data (or the appropriate empty state if data thresholds are not met). Dismiss via outside tap or close button.
-- **Delete:** Long-press card → context menu → "Delete [Item]" → standard delete confirmation. Removes only the sortable record; no underlying workout data affected. Remaining cards re-index `sortOrder`.
-- **Reorder:** Long-press card → context menu → "Reorder [Items]" → enters Standard Reorder Edit Mode.
-- **All Removed state:** Centered muted message inviting the user to add items via the ellipsis menu. Ellipsis and any non-card screen chrome remain accessible.
+- **Add Menu:** opened from the screen's ellipsis. Centered overlay, dimmed bg, scrollable list of all card types. Each row: display name, brief description (muted), "Add" button. Already-added types show muted "Added" instead. Tap "Add" → creates record at max+1, dismisses, renders with live data (or empty state if data thresholds unmet).
+- **Delete:** long-press → context menu → "Delete [Item]" → standard delete confirmation. Removes record only; no underlying data affected. Remaining cards re-index `sortOrder`.
+- **Reorder:** long-press → context menu → "Reorder [Items]" → Standard Reorder Edit Mode.
+- **All Removed state:** centered muted message inviting use of the ellipsis. Ellipsis + non-card chrome stay accessible.
 
-Each screen specifies only its seed defaults, card definitions, and any deviations from this pattern.
+Each screen specifies only seed defaults, card definitions, and deviations.
 
-**Scroll Fade Header:** Every screen with scrollable content uses a floating header overlay that creates a fade effect as content scrolls beneath it. Structure:
+**Scroll Fade Header:** Floating header overlay that fades content scrolling beneath it.
+- Structure: `ZStack(alignment: .top)` with `ScrollView` (`.scrollClipDisabled()`) + fixed header `VStack` on top. Scroll content uses `.padding(.top, headerHeight)` measured via `GeometryReader`.
+- Header bg: `FortiFitColors.background.opacity(0.90)`. Below the header, a 30pt `LinearGradient` fades to `.clear` (`.allowsHitTesting(false)`).
+- Header holds only top-level action buttons (back, ellipsis, plus, share/edit/delete); screen headings (`FortiFitScreenHeading`) live in scroll content.
+- FortiFitDivider in header: kept on form/detail screens (Log Workout, Create Template, Schedule Workout); removed on list/tab screens (Home, Workouts, Plan, Trends, Goals, Saved Templates, Add Goal, Workout Detail).
+- Empty states use `.padding(.top, headerHeight)`.
 
-- `ZStack(alignment: .top)` containing: (1) `ScrollView` with `.scrollClipDisabled()`, (2) a fixed header `VStack` rendered on top.
-- Scroll content uses `.padding(.top, headerHeight)` where `headerHeight` is measured dynamically via a `GeometryReader` overlay on the header.
-- Header background: `FortiFitColors.background.opacity(0.90)`. Below the header, a 30pt `LinearGradient` fades from the same color to `.clear`, with `.allowsHitTesting(false)`.
-- Header contains only top-level action buttons (back, ellipsis, plus, share/edit/delete). Screen headings (`FortiFitScreenHeading`) remain in scroll content.
-- FortiFitDivider in the header is **per-screen**: kept on form/detail screens (Log Workout, Create Template, Schedule Workout), removed on list/tab screens (Home, Workouts, Plan, Trends, Goals, Saved Templates, Add Goal, Workout Detail).
-- Empty states use `.padding(.top, headerHeight)` so they sit below the floating header.
+**Peripheral Apple Workout Label:** Inline "Apple Workout" text alongside workout metadata on compact surfaces. `bodySmall` / muted to match surroundings.
 
-**Peripheral Apple Workout Glyph:** A small inline glyph rendered alongside workout metadata on compact surfaces to indicate the workout was recorded via Apple's Workout app on Apple Watch. Component: `FortiFitHealthGlyph.swift` (see PRD.md § Project Structure → Design/Components/) — implementation already encapsulates the visual treatment.
+- **Scope:** renders only when `workout.healthKitUUID != nil` AND `HealthKitClient.sourceName(for:)` returns `Apple Workout` (i.e., the source is Apple Watch). Other HK sources (Strava, Peloton, etc.) render no label on peripheral surfaces — visually indistinguishable from manual workouts there.
+- **Position:** trailing metadata on the date row (Home) or duration/distance row (Workouts), separated by ` · `. Always the last token on its row.
+- **Examples:** `Apr 23, 2026 · Apple Workout` (Home); `45 min · Apple Workout` (Workouts); `Apr 23, 2026` (manual, no label).
+- **Used on:** Home Recent Workouts rows; Workouts expanded preview rows; Plan logged-only and Apple-Watch-linked completed scheduled cards.
+- **Not used on:** Workout Detail (uses the full Source Indicator instead — see § Workout Detail), Log Workout (uses disabled fields + popovers — see § Log Workout HK-Linked Workouts), Trends, Goals, widget bodies.
 
-**Rendering scope (Apple Watch source only):** the glyph renders **only when** `workout.healthKitUUID != nil` AND `workout.healthKitSourceBundleID` resolves to Apple Watch's source bundle (i.e., `HealthKitClient.sourceName(for:)` returns `Apple Workout`). HK-imported workouts from other sources (Strava, Peloton, etc.) do **not** render this glyph on peripheral surfaces. Future per-source glyphs may be added later — for now, non-Apple-Watch HK workouts look identical to manual workouts on these compact surfaces.
+**See Info Modal:** Shared explainer sheet for a single feature. Opened via long-press context menu → "See Info" (SF Symbol `info.circle`). Used by Trends chart cards (Strength Tracker, Training Frequency, etc.) and Home widgets (Training Load, Power Level, Activity Rings).
 
-**Position:** Trailing metadata on the workout's date row, separated by ` · ` from the date. The glyph is always the last token on the date row. Duration and distance (if present) render on a separate third row below the date row — they are never on the same row as the glyph.
+**Component:** `FortiFitSeeInfoModal.swift`. Takes a content struct (`title`, `intro`, `sections: [(heading, body)]`). Content sourced from INFO_COPY.md — Chart entries for Trends, Widget entries for Home widgets. Strings always read from `AppConstants`; never hardcoded.
 
-Examples:
-- `Apr 23, 2026 · [glyph]` (date row with glyph)
-- `45 min` (third row — duration)
-- `Apr 23, 2026` (date row without glyph, manual workout)
+**Presentation:** iOS modal sheet, `.large` detent, swipe-down dismiss, Card Surface bg.
 
-**Used on (per the scope rule above):**
-- Home → Recent Workouts list rows
-- Workouts tab → Expanded Workout Preview Rows
-- Plan tab → Logged-only workout cards and completed scheduled workout cards linked to an Apple Watch–sourced Workout
+**Layout:**
 
-**Not used on:** Workout Detail (which uses the full Source Indicator row instead — see § Workout Detail), Log Workout (which uses disabled fields + inline `info.circle` popovers instead — see § Log Workout § Edit Mode — HealthKit-Linked Workouts), Trends, Goals, any widget body. The peripheral glyph is scoped exclusively to compact workout-metadata surfaces.
+| Element | Treatment |
+|---|---|
+| Header | Centered title "About [Subject]" (Primary Text, heading typography per PRD § 2). Matches Match Prompt Sheet header style. |
+| Close button | Top-right 24×24pt circular, Elevated Surface bg + Border, muted `×`. Reused across this modal, the QR Modal, and Settings widget modals. ID `seeInfoModal_closeButton`. |
+| Body | Scrollable. Intro paragraph (Secondary Text 14px, no preceding heading) + named sections (15px/800 heading, Secondary Text body). Body may contain bullet lists — bullets are parsed from source-string `- ` prefixes and rendered by the component (don't pre-format in constants). |
+| Footer | None — ends after last section + safe-area padding. |
 
-**See Info Modal:** Shared modal sheet that explains a single feature (a chart, a widget, etc.) in user-friendly depth. Opened via a long-press context-menu item labeled "See Info" with SF Symbol `info.circle`. Used by Trends chart cards (Strength Tracker, Training Frequency, etc.) and by Home widgets (Training Load, Power Level). Reuses one component across both surfaces.
+**Accessibility:** title announced first; section headings traverse as headers (`accessibilityAddTraits(.isHeader)`); close button reads "Close, button".
 
-**Component:** `FortiFitSeeInfoModal.swift` (see PRD.md § Project Structure → Design/Components/). Takes a generic content struct (`title: String`, `intro: String`, `sections: [(heading: String, body: String)]`). Caller supplies the content from the appropriate per-surface lookup in CONSTANTS.md.
+**Trends Chart Card Visual Treatment:** Shared visual styling for every chart card on the Trends screen. Implemented via `FortiFitChartCard` (Design/Components/), which wraps `FortiFitCard` and composes a gradient backdrop, inner plot hairline, header summary block, latest-point highlight, rounded bar tops, smoothed line interpolation, donut center label, and tap-to-select state. Per-chart values (gradient anchor, header summary formula, selection availability) live in CONSTANTS.md § Trends Chart Visual Tokens — never hardcoded in views.
 
-**Presentation:** iOS modal sheet (sheet presentation, `.large` detent). Swipe-down to dismiss. Background uses Card Surface `#1a1a1a`.
+**Component:** `FortiFitChartCard.swift`. Public API takes `chartId: ChartType`, `title: String`, `summary: ChartSummary?`, `gradientAnchor: ChartGradientAnchor`, plus `@ViewBuilder` slots for controls (toggles, dropdowns), the chart marks themselves, and an optional footer (legend).
 
-**Header:** Centered title — "About [Subject]" (e.g., "About Strength Tracker", "About Training Load"). Primary Text `#e5e5e5`, 20px, 900 weight, sentence case, centered. Title style matches the Match Prompt Sheet header (see § Match Prompt Sheet).
+**Layout (top-to-bottom):**
 
-**Close button:** Top-right corner, 24x24pt circular, `#2d2d2d` bg, `#404040` border, muted `×`. Same close-button pattern used by the Saved Templates QR Modal and Settings widget modals. Accessibility identifier `seeInfoModal_closeButton` (shared across all uses of this modal).
+| Slot | Content |
+|---|---|
+| Title row | Existing chart title; preserves chart-specific affordances (e.g., dropdown chevron on Strength Tracker / Personal Records). |
+| Header summary | Hero value + caption per CONSTANTS.md § Trends Chart Visual Tokens → Header Summary Block. Hidden on empty state. The Workout Type Breakdown chart suppresses this slot — its summary lives inside the donut (see § Donut Center Label). |
+| Controls row | Existing toggles (30D/60D/90D, exercise dropdowns). Unchanged. |
+| Plot area | Gradient backdrop + inner hairline + chart marks per CONSTANTS.md § Trends Chart Visual Tokens. |
+| Footer | Existing legend / reference-line callouts. Unchanged. |
 
-**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the header. Content rendered top-to-bottom:
+**Empty state:** When the chart's data threshold is not met (CONSTANTS.md § Chart Data Thresholds), the gradient, hairline, header summary, plot marks, and (on Workout Type Breakdown) donut center label all hide; the existing centered muted empty message renders inside the card. Controls row hides as well per existing per-chart empty-state behavior.
 
-1. **Intro paragraph** — first paragraph below the title. Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned, normal line height. No section heading above it.
-2. **Sections** — each section is a heading + body paragraph(s):
-   - Section heading: Primary Text `#e5e5e5`, 15px, 800 weight, sentence case, left-aligned, normal letter-spacing. 24px top margin (separates sections), 8px bottom margin before its body. Follows the standard heading typography rule (see PRD.md § 2 Design Language → Typography).
-   - Body: Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned. Normal paragraph spacing.
-   - Body may include a markdown-style bulleted list when the source copy provides one (e.g., zone breakdowns, status thresholds). Each bullet renders as a row in a `VStack` with a leading `•` glyph and 8pt left indent. Bullet text inherits body styling. Bullets are detected in the source string by line prefix `- ` and rendered by the component — keep parsing logic in the component, not in the constants.
-3. **Footer:** none. Sheet ends after the last section's body, with standard bottom safe-area padding.
-
-**Content sources:** all visible strings are read from `AppConstants` — never hardcoded in views. Each surface that opens this modal has its own copy section in CONSTANTS.md:
-- **Trends chart cards** → CONSTANTS.md § Chart Info Modal Copy
-- **Home widgets** → CONSTANTS.md § Widget Info Modal Copy
-
-**Accessibility:** modal title is announced first by VoiceOver, followed by intro and section headings/bodies in order. Close button reads "Close, button". Section headings traverse as headers (`accessibilityAddTraits(.isHeader)`).
+**Accessibility:** When the header summary is visible, its hero + caption are announced first as a single label (`"{hero}, {caption}"`). The chart marks then follow per Swift Charts' default accessibility behavior.
 
 ---
 
@@ -95,10 +86,10 @@ Examples:
 **Purpose:** Central hub showing training status, quick stats, and access to logging. Fully customizable widget layout.
 
 ### Widget Card System
-Per § Standard Patterns: Sortable Card System, backed by `HomeWidget` records. Default seed order (first launch only): **Training Load, Weekly Streak**. The previously-seeded Workout Info widget has been removed from the product entirely — see § Widget Definitions below and CONSTANTS.md § Widget Types. Home's edit mode is a variant of the standard — see § Widget Edit Mode below.
+Per § Standard Patterns: Sortable Card System, backed by `HomeWidget` records. Default seed order (first launch only): **Today's Plan, Training Load, Power Level**. Add-only (not in default seed): **Weekly Streak**, **Activity Rings**. The previously-seeded Workout Info widget has been removed from the product entirely — see § Widget Definitions below and CONSTANTS.md § Widget Types. Home's edit mode is a variant of the standard — see § Widget Edit Mode below.
 
 ### Layout
-Top: Left: blue ellipsis icon (functional — opens Home ellipsis menu). Right: blue gear icon (→ Settings). ✦ divider. Widget cards render vertically by `sortOrder`. Full-width blue-outlined "+ Log Workout" button below last widget. "Recent Workouts" header, then list of 5 most recent workouts. Each row has three lines: (1) workout name, (2) date with trailing Apple Workout glyph when Apple-Watch-sourced (see § Standard Patterns → Peripheral Apple Workout Glyph) — e.g., `Apr 23, 2026 · [glyph]`, (3) duration if recorded (e.g., `45 min`). Trailing chevron (>). Other HK sources and manual workouts render no peripheral glyph. Duration row is omitted when not set. Recent Workouts list and "+ Log Workout" are unaffected by widget customization.
+Top: Left: blue ellipsis icon (functional — opens Home ellipsis menu). Right: blue gear icon (→ Settings). ✦ divider. Widget cards render vertically by `sortOrder`. Full-width blue-outlined "+ Log Workout" button below last widget. "Recent Workouts" header, then list of 5 most recent workouts. Each row has three lines: (1) workout name, (2) date with trailing "Apple Workout" text label when Apple-Watch-sourced (see § Standard Patterns → Peripheral Apple Workout Label) — e.g., `Apr 23, 2026 · Apple Workout`, (3) duration if recorded (e.g., `45 min`). Trailing chevron (>). Other HK sources and manual workouts render no peripheral label. Duration row is omitted when not set. Recent Workouts list and "+ Log Workout" are unaffected by widget customization.
 
 ### Home Ellipsis Menu
 One option: **"Add Widgets"** with SF Symbol `plus.rectangle.on.rectangle` to the left → opens Add Widgets Menu overlay.
@@ -111,9 +102,9 @@ Long-pressing any widget card (uses Standard Long-Press Tease) opens a context m
 
 **"Complete Workout":** SF Symbol `checkmark.circle` to the left of the label (see CONSTANTS.md § Widget Context Menu SF Symbols). Visible **only on the Today's Plan widget**, and **only when one or more uncompleted `ScheduledWorkout` records exist for today** (i.e., the same condition that drives the left column's workout name and silhouette). Tapping opens the same compact confirmation sheet used by the Plan tab's Complete Planned Workout flow (see SCREENS.md § Plan → Complete Planned Workout Flow). On confirm, the widget's left column repopulates with the next planned workout for today — same auto-repopulation logic as before. When no uncompleted scheduled workout exists today (no plans, all completed, or every plan has been skipped), the menu item is **hidden entirely** — never rendered as a disabled/grey item. Accessibility identifier `homeWidget_todaysPlan_completeWorkoutMenuItem`.
 
-**"See Info":** SF Symbol `info.circle` to the left of the label (see CONSTANTS.md § Widget Context Menu SF Symbols). Visible only on Training Load and Power Level widgets — opens the See Info Modal (see § Standard Patterns) populated from CONSTANTS.md § Widget Info Modal Copy for that widget. Not rendered on Weekly Streak or Today's Plan widgets.
+**"See Info":** SF Symbol `info.circle` to the left of the label (see CONSTANTS.md § Widget Context Menu SF Symbols). Visible only on Training Load, Power Level, and Activity Rings widgets — opens the See Info Modal (see § Standard Patterns) populated from INFO_COPY § Widget Info Modal Copy for that widget. Not rendered on Weekly Streak or Today's Plan widgets.
 
-**"Configure Settings":** SF Symbol `gear` to the left of the label. Visible only on Training Load and Weekly Streak widgets — opens that widget's existing settings modal (Training Load Settings Modal or Weekly Streak Settings Modal — see § Widget Definitions). Not rendered on Power Level or Today's Plan widgets.
+**"Configure Settings":** SF Symbol `gear` to the left of the label. Visible only on Training Load, Weekly Streak, and Activity Rings widgets — opens that widget's existing settings modal (Training Load Settings Modal, Weekly Streak Settings Modal, or Activity Rings Settings Modal — see § Widget Definitions). Not rendered on Power Level or Today's Plan widgets.
 
 **"Reorder Widgets":** Enters Widget Edit Mode (see below). Always visible regardless of widget count.
 
@@ -125,6 +116,7 @@ Long-pressing any widget card (uses Standard Long-Press Tease) opens a context m
 - **Weekly Streak:** Configure Settings → Reorder Widgets → Delete Widget (3 items)
 - **Today's Plan (with uncompleted plan today):** Complete Workout → Reorder Widgets → Delete Widget (3 items)
 - **Today's Plan (no uncompleted plan today):** Reorder Widgets → Delete Widget (2 items)
+- **Activity Rings:** See Info → Configure Settings → Reorder Widgets → Delete Widget (4 items)
 
 ### Widget Edit Mode
 Entered via the context menu's "Reorder Widgets" item. Unlike the standard reorder pattern, Home combines delete + drag in a single edit mode:
@@ -136,35 +128,115 @@ Entered via the context menu's "Reorder Widgets" item. Unlike the standard reord
 
 ### Widget Definitions
 
-**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header. In-depth explanation accessible via long-press → **"See Info"** (see § Widget Context Menu) opens the See Info Modal (see § Standard Patterns) populated from CONSTANTS.md § Widget Info Modal Copy. Settings access via long-press → **"Configure Settings"** opens the **Training Load Settings Modal** (see below). Zone label (e.g., "Moderate"), gradient progress bar (LOW→HIGH), context-aware advisory text below. Advisory shows readiness variant (no workout today) or post-training variant (trained today). See `CONSTANTS.md` for advisory text table and `SERVICES.md` for algorithm. Score updates in real time on workout log/edit/delete.
+**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header + zone label (e.g., "Moderate") + gradient progress bar (LOW→HIGH) + context-aware advisory below. Advisory uses readiness variant (no workout today) or post-training variant (trained today) — see CONSTANTS § Training Load Zones / Advisory Text. Algorithm: SERVICES § Training Load. Long-press → "See Info" (INFO_COPY § Training Load) or "Configure Settings" → Training Load Settings Modal. Updates in real time on workout log/edit/delete.
 
-**Training Load Settings Modal:** Centered modal with dimmed background. "Configure Training Load" heading + "?" tooltip (explains experience affects decay rate and stress capacity). Training Experience card (3-position slider: Beginner/Intermediate/Advanced). Target Workout Duration card (slider 0–300 min) — fallback duration for Training Load algorithm. All changes take effect immediately. Experience level change recalculates Training Load. Dismiss via close button or outside tap.
+**Training Load Settings Modal:** Centered modal, dimmed bg. "Configure Training Load" heading + "?" tooltip. Two slider cards: Training Experience (3-position: Beginner/Intermediate/Advanced) and Target Workout Duration (0–300 min, fallback for the Training Load algorithm). Changes apply immediately; experience change triggers recalc. Dismiss: close button or outside tap.
 
-**Weekly Streak** (`weekStreak`): "Weekly Streak" card. Settings access via long-press → **"Configure Settings"** (see § Widget Context Menu) opens the **Weekly Streak Settings Modal** (see below). Left: animated blue flame SVG scaling by tier. Right: streak count (32px, 900 weight), "WEEK STREAK" label (blue uppercase), motivational message (muted italic). See `CONSTANTS.md` for flame tiers and messages, `SERVICES.md` for algorithm. Flame flickers (1.2s outer, 0.9s inner loops).
+**Weekly Streak** (`weekStreak`): "Weekly Streak" card. Left: animated blue flame SVG scaling by tier (1.2s outer / 0.9s inner flicker loops). Right: streak count (32px, 900 weight) + "WEEK STREAK" label (blue uppercase) + motivational message (muted italic). See CONSTANTS § Streak Flame Tiers / Streak Motivational Messages and SERVICES § Streak Algorithm. Long-press → "Configure Settings" → Weekly Streak Settings Modal.
 
-**Weekly Streak Settings Modal:** Centered modal with dimmed background. "Configure Streak Widget" heading. Target Workouts per Week card (slider 0–99). Used exclusively by Streak algorithm. All changes take effect immediately. Target workouts change recalculates streak retroactively. Dismiss via close button or outside tap.
+**Weekly Streak Settings Modal:** Centered modal, dimmed bg. "Configure Streak Widget" heading. Single slider: Target Workouts per Week (0–99). Used exclusively by the Streak algorithm. Changes apply immediately and recalculate streak retroactively. Dismiss: close button or outside tap.
 
-**Power Level** (`powerLevel`): Blue-bordered card. "Power Level" header. In-depth explanation accessible via long-press → **"See Info"** (see § Widget Context Menu) opens the See Info Modal (see § Standard Patterns) populated from CONSTANTS.md § Widget Info Modal Copy. Status label (Deloading/Steady/Rising), directional indicator (↓/—/↑ with status-specific color), contextual message (muted italic). See `CONSTANTS.md` for messages, `SERVICES.md` for algorithm.
+**Power Level** (`powerLevel`): Blue-bordered card. "Power Level" header + status label (Deloading/Steady/Rising) + directional indicator (↓/—/↑, status-colored) + contextual message (muted italic). See CONSTANTS § Power Level Statuses and SERVICES § Power Level Algorithm. Long-press → "See Info" (INFO_COPY § Power Level).
 
-**Today's Plan** (`todaysPlan`): "Today's Plan" header. Card interior is split into two columns — workout info on the left, calendar square on the right.
+**Today's Plan** (`todaysPlan`): "Today's Plan" header. Two-column card.
 
-**Left column (workout info):** If one or more planned workouts exist today, shows the first uncompleted workout — template name only (primary text). The previous "Complete Workout" inline button and the muted workout-type pill below the name have been removed entirely; completion now lives in the long-press context menu (see § Widget Context Menu — "Complete Workout"), and the workout type is conveyed by the background silhouette described below. If additional planned workouts remain beyond the one displayed, a muted note "X more planned" appears below the workout name (11px, 700 weight, muted text). When a workout is completed via the context menu, the widget automatically repopulates with the next planned workout on the same day. If all today's workouts are completed: "All planned workouts completed." (muted, with green checkmark). If no workouts scheduled today: "No workout planned for today." (muted text).
+**Left column (workout info):**
+- ≥1 uncompleted workout today → first one's template name (Primary Text). Below: muted "X more planned" if additional workouts remain. Completion happens via long-press → "Complete Workout" (no inline button, no workout-type pill). On completion, widget auto-repopulates with the next planned workout same day.
+- All today's workouts completed → "All planned workouts completed." (muted, green checkmark).
+- No workouts scheduled → "No workout planned for today." (muted).
 
-**Background silhouette (left column):** When a planned workout exists today, render the workout type's SF Symbol from CONSTANTS.md § Workout Type SF Symbols (`dumbbell.fill` for Strength, `figure.highintensity.intervaltraining` for HIIT, `figure.mixed.cardio` for Cardio, `figure.yoga` for Yoga, `figure.pilates` for Pilates, `figure` for Other) as a background watermark behind the workout name. Treatment:
-- Color: Muted Text `#737373` at **20% opacity** (`.opacity(0.2)`).
-- Size: intentionally **larger than the left column** so the symbol bleeds top and bottom of the card — target ~140pt symbol size against a column ~100pt tall. Use `.scaledToFit()` then explicit `.frame(width: 140, height: 140)` so the bleed is consistent across workout types regardless of the symbol's intrinsic aspect ratio.
-- Alignment: centered vertically and horizontally within the left column. Use `ZStack(alignment: .center)` with the silhouette as the back layer and the workout name + "X more planned" caption as the front layer.
-- Clipping: the card itself clips overflow (existing FortiFitCard behavior — `.clipShape(RoundedRectangle(cornerRadius: …))`) so the bleed renders as a tasteful watermark, not a layout bug.
-- Empty / "all completed" / "no workout planned" states: the silhouette **does not render**. The background only appears when there is a specific scheduled workout to associate it with. Accessibility identifier: `homeWidget_todaysPlan_silhouette` (renders only when present so tests can assert presence/absence by state).
+**Background silhouette (left column):** When a planned workout exists today, render the workout type's SF Symbol (CONSTANTS § Workout Type SF Symbols) as a watermark behind the workout name. Muted Text at 20% opacity. ~140pt symbol against ~100pt column so the icon bleeds top/bottom — `.scaledToFit()` + explicit `.frame(140×140)`, ZStack centered, clipped by the parent card. Hidden in completed / empty / no-plan states. ID: `homeWidget_todaysPlan_silhouette` (rendered only when a planned workout exists; tests assert presence/absence by state).
 
-**Right column (calendar square):** Always visible in all states. Rounded rectangle container styled after the iOS Calendar icon in FitNavi colors. Top bar: Primary Accent Blue (#3b82f6) background with the day abbreviation (e.g., "MON") in white text, uppercase, bold. Body area: dark surface (#1a1a1a or elevated #2d2d2d) with the month and date number rendered large and prominent in primary text (#e5e5e5). Blue and green dot indicators appear below the date number matching Plan tab dot logic — blue dot = planned `ScheduledWorkout`, green dot = completed from either a completed `ScheduledWorkout` OR a logged-only `Workout` surfaced on Plan (see SCREENS.md § Plan → Logged-Only Workout Surfacing for the inclusion rule). The left column's workout info, the "Complete Workout" context-menu item, the silhouette, and the "No workout planned for today." / "All planned workouts completed." messaging remain scoped exclusively to `ScheduledWorkout` records — logged-only workouts do **not** appear in the left column.
+**Right column (calendar square):** Always visible. Rounded rectangle styled after the iOS Calendar icon in FitNavi colors — Primary Accent Blue top bar with day abbreviation (white, bold uppercase), dark body with month + date number (Primary Text, large). Below the date: blue dot = planned `ScheduledWorkout`, green dot = completed (scheduled OR logged-only surfaced on Plan; see § Plan → Logged-Only Workout Surfacing). Logged-only workouts do **not** appear in the left column — that area remains scoped to `ScheduledWorkout` records.
 
-Included in default widget set — also available via Add Widgets menu.
+Included in default widget set; also available via Add Widgets menu.
+
+**Activity Rings** (`appleActivity`): "Activity Rings" header. Two-column card. Add-only — always offered in the Add Widgets menu regardless of HK/Watch state.
+
+**Layout:**
+
+| Region | Content |
+|---|---|
+| Left column | Three stacked entries (Move, Exercise, Stand). Each: chevron icon (CONSTANTS § Activity Rings → Ring Chevron SF Symbols) + uppercase label (Primary Text, label treatment) + hero `current/goal unit` value rendered in the ring's accent color (CONSTANTS § Activity Rings → Ring Colors), 20px heavy. |
+| Right column | Three nested rings (Move outermost, Exercise middle, Stand innermost — matches Apple Fitness). Ring thickness ~10pt, ~2pt gap. Arcs start 12 o'clock, sweep clockwise. Center: abbreviated month (10pt) over day-number (18pt), both Muted Text. |
+| Bottom chip | Weekly closure rate — `Closed all rings {n} day(s) this week`. Sourced from `AppleActivityService.closedAllRingsDayCount`. Hidden in non-live states. |
+
+**Workout contribution caption (Move and Exercise only):** Below each fraction, if ≥1 HK-linked workout today contributes, render a muted single-line caption. One contributor: `+{value} from today's {workoutName}`. Multiple: `+{summed value} from today's workouts`. Manual logs (no `healthKitUUID`) never appear — they're not in HealthKit. Stand never renders this caption. Source: SERVICES § AppleActivityService.
+
+**Over-100% behavior:** Replicates Apple Watch — once a ring hits 100%, a second arc layer continues drawing on top, sweeping from `(progress - 1.0)`. Implementation: two `Circle().trim(...).stroke(...)` per ring, base + overlay.
+
+**All-rings-closed celebration:** When all three reach 100%, widget pulses (0.6s scale 1.0 → 1.05 → 1.0). Debounced — once per closure event per day; does not retrigger on subsequent foregrounds the same day.
+
+**Tap (live state only):** Opens the Activity Detail Sheet (§ below).
+
+**Long-press context menu (all states):** See Info, Configure Settings, Reorder Widgets, Delete Widget. Configure Settings is accessible even when HK/Watch unavailable; the "Import from Apple Health" button inside the modal is the only thing that disables.
+
+**States** (gating logic in SERVICES § AppleActivityService → Apple Watch Empty-State Detection):
+
+| `healthKitEnabled` | `appleWatchDetected` | What the user sees |
+|---|---|---|
+| false | (any) | **Connect Apple Health.** Muted gray ring outlines on the right. Left column shows centered message + small "Connect" text button (Primary Accent Blue) → deep-links to Settings → Apple Health. Tapping anywhere else on the card also navigates to Settings. Closure chip hidden. IDs: `homeWidget_appleActivity_state_connectAppleHealth`, `homeWidget_appleActivity_connectButton`. |
+| true | false | **Pair an Apple Watch.** Same muted ring outlines. Centered message; no CTA (FitNavi can't pair watches). Tap is a no-op. Watch-detection cached per foreground session — a freshly paired Watch may need one background/foreground cycle to register. Closure chip hidden. ID: `homeWidget_appleActivity_state_pairAppleWatch`. |
+| true | true | **Live rings.** Full layout above. IDs: `homeWidget_appleActivity_card`, `homeWidget_appleActivity_moveRing`, `homeWidget_appleActivity_exerciseRing`, `homeWidget_appleActivity_standRing`, `homeWidget_appleActivity_weeklyClosureChip`. |
+
+**Add Widgets row description:** *"Tracks your daily Move, Exercise, and Stand rings. Requires an Apple Watch and Apple Health connected in Settings."* The Add button is always enabled — gating happens via the in-card states.
+
+### Activity Rings Settings Modal
+
+Centered modal, dimmed bg. Same visual treatment as Weekly Streak / Training Load Settings Modals. Long-press Activity Rings widget → "Configure Settings".
+
+Heading: "Configure Activity Rings".
+
+Body — three slider cards (track tints to ring accent color, white thumb):
+
+| Card | Range | Label | Increment |
+|---|---|---|---|
+| Move | 1–2000 cal | `Move — {value} cal` | 10 |
+| Exercise | 1–240 min | `Exercise — {value} min` | 5 |
+| Stand | 1–24 hrs | `Stand — {value} hrs` | 1 |
+
+Slider changes apply immediately to `UserSettings.targetMoveCalories` / `targetExerciseMinutes` / `targetStandHours` — no save button. Widget rings update on dismiss.
+
+Action buttons (two, full-width, stacked):
+- **"Reset to defaults"** (blue-outlined). Sets 500 / 30 / 12. No confirmation. ID `activityRingsSettings_resetButton`.
+- **"Import from Apple Health"** (blue-filled). Calls `AppleActivityService.importGoalsFromAppleHealth()` (SERVICES § AppleActivityService → Goal Import). Sliders animate to imported values. Disabled when `healthKitEnabled == false` OR `appleWatchDetected == false`; disabled-state caption: *"Connect Apple Health to import your goals."* ID `activityRingsSettings_importButton`.
+
+Dismiss: close button (top-right `xmark`) or outside tap. No live ring preview in the modal.
+
+### Activity Detail Sheet
+
+Tap the Activity Rings widget in live state → opens `FortiFitActivityDetailSheet`. Pulls all data from `AppleActivityService` (never queries HK directly).
+
+Presentation: iOS modal sheet, `.large` detent, swipe-down dismiss, Card Surface bg, drag indicator visible.
+
+Header: centered title "Activity – {Month} {Day}" (dynamic date). Close button top-right (`xmark`, Muted Text). ID `activityDetailSheet_closeButton`.
+
+Range toggle below header: segmented "7 days" (default) / "30 days". Tapping refetches and re-renders all blocks. IDs `activityDetailSheet_range7d`, `activityDetailSheet_range30d`.
+
+Body — three sparkline blocks + one heatmap, scrollable. Each sparkline block is a FortiFitCard with a centered chevron-icon silhouette (100pt, ring color, 3% opacity) behind the chart:
+
+| Block | Line color | Silhouette | Goal line at | Caption |
+|---|---|---|---|---|
+| Move sparkline | `#ef4444` | `chevron.right` | `targetMoveCalories` | `Last {7\|30} days · Move` |
+| Exercise sparkline | `#10b981` | `chevron.right.2` | `targetExerciseMinutes` | `Last {7\|30} days · Exercise` |
+| Stand sparkline | `#0845AD` | `chevron.up` | `targetStandHours` | `Last {7\|30} days · Stand` |
+
+Sparkline structure: Swift Charts `LineMark` with each day a ~3pt filled circle; today's point is ~6pt Primary Accent Blue. Y-axis auto-scaled. Goal line is dashed Muted Text.
+
+Ring closure heatmap (4th block): horizontal calendar strip (7 cells for 7-day, ~5×6 for 30-day). Cell fill: all three rings closed = Primary Accent Blue 100%; one or two rings closed = Primary Accent Blue 40%; none = Card Surface with border. Cell label: day-of-month (Primary Text 10px). Today's cell has Primary Accent Blue 1px outline. Caption: `Ring closure heatmap · last {7|30} days`. ID `activityDetailSheet_closureHeatmap`.
+
+Empty / insufficient data: day with no HK summary → empty cell + 0 sparkline point. Range entirely empty → block-level fallback `Not enough data yet — wear your Apple Watch and check back.`
+
+Tap behavior on cells / sparkline points: none in v1 (passive breakdown).
+
+### Activity Rings See Info Modal
+
+Standard See Info Modal (§ Standard Patterns). Content from INFO_COPY § Activity Rings. Title "About Activity Rings". Reuses `seeInfoModal_closeButton`.
 
 ### States
 | State | What the User Sees |
 |-------|-------------------|
-| Empty | All widgets at default/empty: Training Load 0% "Resting", Streak 0 dormant flame, Power Level "No data" message, Today's Plan "No workout planned for today." |
+| Empty | All widgets at default/empty: Training Load 0% "Resting", Streak 0 dormant flame, Power Level "No data" message, Today's Plan "No workout planned for today.", Activity Rings shows the appropriate State 1 or State 2 message based on HealthKit + Watch availability. |
 | Populated | Full dashboard with live data |
 | Edit Mode | All widgets show "x" buttons; cards draggable; tap outside exits |
 | All Widgets Removed | Centered muted message: "Tap the menu to add widgets to your Home screen." Ellipsis, Log Workout, and Recent Workouts remain accessible. |
@@ -182,49 +254,44 @@ Left: blue ellipsis icon. Right: "+" button. ✦ divider. One Workout Type card 
 Two options: **"CREATE WORKOUT TEMPLATE"** with SF Symbol `square.and.pencil` to the left → Create Template screen. **"VIEW SAVED TEMPLATES"** with SF Symbol `doc.on.doc` to the left → Saved Templates List.
 
 ### Workout Type Card (FortiFitWorkoutTypeCard)
-- Leading SF Symbol representing the workout type (see CONSTANTS.md § Workout Type SF Symbols), rendered at the same size and color as the type name text, with standard spacing between icon and name.
-- Type name as header (primary text #e5e5e5, 20px, 900 weight, uppercase, 2px spacing).
-- Count badge on right (e.g., "8 WORKOUTS" / "1 WORKOUT" — muted, 11px, 700 weight, uppercase).
-- Trailing chevron: ▸ collapsed, ▾ expanded (0.2s ease rotation).
-- Tap anywhere toggles expand/collapse. Default: collapsed. State persists via `WorkoutTypeOrder.isExpanded`.
-- Long-press header → Sort, Filter, Reorder & Delete context menu (see below).
+
+Leading workout-type SF Symbol (CONSTANTS § Workout Type SF Symbols, same size + color as the type name) · type name as header (Primary Text 20/900 uppercase, 2px spacing) · count badge right (`8 WORKOUTS` / `1 WORKOUT`, muted 11/700) · trailing chevron (▸ collapsed, ▾ expanded, 0.2s ease rotate). Tap anywhere = toggle expand/collapse (state persists via `WorkoutTypeOrder.isExpanded`; default collapsed). Long-press header → Sort/Filter/Reorder/Delete context menu.
 
 ### Expanded Workout Preview Rows
-Sorted newest-first (or by active sort). Each row separated by #404040 border:
-- **Row 1 — Workout Name** — 16px semibold.
-- **Row 2 — Date row** — muted text. Format: `{date} · {Apple Workout glyph if Apple-Watch-sourced}`. The glyph is the trailing token when present, per § Standard Patterns → Peripheral Apple Workout Glyph (renders only when source is Apple Watch).
-- **Row 3 — Duration / Distance** (optional) — muted text. Format: `{duration} min` and/or `{distance} {unit}`, `·`-separated when both are present. Row is omitted entirely when neither duration nor distance is set.
-- Trailing chevron (>).
 
-Tap row → Workout Detail. Swipe left → red "Delete" → standard delete confirmation → cascade delete, PR recalc, Workout Type card count update. Deleting last workout of a type removes the card and its WorkoutTypeOrder record.
+Sorted by active sort (default newest-first). Each row separated by Border 1px:
+- **Row 1** — workout name (16px semibold)
+- **Row 2** — date row (muted), format `{date} · Apple Workout` when applicable per § Standard Patterns → Peripheral Apple Workout Label
+- **Row 3** (optional) — duration / distance, format `{duration} min` and/or `{distance} {unit}`, `·`-separated when both. Row omitted when both absent.
+- Trailing chevron (>)
+
+Tap → Workout Detail. Swipe left → red "Delete" → standard delete confirmation → cascade delete + count update. Deleting last workout of a type removes the card and its WorkoutTypeOrder record.
 
 ### Pagination
-First 30 workouts shown when expanded. "Show next 30 workouts (X total)" button at bottom (muted, centered, same border style) if >30 exist. Appends next batch, button updates dynamically, disappears when all loaded. Collapse/re-expand resets to initial 30. Sort/filter changes reset pagination.
+
+First 30 workouts shown on expand. "Show next 30 workouts (X total)" button (muted centered) when >30 exist; appends next batch and updates dynamically; disappears when all loaded. Collapse/re-expand resets to 30. Sort/filter changes reset pagination.
 
 ### Search Bar
-Visible only when type has >20 workouts. Appears below card header, above first preview row. Elevated surface (#2d2d2d), muted magnifying glass, placeholder "Search workouts". Case-insensitive by workout name across ALL workouts of that type (not just loaded batch). Replaces paginated view — no "Show More" while searching. Clearing (via "×" button) returns to default paginated view. "No workouts found." when no matches.
+
+Visible only when type has >20 workouts. Below card header, above first preview row. Elevated Surface bg, muted magnifying glass, placeholder "Search workouts". Case-insensitive by name across **all** workouts of the type (not just loaded batch). Replaces paginated view (no Show More while searching). Clearing (×) returns to paginated. "No workouts found." on miss.
 
 ### Sort, Filter, Reorder & Delete Context Menu
-Long-press card header to open.
 
-**Sort by...** sub-menu: Newest first (default, checkmarked), Oldest first, Alphabetical (A–Z). One active at a time. Selecting re-renders immediately, resets pagination.
+Long-press card header. Items:
 
-**Filter by...** sub-menu (multiple filters, AND logic between filter types):
-- **Date range:** Last 7 days, Last 30 days, Last 3 months, Last 6 months, This year, All time (default), Custom range (date picker sheet with start/end, Cancel/Apply).
-- **Effort range:** Min/max stepper 1–10. Nil Effort workouts excluded when active.
-- **Duration range:** Preset buckets — Under 30 min, 30–60 min, 60–90 min, 90+ min. Multiple selectable (OR within, AND with other filters). Hidden for Yoga/Pilates.
+| Item | Sub-options |
+|---|---|
+| Sort by… | Newest first (default ✓), Oldest first, Alphabetical (A–Z). One active. Selecting re-renders + resets pagination. |
+| Filter by… | **Date range:** Last 7d, 30d, 3mo, 6mo, This year, All time (default), Custom (date-picker sheet). **Effort range:** Min/max stepper 1–10 (nil-Effort workouts excluded when active). **Duration range:** preset buckets (<30, 30–60, 60–90, 90+ min) — multi-select OR within, AND across types; hidden for Yoga/Pilates. |
+| Reorder Workout Types | Standard Reorder Edit Mode → persists to `WorkoutTypeOrder.sortOrder`. Expand/collapse disabled during reorder. |
+| Delete Workout Type | Confirmation modal: "This will permanently delete all X [Workout Type] workouts. This cannot be undone." Cancel / destructive Delete → cascade-deletes all workouts of the type + their ExerciseSets, removes the WorkoutTypeOrder record, fires cascade per SERVICES § Workout Type Deletion. Always visible regardless of sort/filter state. |
+| Clear All | Resets sort to Newest first + clears all filters. Visible only when non-default sort or any filter active. |
 
-**Reorder Workout Types:** Enters Standard Reorder Edit Mode (see § Standard Patterns). Persists to `WorkoutTypeOrder.sortOrder`. Expand/collapse is additionally disabled during reorder.
+**Gesture coexistence:** long-press menu is scoped to card *header*; swipe-to-delete on *preview rows* operates independently — no conflict.
 
-**Delete Workout Type:** Tapping opens a confirmation modal: "This will permanently delete all X [Workout Type] workouts. This cannot be undone." — where X is the total workout count for that type and [Workout Type] is the type name (e.g., "Strength Training", "Yoga"). Two actions: "Cancel" (default) and "Delete" (destructive, red). On confirm: all workouts of that type are deleted along with their ExerciseSets (cascade), the WorkoutTypeOrder record is removed, and the card disappears. Full cascading recalculations are triggered for every deleted workout — see `SERVICES.md` § Workout Type Deletion. This is always visible in the context menu regardless of sort/filter state.
+**Visual indicators:** sort indicator (↑↓, muted) near count badge when non-default sort active; filter indicator (funnel + count badge) when filters active. Both can appear simultaneously.
 
-**Clear All:** Resets sort to Newest first, removes all filters. Only shown when non-default sort or any filter is active.
-
-**Gesture Coexistence:** The long-press context menu is scoped to the card *header area* (type name, count badge, chevron). Swipe-to-delete on individual *preview rows* within expanded cards (see Expanded Workout Preview Rows above) operates independently — both gestures coexist without conflict.
-
-**Visual Indicators:** Sort indicator (↑↓ icon, muted) near count badge when non-default sort active. Filter indicator (funnel + count badge) when filters active. Both can appear simultaneously.
-
-**Persistence:** Sort/filter stored on WorkoutTypeOrder (activeSortOption, activeFiltersJSON). Persists per workout type across sessions.
+**Persistence:** sort/filter stored on WorkoutTypeOrder (`activeSortOption`, `activeFiltersJSON`). Persists per type across sessions.
 
 ### States
 | State | What the User Sees |
@@ -242,78 +309,82 @@ Long-press card header to open.
 **Purpose:** Form for creating or editing a workout.
 
 ### Layout
-← BACK. Top right: blue ellipsis. In **new-workout mode** the ellipsis is always visible. In **edit mode** the ellipsis is conditional — visible only when `workout.workoutType` is Strength Training or HIIT (the only types templates support); hidden for Cardio / Yoga / Pilates / Other Edit screens. When visible in edit mode, the ellipsis sits to the right of the trash icon — the top-right header in edit mode reads `trash | ellipsis` left-to-right (see § Edit Mode Behavior). Heading: "Log Workout" (new) / "Edit Workout" (edit).
 
-Workout Name input. Single SwiftUI `DatePicker` with `.dateAndTime` components — date defaults to today, constrained to today or earlier; any time selectable; format follows iOS locale (12/24-hour). Date stored on `workout.date`, time on `workout.time`.
+← BACK · Heading "Log Workout" (new) / "Edit Workout" (edit) · top-right blue ellipsis. Ellipsis visibility:
+- **New mode:** always visible.
+- **Edit mode:** visible only when `workout.workoutType` is Strength Training or HIIT (templates support only those). Hidden on Cardio/Yoga/Pilates/Other. Top-right header in edit mode is `trash | ellipsis` left-to-right.
 
-Workout Type dropdown (6 types). Post-Workout Effort dropdown + "?" tooltip — each option renders as `[Label] ([Number])` (e.g., `Easy (1)`, `Easy (2)`, `Light (3)`, `Light (4)`, `Moderate (5)`, `Moderate (6)`, `Hard (7)`, `Hard (8)`, `All Out (9)`, `All Out (10)`) per CONSTANTS.md § Effort Label Mapping. The integer is stored on `workout.rpe`; the label is display-only. Duration field (minutes, optional) — shown for all types, below Effort.
+**Form fields (all modes):**
+- Workout Name input
+- DatePicker `.dateAndTime` (date defaults to today, constrained today-or-earlier; any time; iOS locale formatting; date → `workout.date`, time → `workout.time`)
+- Workout Type dropdown (6 types)
+- Post-Workout Effort dropdown + "?" tooltip — each option renders as `[Label] ([Number])` per CONSTANTS § Effort Label Mapping (e.g., `Easy (1)`, `Hard (7)`, `All Out (10)`). Integer stored on `workout.rpe`; label display-only.
+- Duration (minutes, optional) — all types, below Effort
 
 **Type-specific fields below duration:**
-- **Strength Training / HIIT:** Exercise cards (name input with autocomplete, sets/reps/weight table, + ADD ROW, remove). "+ Add Exercise" button. Each table row = one ExerciseSet.
-- **Cardio / Sprints:** Distance field (km or mi per useMiles, optional). No exercises.
-- **Yoga / Pilates:** No additional fields. No distance.
+
+| Type | Additional fields |
+|---|---|
+| Strength Training / HIIT | Exercise cards: name input with autocomplete, sets/reps/weight table, + ADD ROW, remove. "+ Add Exercise" button. Each row = one ExerciseSet. |
+| Cardio | Distance (km or mi per `useMiles`, optional). No exercises. |
+| Yoga / Pilates | No additional fields. |
 
 ### Log Workout Ellipsis Menu (New Mode Only)
-**"Use workout template"** with SF Symbol `doc.badge.arrow.up` to the left → Centered selector overlay listing all templates (name + type). Selecting pre-populates form (name, type, duration, exercises). Date/time default to now, Effort empty. All fields editable. Shows "No saved templates yet." when empty.
 
-**"Save as workout template"** with SF Symbol `square.and.arrow.down` to the left → Grayed out when type isn't Strength/HIIT or when name + exercise not yet entered. Opens naming prompt (pre-filled with workout name). Saves template to SwiftData + "Template saved!" toast (auto-dismiss ~2s). Does NOT log the workout.
+| Item | SF Symbol | Behavior |
+|---|---|---|
+| Use workout template | `doc.badge.arrow.up` | Centered selector overlay listing all templates (name + type). Selecting pre-populates name, type, duration, exercises. Date/time → now, Effort empty. All fields editable. Empty: "No saved templates yet." |
+| Save as workout template | `square.and.arrow.down` | Grayed out when type isn't Strength/HIIT or name + exercise not yet entered. Naming prompt pre-filled with workout name. Saves to SwiftData + "Template saved!" toast (~2s). Does NOT log the workout. |
 
 ### Save Button
+
 "Save Workout" (new) / "Save Changes" (edit). Disabled until name filled. Enabled = blue.
 
 ### Edit Mode Behavior
-All fields pre-populated. Heading: "Edit Workout". Workout type dropdown locked. Blue trash icon (16px) in top-right → standard delete confirmation → deletes workout + ExerciseSets, cascade recalcs (PR, goals, Training Load, streak, Workout Type card), navigates to Workouts list. Adding exercise = new ExerciseSet on save. Modifying row = update ExerciseSet. Removing row = delete ExerciseSet.
 
-**Top-right header layout:** `trash | ellipsis` left-to-right. The ellipsis is conditional — present only on Strength Training or HIIT Edit Workout screens (the only types templates support). Hidden on Cardio / Yoga / Pilates / Other Edit screens. Same conditionality applies whether the workout is HK-linked or not. The ellipsis is the **only** ellipsis surface on the Edit Workout screen — no per-field ellipsis icons appear next to form fields. (HK-linked workouts continue to show inline `info.circle` popovers next to read-only field labels per § Edit Mode — HealthKit-Linked Workouts; those are a separate symbol with a separate purpose and are unaffected by this change.)
+All fields pre-populated. Type dropdown locked. Blue trash icon top-right → standard delete confirmation → deletes workout + ExerciseSets, fires Workout Cascade, navigates back to Workouts. Add row → new ExerciseSet on save; modify → update; remove → delete.
+
+The top-right ellipsis is the **only** ellipsis surface in Edit mode — no per-field ellipsis icons. (HK-linked workouts show inline `info.circle` icons on read-only field labels — separate symbol, separate purpose; see HK-Linked Workouts below.)
 
 ### Edit Mode Ellipsis Menu
 
-Visible only on Strength Training or HIIT Edit Workout screens. Single item:
+Visible only on Strength Training or HIIT Edit screens. Single item:
 
-**"Use Template"** with SF Symbol `doc.badge.arrow.up` to the left → opens the same centered template-selector overlay used by the Log Workout new-mode "Use workout template" item (see § Log Workout Ellipsis Menu (New Mode Only) above), with one filter applied: the list shows only templates whose `workoutType` matches the current workout's `workoutType`. Empty-state copy reused: "No saved templates yet." Accessibility identifier `editWorkout_useTemplateMenuItem`.
+**"Use Template"** (`doc.badge.arrow.up`, ID `editWorkout_useTemplateMenuItem`) → opens the same template selector as new-mode "Use workout template", filtered to templates matching the current `workoutType`. Empty: "No saved templates yet."
 
-Behavior on selection — applies to the in-memory edit state only; nothing persists until "Save Changes" is tapped. The Workout Cascade fires on save through `WorkoutService.update()` exactly as it does for any edit. Apply rules:
+Apply rules (in-memory edit state only — nothing persists until Save; Workout Cascade fires on save via `WorkoutService.update()`):
 
-- **Exercises:** the template's `TemplateExerciseSet` rows are **appended** to the end of the existing `ExerciseSet` list as new `ExerciseSet` records (preserving the existing `sortOrder` of in-place rows; new rows get `sortOrder` values continuing from the current max). No dedupe by name — duplicates are the user's call to clean up.
-- **Workout name:** if `workout.name` is empty, fill from the template's name. If `workout.name` is already set, the template's name is **never** applied — name is identity, not configuration.
-- **Duration (non-HK-linked workouts):** if `workout.durationMinutes` is nil/empty, fill from the template's duration. If a duration is already set, the template's duration is **never** applied.
-- **Duration (HK-linked workouts):** never applied. The field is HK-owned and read-only — see § Edit Mode — HealthKit-Linked Workouts and HEALTHKIT.md § 7. The template-derived duration is silently dropped.
-- **Workout type:** never applied (locked in Edit Mode; the selector filter ensures the template matches anyway).
-- **Effort, date, time, distance:** never applied. Effort is per-session; date/time/distance aren't carried by templates (templates are Strength/HIIT-only and have no distance, and dates are user-set per session).
+| Field | Apply rule |
+|---|---|
+| Exercises | **Append** template's `TemplateExerciseSet` rows as new `ExerciseSet`s (preserving existing rows' `sortOrder`; new rows continue from the current max). No dedupe by name. |
+| Workout name | Fill if empty; never overwrite an existing name. |
+| Duration (non-HK-linked) | Fill if nil/empty; never overwrite. |
+| Duration (HK-linked) | **Silently dropped** (HK-owned, read-only). |
+| Workout type | Never applied (locked; selector pre-filters to matching type anyway). |
+| Effort / date / time / distance | Never applied. Per-session or not carried by templates. |
 
-No "Save as workout template" item in Edit Mode — keeping the menu minimal. New-mode behavior unchanged.
-
-No confirmation dialog before applying — the operation is non-destructive (append-only for exercises; fill-if-empty for fields; nothing the user already entered is lost).
+No confirmation dialog — operation is non-destructive (append-only for exercises, fill-if-empty for fields). No "Save as template" in Edit mode (kept minimal).
 
 ### Edit Mode — HealthKit-Linked Workouts
 
-When the workout being edited has `healthKitUUID != nil`, three fields become read-only. Each field's label shows an inline `info.circle` popover explaining why it's disabled. See HEALTHKIT.md § 7 for field ownership rationale.
+When `healthKitUUID != nil`, three fields are read-only with inline `info.circle` popovers per HEALTHKIT § 7.
 
-**Read-only fields (when linked):**
-- **DatePicker (date/time)** — disabled. Date portion is HK-owned (`workout.date = HK start date`). Time component stays editable as a user-owned field via the date/time split (see below).
-- **Duration input** — disabled, pre-populated with HK value.
-- **Distance input** (Cardio only) — disabled, pre-populated with HK value.
+| Field | State when linked |
+|---|---|
+| DatePicker (date/time) | Disabled. Date is HK-owned (`workout.date = HK start date`). Time is user-owned but shares the input; date/time split tradeoff (see below). |
+| Duration | Disabled, pre-populated with HK value. |
+| Distance (Cardio only) | Disabled, pre-populated with HK value. |
+| Workout name, Effort, Session notes, ExerciseSets | **Editable** — user-owned. Adding sets to a linked Cardio import is allowed though uncommon. |
 
-**Inline `info.circle` popover (per-field):**
-Each disabled HK-owned field shows an `info.circle` SF Symbol (14pt, Muted Text `#737373`) trailing the field's label. Tapping the icon opens a SwiftUI `.popover` anchored to the icon, with field-specific copy (see CONSTANTS.md § HealthKit Strings → Log Workout — HealthKit-Linked Field Popovers). Popover contents are a single short paragraph (Primary Text `#e5e5e5`, 13px, 500 weight, ~260pt width) explaining what the field shows, why it's read-only, and how to recover edit access. Popover dismisses on tap-outside. After unlink, the fields become editable and the popovers disappear. Accessibility identifiers: `logWorkout_hkFieldInfoIcon_{date|startTime|duration|distance}`.
+**Inline `info.circle` popover:** trailing each disabled label, 14pt Muted Text. Tap → SwiftUI `.popover` anchored to the icon (~260pt width, Primary Text 13/500) with field-specific copy from CONSTANTS § HealthKit Strings → Log Workout — HealthKit-Linked Field Popovers. Tap-outside dismisses. Vanishes after unlink. IDs `logWorkout_hkFieldInfoIcon_{date|startTime|duration|distance}`.
 
-**Rationale:** Users need to know WHY a field is disabled. The inline `info.circle` answers that question per-field without forcing a sheet round-trip, reducing friction and increasing trust by making the field's provenance scannable.
+**Rationale:** users need to know *why* a field is disabled; per-field popovers answer that without a sheet round-trip.
 
-**Date/time split:** The DatePicker widget in FortiFit uses `.dateAndTime` mode. Since `date` is HK-owned but `time` is user-owned, this field is conceptually split — but because both share a single input, the entire DatePicker is disabled when linked. A user who needs to adjust the time alone still has to unlink first. Acceptable tradeoff for MVP; revisit if users complain.
+**Date/time split tradeoff:** `time` is user-owned, but DatePicker `.dateAndTime` shares one input, so the whole DatePicker disables. Editing time alone requires unlink first. Acceptable for MVP.
 
-**Fields that remain editable when linked:**
-- Workout name
-- Effort
-- Session notes
-- ExerciseSets (for Strength / HIIT)
+**Use Template + HK-linked:** ellipsis shows on linked Strength/HIIT Edit screens too. Apply rules same as above; only difference is template's duration is silently dropped (already covered in the apply table). Disabled fields and popovers unaffected.
 
-These are user-owned per § 7. Adding ExerciseSets to a linked Cardio workout imported from Apple Watch is allowed but not expected in practice.
-
-**Use Template menu item — interaction with HK-linked workouts:** the Edit Mode ellipsis (see § Edit Mode Ellipsis Menu above) is visible on Strength Training and HIIT HK-linked workouts, just like on non-linked ones. Tapping "Use Template" opens the same selector and applies the template under the same rules with one HK-aware exception: the template's duration is **silently dropped** because `durationMinutes` is HK-owned and read-only. Exercises append normally; name fills if `workout.name` is empty. The HK-linked field popovers and disabled state are unaffected by template application — the disabled fields stay disabled, and the popovers stay anchored to their `info.circle` icons. See SCREENS.md § Edit Mode Ellipsis Menu for the full apply-rule table.
-
-**Save button:** Behaves identically to non-linked save. Triggers `WorkoutService.update()`, which bumps `lastModifiedDate` and fires the Workout Cascade.
-
-**Accessibility:** Inline `info.circle` icons use identifiers `logWorkout_hkFieldInfoIcon_{date|startTime|duration|distance}`. See TESTING.md § Accessibility Identifiers.
+**Save:** identical to non-linked — `WorkoutService.update()` bumps `lastModifiedDate` and fires Workout Cascade.
 
 ---
 
@@ -322,13 +393,14 @@ These are user-owned per § 7. Adding ExerciseSets to a linked Cardio workout im
 **Purpose:** Build a reusable workout template from scratch, or edit an existing one.
 
 ### Layout
-← BACK. Heading: "Create Template" (new) / "Edit Template" (edit). Template Name input (required). Workout Type dropdown — Strength Training and HIIT only. Duration (optional). Exercise cards identical to Log Workout for Strength/HIIT. "+ Add Exercise" button. No Effort, no DatePicker, no distance.
 
-"SAVE TEMPLATE" / "Save Changes" button. Disabled until name + at least one exercise with sets/reps entered. Saves to SwiftData, navigates back.
+← BACK · Heading "Create Template" (new) / "Edit Template" (edit). Form fields: Template Name (required), Workout Type dropdown (Strength Training / HIIT only), Duration (optional), exercise cards (identical to Log Workout Strength/HIIT), "+ Add Exercise". No Effort, no DatePicker, no distance.
 
-**Edit mode:** Opened from Saved Templates List. All fields pre-populated. Workout type locked. Top-right icons: muted trash icon (16px), blue ellipsis icon (16px) to right of trash. Trash → standard delete confirmation → cascade-delete template + TemplateExerciseSets, navigate to Saved Templates List. Back button in left hand corner navigates to Saved Templates.
+"SAVE TEMPLATE" / "Save Changes" button. Disabled until name + ≥1 exercise with sets/reps. Saves to SwiftData, navigates back.
 
-**Edit Mode Ellipsis Menu:** "Share Template" with QR code icon (SF Symbol `qrcode`) to the left. Tapping opens the same Share Template QR Modal as on the Saved Templates List (see Saved Templates List § Share Template QR Modal).
+**Edit mode:** Pre-populated from Saved Templates List. Type locked. Top-right: muted trash · blue ellipsis. Trash → standard delete confirmation → cascade-deletes template + TemplateExerciseSets → navigate to Saved Templates List. Back button → Saved Templates.
+
+**Edit Mode Ellipsis Menu:** **"Share Template"** (`qrcode`) → opens the same Share Template QR Modal as Saved Templates List (§ below).
 
 ---
 
@@ -342,20 +414,20 @@ These are user-owned per § 7. Adding ExerciseSets to a linked Cardio workout im
 Tap row → Create Template in edit mode. Template deletion has no effect on workouts, goals, PRs, streaks, or Training Load.
 
 ### Long-Press Context Menu
-Long-pressing any template card opens a context menu (uses Standard Long-Press Tease). Three options:
 
-**"Share Template":** QR code icon (SF Symbol `qrcode`) to the left of the label. Tapping opens the Share Template QR Modal (see below).
-
-**"Schedule This Template":** Calendar icon (SF Symbol `calendar.badge.plus`) to the left of the label. Tapping opens the Plan scheduling flow (see SCREENS.md § Plan, Scheduling Flow) with this template pre-selected.
-
-**"Delete Template":** Tapping opens the standard delete confirmation ("Delete [Template Name]? This cannot be undone."). On confirm: template + TemplateExerciseSets cascade-deleted from SwiftData.
+| Item | SF Symbol | Behavior |
+|---|---|---|
+| Share Template | `qrcode` | Opens Share Template QR Modal (§ below). |
+| Schedule This Template | `calendar.badge.plus` | Opens § Plan → Scheduling Flow with this template pre-selected. |
+| Delete Template | — | Standard delete confirmation: `Delete [Template Name]? This cannot be undone.` On confirm cascade-deletes template + TemplateExerciseSets. |
 
 ### Share Template QR Modal
-Centered modal with dimmed background. Dismissible via outside tap or close button.
 
-**Layout:** Upper-left: blue share icon (16px, `square.and.arrow.up`, #3b82f6) — tapping presents iOS share sheet with the QR code as a PNG image. Upper-right: muted "×" close button (24x24pt circular, #2d2d2d bg, #404040 border, muted "×"). Center: generated QR code image encoding the full template data as a `fitnavi://` URL (see `SERVICES.md` § TemplateShareService). Below QR code: template name (Primary Text, 15px, 700 weight, centered) and workout type (Muted Text, 13px, centered).
+Centered modal, dimmed bg, outside-tap or close-button dismiss.
 
-**QR code styling:** White-on-dark QR code. Card Surface (#1a1a1a) background behind the QR module. Border (#404040) 1px stroke, 12px corner radius around the QR container. QR code renders at a size that comfortably scans from a phone screen (~250pt).
+Upper-left: blue share icon (`square.and.arrow.up`) → iOS share sheet with QR code as PNG. Upper-right: standard close button (24×24pt). Center: QR code encoding the template data as a `fitnavi://` URL (see SERVICES § TemplateShareService). Below: template name (Primary Text 15/700 centered) + workout type (Muted Text 13px centered).
+
+QR styling: white-on-dark; Card Surface bg behind the QR module; Border 1px stroke + 12px corner radius around the container; QR ~250pt for comfortable scanning.
 
 ### States
 | State | What the User Sees |
@@ -370,19 +442,18 @@ Centered modal with dimmed background. Dismissible via outside tap or close butt
 **Purpose:** Confirm and save a workout template received via QR code deep link.
 
 ### Trigger
-Activated when the app opens via a `fitnavi://template?data=...` URL (scanned QR code or tapped link). If the app is not running, it launches first, then presents the prompt. If the app is already open, the prompt appears as a modal over the current screen.
+
+Fires when the app opens via `fitnavi://template?data=...` (scanned QR or tapped link). App not running → launches first then presents prompt; already open → modal over current screen.
 
 ### Layout
-Centered modal with dimmed background. "Import Template?" heading (Primary Text, 20px, 900 weight). Template preview card below the heading showing:
 
-- Template name (Primary Text, 16px, 700 weight)
-- Workout type (Muted Text, 13px)
-- Exercise count (Muted Text, 13px, e.g., "5 exercises")
+Centered modal, dimmed bg. Heading "Import Template?" (Primary Text 20/900). Template preview card showing template name (Primary Text 16/700), workout type (Muted Text 13px), exercise count (Muted Text 13px, e.g., "5 exercises").
 
-Two action buttons below the preview: "Cancel" (default, muted outline) and "Save Template" (blue, filled). Cancel dismisses with no action. Save creates the template in SwiftData and shows a "Template saved!" toast (~2s auto-dismiss, matching existing toast pattern), then dismisses the modal.
+Action buttons below preview: "Cancel" (muted outline, no action) / "Save Template" (blue filled — creates the template + "Template saved!" toast ~2s, dismisses).
 
 ### Duplicate Name Handling
-If a template with the same name already exists, the imported template is auto-renamed by appending a numeric suffix: "Push Day" → "Push Day (1)". If "Push Day (1)" also exists, increment to "Push Day (2)", and so on. The preview card in the prompt shows the final resolved name so the user sees what will be saved.
+
+Same-name template exists → auto-rename with numeric suffix: "Push Day" → "Push Day (1)" → "Push Day (2)" etc. Preview shows the final resolved name.
 
 ### Error Handling
 
@@ -407,160 +478,134 @@ If a template with the same name already exists, the imported template is auto-r
 **Core Principle:** A scheduled workout is an intent, not a record. The `Workout` model object is only created when the user explicitly completes the session. The schedule is tracked by a separate `ScheduledWorkout` model.
 
 ### Layout
-Left: blue ellipsis icon (functional — opens Plan ellipsis menu). Right: "+" button (light haptic on tap, matching the "+ Log Workout" button on Home). ✦ divider. FortiFitSegmentedToggle: "WEEK" (default) / "MONTH". Calendar area below toggle. Day detail area below calendar.
+
+Header: blue ellipsis (left) · "+" button (right, light haptic, matches Home "+ Log Workout"). ✦ divider. FortiFitSegmentedToggle: "WEEK" (default) / "MONTH". Calendar area below the toggle. Day Detail Area below the calendar.
 
 ### Week Strip Calendar (Default)
-Continuous horizontal scroll showing 7 visible day cells at a time. Scrolls day-by-day (not week-by-week) — each swipe advances one day in either direction. The visible window slides gradually rather than snapping in 7-day increments.
 
-**Month indicator:** A month name label appears above the week strip (15px, 700 weight, primary text), updating dynamically as the user scrolls. Shows the year if not the current year. If the visible 7 days span two months, both are shown (e.g., "April – May"). No month-by-month navigation controls — the indicator is passive context only.
+Continuous horizontal scroll, 7 visible day cells. Scrolls day-by-day (not week-by-week) — each swipe advances one day; visible window slides gradually rather than snapping.
 
-**Day cell sizing:** Each cell is evenly distributed across screen width (1/7 of available width minus horizontal padding). Minimum cell height: 72pt. Internal vertical spacing: 6pt between day abbreviation, date number, and dot indicators. Blue selection circle: 36pt diameter, centered on the date number.
+Month indicator above the strip (15/700, Primary Text), updating as the user scrolls. Shows year if not current year. If the visible 7 days span two months, shows both (e.g., "April – May"). No month navigation controls — passive context only.
 
-Each day cell shows:
-- Day abbreviation (e.g., "MON") — muted uppercase label (12px, 700 weight, 2px spacing).
-- Date number (e.g., "7") — primary text (18px, 800 weight).
-- Dot indicators below date: blue dot = planned `ScheduledWorkout`, green dot = completed — from either a completed `ScheduledWorkout` OR a logged-only `Workout` that is surfaced per § Day Detail Area § Logged-Only Workout Surfacing. No dot = empty. Multiple workouts on one day show multiple dots (max 3 visible, "+N" if more). Dot size: 6pt diameter, 4pt spacing between dots.
+Cell sizing: 1/7 width, 72pt min height, 6pt internal vertical spacing, 36pt selection-circle diameter.
 
-**Day cell states:**
-- **Selected day:** Date number displayed inside a solid Primary Accent Blue (#3b82f6) filled circle. Number text becomes Background Dark (#0a0a0a) for contrast.
-- **Today (when not selected):** Blue border ring (unfilled) around the date number to orient the user.
-- **Today AND selected:** Filled blue circle (selected state takes precedence over today's border ring).
-- **Other days:** No circle or ring treatment.
+Each cell:
+- Day abbreviation ("MON" — muted uppercase label, 12/700, 2px spacing)
+- Date number ("7" — Primary Text, 18/800)
+- Dot indicators below date: **blue** = planned `ScheduledWorkout`; **green** = completed (from either a completed `ScheduledWorkout` OR a logged-only `Workout` surfaced per § Logged-Only Workout Surfacing); none = empty. Max 3 visible, "+N" if more. Dot 6pt, 4pt spacing.
 
-Tapping a day cell selects it and shows its scheduled workouts in the day detail area below.
+Cell states: **selected** = solid Primary Accent Blue circle around the date number (number flips to Background Dark for contrast); **today (not selected)** = blue ring (unfilled); **today + selected** = filled blue circle (selected wins). Tap selects and updates Day Detail Area.
 
 ### Month Grid View
-Calendar grid with generous cell sizing for comfortable tap targets. Each day cell: minimum 44x44pt (Apple HIG touch target). Date number: 14px, 700 weight, centered. Blue selection circle: 30pt diameter, scaled down from the week strip but still prominent. Dot indicators: 5pt diameter, positioned below the date number. Dot color logic matches the week strip (blue = planned `ScheduledWorkout`, green = completed from either source — see § Week Strip Calendar). Row height: 52pt minimum to accommodate date number + dots with breathing room. Weekday header row ("M T W T F S S") in muted uppercase, 11px, 700 weight. Month navigation via swipe left/right between months.
 
-Selected day uses the same blue filled circle treatment as the week strip. Tapping a day selects it and shows its scheduled workouts in the day detail area below — the user stays in month view.
+Calendar grid, 44pt min tap target. Date number 14/700 centered. Selection circle 30pt (scaled down from week strip). Dot indicators 5pt below the date — same color logic as week strip. Row height 52pt min. Weekday header row ("M T W T F S S") muted uppercase 11/700. Swipe left/right for month navigation.
+
+Selected day uses the same blue filled circle. Tap → selects + updates Day Detail Area; stays in month view.
 
 ### Plan Ellipsis Menu
-One option: **"Saved Templates"** with SF Symbol `doc.on.doc` to the left → navigates to the existing SavedTemplatesListView (same view accessible from the Workouts ellipsis menu).
+
+One option: **"Saved Templates"** (`doc.on.doc`) → SavedTemplatesListView (same view as Workouts ellipsis).
 
 ### Day Detail Area
-Below the calendar. Renders one card per scheduled or logged workout on the selected day (see § Logged-Only Workout Surfacing for inclusion rules). Cards stack vertically.
 
-**Scheduled workout card (FortiFitScheduledWorkoutCard):**
-- Workout name (primary text, 16px semibold).
-- Workout type pill (muted, uppercase, 11px).
-- Estimated duration (muted, if available from template).
-- Scheduled time (muted, if set).
-- **"Complete Planned Workout"** button (full-width, blue-outlined, consistent with "+ Log Workout" button style on Home).
+Below the calendar. One card per scheduled or logged workout on the selected day (inclusion rules in § Logged-Only Workout Surfacing). Cards stack vertically.
 
-**Logged-only workout card:**
-Rendered for each `Workout` that surfaces per § Logged-Only Workout Surfacing. Visually identical to a completed scheduled workout card (grey fill, green border, green checkmark, muted "COMPLETED" label). Fields:
-- Workout name (primary text, 16px semibold). No leading glyph — Apple Workout glyph (when applicable) renders trailing on the metadata row below.
-- Workout type pill (muted, uppercase, 11px) followed by ` · LOGGED SESSION` metadata to the right of the pill (11px, 700 weight, uppercase, muted text — matches pill label styling but sits outside the pill boundary). `· LOGGED SESSION` is the source affordance and appears **only** on logged-only cards, not on completed scheduled cards.
-- Metadata row: duration (when `workout.durationMinutes` is set) and Apple Workout glyph (when source is Apple Watch — see § Standard Patterns → Peripheral Apple Workout Glyph), separated by ` · `. Glyph is the trailing token. Either or both may be omitted; row is hidden entirely when both are absent.
-- Muted "COMPLETED" label with green checkmark in place of any action button.
+**Card variants:**
 
-Days with no scheduled or logged-only workouts show no content in the detail area. The "+" button in the Plan header is the sole entry point for scheduling.
+| Variant | Visual | Trailing affordance | Action |
+|---|---|---|---|
+| Planned scheduled (`FortiFitScheduledWorkoutCard`) | Default styling | — | Full-width blue-outlined "Complete Planned Workout" button |
+| Overdue planned (past `scheduledDate`, still "planned") | + muted "OVERDUE" badge below the type pill | — | Same as planned |
+| Completed scheduled | Green checkmark, muted styling | `· PLANNED SESSION` to the right of the type pill | Muted "COMPLETED" label replaces the button |
+| Logged-only (surfaced per rules below) | Visually identical to completed scheduled | `· LOGGED SESSION` to the right of the type pill | Muted "COMPLETED" label replaces the button |
+| Skipped scheduled | Dimmed, strikethrough name, muted border | — | Muted "SKIPPED" label replaces the button |
 
-**Overdue planned workouts** (scheduled date in the past, status still "planned"): Card shows a muted "OVERDUE" badge (11px, 700 weight, uppercase, muted text) below the workout type pill.
-
-**Completed scheduled workouts:** Card visually marked with green checkmark and muted styling. Next to the workout type name is `· PLANNED SESSION`. "Complete Planned Workout" button replaced with muted "COMPLETED" label. `· PLANNED SESSION` is the source affordance and appears **only** on scheduled-only cards, not on completed logged cards. If the linked `Workout` was Apple-Watch-sourced, the Apple Workout glyph renders trailing on the same metadata row as duration, per § Standard Patterns → Peripheral Apple Workout Glyph (same rules as logged-only cards).
-
-**Skipped workouts:** Card visually dimmed (muted text, strikethrough on workout name, muted border). Button replaced with muted "SKIPPED" label.
+**Card fields (common):** workout name (Primary Text 16/semibold), workout type pill (muted uppercase, 11px), metadata row with duration, scheduled time (planned only, when set), and "Apple Workout" peripheral label trailing on the metadata row when source is Apple Watch (§ Standard Patterns). Metadata row hidden if all components absent.
 
 **Tap behavior:**
-- **Planned card:** No tap navigation (the "Complete Planned Workout" button is the primary action).
-- **Skipped card:** No tap navigation.
-- **Completed scheduled card:** Tap anywhere on the card → navigates to Workout Detail for the linked `Workout` (resolved via `completedWorkoutId`).
-- **Logged-only card:** Tap anywhere on the card → navigates to Workout Detail for the underlying `Workout`.
+- Planned / Skipped: no tap navigation (button is the primary action).
+- Completed scheduled: tap → Workout Detail (resolved via `completedWorkoutId`).
+- Logged-only: tap → Workout Detail for the underlying `Workout`.
+
+Days with no surfaced workouts → empty detail area. The header "+" is the sole scheduling entry.
 
 ### Logged-Only Workout Surfacing
 
-The Day Detail Area and calendar dot indicators include logged-only `Workout` records alongside `ScheduledWorkout` records. A `Workout` surfaces on Plan (as a green dot and a logged-only card under its `workout.date`) if and only if **both** conditions are met:
-1. No `ScheduledWorkout` has `completedWorkoutId == workout.id` (workouts linked to a scheduled slot are already represented by their `ScheduledWorkout` — surfacing them separately would duplicate them).
+A `Workout` surfaces on Plan (as a green dot and a logged-only card under `workout.date`) iff **both**:
+1. No `ScheduledWorkout` has `completedWorkoutId == workout.id` (already represented by the scheduled card — would duplicate).
 2. `workout.hiddenFromPlan == false`.
 
-Workouts failing either condition are invisible to the Plan screen. See SERVICES.md § PlanService → Retrieval for the fetch implementation.
+Failing either → invisible to Plan. Implementation in SERVICES § PlanService → Retrieval.
 
-Empty state applies only when **no** `ScheduledWorkout` records exist AND no non-hidden `Workout` records exist — the Plan screen treats any surfaced card or dot (scheduled or logged) as non-empty.
+Plan empty state fires only when **no** `ScheduledWorkout` records exist AND no non-hidden `Workout` records exist — any surfaced card or dot counts as non-empty.
 
 ### Scheduling Flow
 
-**Entry points:** (1) Tap "+" button in Plan tab header. (2) Long-press a template in Saved Templates List → "Schedule This Template."
+**Entry points:** (1) "+" button in Plan header. (2) Long-press a template in Saved Templates List → "Schedule This Template."
 
 **Flow:**
-1. **Template Selection:** Sheet slides up showing saved templates (reuses SavedTemplatesListView as a selection interface). Each row: template name, workout type, exercise count. Tap to select.
-2. **Date Selection:** If entered from Plan on a specific day, that date is pre-filled. Otherwise, date picker appears. Date must be today or later — past dates are not schedulable.
-3. **Time (Optional):** Optional time-of-day picker. Defaults to no specific time.
-4. **Recurrence (Optional):** Recurrence picker: None (default), Weekly, Biweekly. Selecting a recurrence auto-generates `ScheduledWorkout` records for the next 12 weeks. All share the same `recurrenceGroupId`.
-5. **Confirmation:** Summary card showing template name, date, time, recurrence. Summary card sits under a "Summary" header. "Schedule Workout" button saves and dismisses.
+1. **Template Selection** — sheet up showing saved templates (reuses SavedTemplatesListView as a picker). Each row: template name, workout type, exercise count. Tap to select.
+2. **Date Selection** — pre-filled if entered from a specific day. Otherwise date picker. Today or later only — past dates not schedulable.
+3. **Time (optional)** — time-of-day picker. Defaults to no specific time.
+4. **Recurrence (optional)** — None (default) / Weekly / Biweekly. Selecting auto-generates `ScheduledWorkout`s for the next 12 weeks, all sharing the same `recurrenceGroupId`.
+5. **Confirmation** — summary card (template name, date, time, recurrence) under a "Summary" header. "Schedule Workout" saves and dismisses.
 
-**Validation:** Template must be selected. Date must be today or in the future. Multiple workouts can be scheduled for the same day.
+Validation: template required; date today or future. Multiple workouts per day allowed.
 
 ### Complete Planned Workout Flow
 
-1. User taps **"Complete Workout"** on a scheduled workout card.
-2. **Date Resolution** (see below) — if date prompt is needed, resolve first.
-3. **Compact Confirmation Sheet** slides up (elevated surface #1a1a1a, border #404040, dimmed background overlay):
-   - Workout name displayed at top (non-editable, for context, primary text 16px 700 weight).
-   - **Effort** — horizontal row of numbered pills (1–10), consistent with Log Workout Effort input. Optional. No default value.
-   - **Duration** — FortiFitInput with "min" suffix label. Optional. Pre-filled from template's `durationMinutes` if available.
-   - **"Save Workout"** button (full-width, blue filled, prominent).
-   - **"Modify Exercises"** button below "Save Workout" (full-width, blue-outlined secondary style). Routes to full Log Workout view pre-populated from template snapshot.
-4. **On "Save Workout":** Creates `Workout` from template snapshot (name, type, exercises/sets/reps/weights) plus Effort and duration from sheet. Marks `ScheduledWorkout` as completed, stores new `Workout.id` in `completedWorkoutId`. Dismisses sheet. Toast: "Workout completed." (~2s auto-dismiss).
-5. **On "Modify Exercises":** Dismisses compact sheet. Opens Log Workout in new-workout mode, pre-populated from template snapshot. `ScheduledWorkout` ID carried through. On save in Log Workout: same completion logic (mark slot completed, link workout ID). On back-out without saving: slot remains "planned".
+1. Tap "Complete Planned Workout" on a card.
+2. **Date Resolution** (see below) — resolve any date prompt first.
+3. **Compact confirmation sheet** slides up (Card Surface bg, Border, dimmed overlay):
+   - Workout name at top (non-editable context line, Primary Text 16/700).
+   - **Effort** — horizontal row of 1–10 pills, matches Log Workout. Optional, no default.
+   - **Duration** — FortiFitInput with "min" suffix. Optional. Pre-filled from template's `durationMinutes` if available.
+   - **"Save Workout"** (full-width, blue-filled).
+   - **"Modify Exercises"** (full-width, blue-outlined) → full Log Workout pre-populated from template snapshot.
+4. **On Save:** creates `Workout` from template snapshot (name, type, exercises/sets/reps/weights) + Effort + duration from sheet. Marks slot completed, stores new `Workout.id` on `completedWorkoutId`. Dismiss + "Workout completed." toast.
+5. **On Modify Exercises:** dismisses compact sheet, opens Log Workout new-mode pre-populated from snapshot, carrying through the `ScheduledWorkout` ID. Save → same completion logic. Back-out without saving → slot stays "planned".
 
-Dismiss compact sheet via close button or outside tap (does not complete the workout).
+Sheet dismiss (close button / outside tap) does not complete the workout.
 
 ### Date Resolution Logic
 
-When a user taps "Complete Planned Workout," the system determines the workout date:
-
-**Scheduled date is today:** No prompt. Workout stamped with today's date.
-
-**Scheduled date is in the past:** Prompt: "This workout was planned for [scheduled date]. Log for [scheduled date] or today?" Two options: [Scheduled date] or Today. Either proceeds to compact confirmation sheet.
-
-**Scheduled date is in the future:** Prompt: "This workout is planned for [future date]. Log for today instead?" Two options: "Log for Today" (proceeds to compact confirmation sheet, workout saved with today's date) or "Cancel" (returns to Plan, slot remains planned). No option to keep the future date — post-dating is prohibited to prevent phantom entries in stress, streak, and PR calculations.
+| Scheduled date | Prompt | Outcome |
+|---|---|---|
+| Today | None | Workout stamped today |
+| Past | "This workout was planned for [scheduled date]. Log for [scheduled date] or today?" → [Scheduled date] / Today | Either choice → confirmation sheet with corresponding date |
+| Future | "This workout is planned for [future date]. Log for today instead?" → "Log for Today" / "Cancel" | Log for Today → confirmation sheet, workout saved today. Cancel → returns to Plan, slot stays planned. No option to keep the future date — post-dating prohibited to prevent phantom entries in stress, streak, and PR calculations. |
 
 ### Long-Press Context Menu
 
-Long-pressing a card in the Day Detail Area opens a context menu (uses Standard Long-Press Tease). Menu contents vary by card type:
+Long-press a Day Detail card (uses Standard Long-Press Tease). Menu varies by card type:
 
-**Planned scheduled card:**
-- **"Skip Workout":** Sets status to "skipped". Card visually dims. No `Workout` record created. Reversible — long-press the skipped card → "Restore Workout" sets status back to "planned".
-- **"Remove from Plan":** Standard delete confirmation ("Remove [Workout Name] from Plan? This cannot be undone."). On confirm: `ScheduledWorkout` record deleted. For recurring instances, the standard "This workout only / This and future workouts" prompt applies first (see § Editing Recurring Workouts).
+| Card type | Menu items |
+|---|---|
+| Planned scheduled | **Skip Workout** (sets status "skipped", dims card, no `Workout` created — reversible via "Restore Workout"). **Remove from Plan** (standard delete confirmation; deletes `ScheduledWorkout`. Recurring instances trigger the "This workout only / This and future" prompt first). |
+| Skipped scheduled | **Restore Workout** (status back to "planned"). **Remove from Plan** (same as planned). |
+| Completed scheduled | **Remove from Plan** — dual-action (see below). Underlying `Workout` preserved. |
+| Logged-only | **Remove from Plan** — non-destructive ("Remove [Workout Name] from Plan? The workout will remain in your log." — Cancel / Remove, no destructive-red styling). Sets `workout.hiddenFromPlan = true`. Card + dot disappear; workout intact in Workouts and algorithms. Toast "Removed from Plan. [Undo]" (~4s) flips back on Undo. |
 
-**Skipped scheduled card:**
-- **"Restore Workout":** Sets status back to "planned".
-- **"Remove from Plan":** Same confirmation and behavior as on a planned card.
+**"Remove from Plan" dual-action (completed scheduled only):** A completed scheduled card is backed by both a `ScheduledWorkout` and a linked `Workout`. Deleting the schedule alone would re-surface the workout as a logged-only card (per § Logged-Only Workout Surfacing). So this action atomically (1) deletes the `ScheduledWorkout`, (2) sets `workout.hiddenFromPlan = true`. User sees a single disappearance. Schedule/recurrence lineage is permanently lost; the workout can only reappear via "Show on Plan" in Workout Detail (then as a logged-only card). Confirmation + toast match the logged-only flow. Undo flips `hiddenFromPlan` back; the `ScheduledWorkout` is **not** restored. SERVICES § PlanService → Remove from Plan for full logic.
 
-**Completed scheduled card:**
-- **"Remove from Plan":** Dual-action (see below). The underlying `Workout` record is preserved — only its visibility on Plan is removed.
-
-**Logged-only card:**
-- **"Remove from Plan":** Non-destructive confirmation ("Remove [Workout Name] from Plan? The workout will remain in your log." — Cancel / Remove, no destructive-red styling). On confirm: `workout.hiddenFromPlan` set to `true`. Card and dot disappear from Plan. Workout remains fully intact on the Workouts screen and in all algorithms. Toast: "Removed from Plan. [Undo]" (~4s auto-dismiss). Tapping Undo flips the flag back to `false`.
-
-**"Remove from Plan" dual-action (completed scheduled cards only):**
-Because a completed scheduled card is backed by both a `ScheduledWorkout` and a linked `Workout` — and because the dedup rule in § Logged-Only Workout Surfacing would immediately re-surface the `Workout` as a logged-only card if only the `ScheduledWorkout` were deleted — "Remove from Plan" on a completed scheduled card performs both steps atomically:
-1. Delete the `ScheduledWorkout` record.
-2. Set `workout.hiddenFromPlan = true` on the linked `Workout`.
-
-The user sees a single disappearance. Schedule/recurrence lineage is permanently lost; the workout can only reappear on Plan as a logged-only card via the "Show on Plan" action in Workout Detail. See SERVICES.md § PlanService → Remove from Plan for full service logic. Confirmation and toast match the logged-only flow ("Remove [Workout Name] from Plan? The workout will remain in your log.", non-destructive styling, "Removed from Plan. [Undo]" toast). Undo reverses both steps — the `ScheduledWorkout` record is **not** restored (it was deleted), and a fresh `hiddenFromPlan = false` flip makes the card reappear as a **logged-only** card. This is acceptable behavior — the user understands "Remove from Plan" on a completed workout is a lineage-destroying action.
-
-For recurring completed instances, the standard "This workout only / This and future workouts" prompt applies:
-- **This workout only:** Dual-action on just this instance.
-- **This and future:** Dual-action on this instance, plus delete all future **planned** `ScheduledWorkout`s in the same `recurrenceGroupId`. Past completed and skipped instances are untouched (consistent with the existing recurrence delete rule).
+For recurring completed instances, the "This workout only / This and future workouts" prompt applies first. **This and future** = dual-action on this instance, plus delete future **planned** `ScheduledWorkout`s in the same `recurrenceGroupId` (past completed/skipped untouched).
 
 ### Editing Recurring Workouts
 
-When a user edits or deletes a recurring workout, prompt: **"This workout only"** or **"This and future workouts"**. "This workout only" modifies/deletes the single instance. "This and future workouts" modifies/deletes this instance and all future instances sharing the same `recurrenceGroupId` with `scheduledDate` ≥ this instance's date. Past completed/skipped workouts are never retroactively altered.
+Edit/delete on a recurring instance prompts **"This workout only"** or **"This and future workouts"**. "This and future" applies to this instance + all future instances in the same `recurrenceGroupId` with `scheduledDate` ≥ this instance's date. Past completed/skipped workouts are never retroactively altered.
 
 ### States
-| State | What the User Sees |
-|-------|-------------------|
-| Empty | "Schedule your first workout to start planning." Shown only when no `ScheduledWorkout` records exist AND no non-hidden `Workout` records exist. "+" button accessible. |
-| Populated | Calendar with dot indicators, scheduled/logged workout cards in day detail |
-| Week view | Default. Continuous day-by-day scrollable strip with month indicator and day detail below |
-| Month view | Condensed month grid. Tap day → selects day and shows detail below (stays in month view) |
-| Selected day | Blue filled circle on date number in both week and month view |
-| Completed day | Green checkmark on card, muted "COMPLETED" label. Applies to both completed scheduled cards and logged-only cards. |
-| Logged-only card | Visually identical to completed scheduled card, with ` · LOGGED` metadata to the right of the workout type pill as source affordance |
-| Skipped day | Dimmed card, strikethrough name, muted "SKIPPED" label |
-| Overdue | Planned card with muted "OVERDUE" badge |
+
+| State | What the user sees |
+|---|---|
+| Empty | "Schedule your first workout to start planning." Fires only when no `ScheduledWorkout` records exist AND no non-hidden `Workout` records exist. "+" accessible. |
+| Populated | Calendar with dot indicators + cards in Day Detail |
+| Week view | Default — continuous day-by-day scroll, month indicator, detail below |
+| Month view | Condensed grid — tap day selects + updates detail (stays in month view) |
+| Selected day | Blue filled circle on date number (both views) |
+| Completed | Green checkmark + muted "COMPLETED" label (both completed scheduled and logged-only cards) |
+| Skipped | Dimmed card, strikethrough name, muted "SKIPPED" label |
+| Overdue | Planned card + muted "OVERDUE" badge |
 
 ---
 
@@ -569,60 +614,49 @@ When a user edits or deletes a recurring workout, prompt: **"This workout only"*
 **Purpose:** Full breakdown of a single workout session.
 
 ### Layout
-← BACK. "Workout" label, name (blue), date, time, workout type (muted, e.g., "Mar 17, 2026 · 2:35 PM · Strength Training"). When time is nil (pre-feature workout), omit time component.
 
-**Source indicator (HK-linked workouts only):** Rendered on its own row directly below the workout type row when `workout.healthKitUUID != nil`. Format: `{sourceName} [glyph]` — source name only, no activity type prefix. The Apple Workout glyph trails as the last token **only when the source is Apple Watch**. Styled as secondary/muted text using the app's Label treatment (14px, 700 weight, 2px letter-spacing, Muted Text color).
+Header: ← BACK · "Workout" label · workout name (blue) · `{date} · {time} · {type}` (muted; time omitted when nil).
 
-Source name is resolved dynamically at render time via `HealthKitClient.sourceName(for:)` (see SERVICES.md § HealthKitClient → sourceName resolution). Resolution rule:
-- Apple Watch source bundle ID → `Apple Workout`
-- Other known sources → their `HKSource.name` (e.g., `Strava`, `Peloton`)
-- Unknown / unresolvable → `another app` (graceful fallback — never displays a raw bundle ID)
+Top-right icon tray (right-to-left): blue ellipsis (rendered only if ≥1 ellipsis item applies) · muted trash · muted edit · blue share. Share → renders Share Image Card and presents iOS share sheet. Edit → Log Workout in edit mode. Trash → standard delete confirmation → cascade delete → back to Workouts.
 
-**Trailing glyph:** the Apple Workout glyph (component `FortiFitHealthGlyph.swift` — running figure on green circular background) renders trailing the source name **only when source is Apple Watch**. Other sources render with no trailing glyph; users distinguish them by the source name alone. Future updates may add per-source glyphs (Strava, Peloton, etc.) — when that happens, the same trailing-glyph slot is used.
+**Source indicator (HK-linked only)**, on its own row directly below the type row when `workout.healthKitUUID != nil`. Format `{sourceName} [glyph]` — source name only, no activity-type prefix; glyph trails *only* for Apple Watch. Label treatment, 14px Muted Text. Tappable → opens Source Indicator Info Sheet. ID `workoutDetail_healthSourceIndicator`.
 
-Example renderings:
-- `Apple Workout [glyph]` (Apple Watch source)
-- `Strava` (Strava source — no glyph)
-- `Peloton` (Peloton source — no glyph)
+Source name resolution (`HealthKitClient.sourceName(for:)` per SERVICES § HealthKitClient): Apple Watch → `Apple Workout`; other recognized → `HKSource.name` (Strava, Peloton, etc.); unresolvable → `another app`. Never a raw bundle ID. Leading glyph (`FortiFitHealthGlyph` — running figure on green) renders only for Apple Watch source; other sources render no glyph.
 
-The row is tappable — tapping anywhere on the row opens the **Source Indicator Info Sheet** (see below). Row has accessibility identifier `workoutDetail_healthSourceIndicator` (see TESTING.md).
+**Ellipsis menu** (icon visible only when ≥1 item applies):
 
-Top-right icons: blue share icon (16px, `square.and.arrow.up`, #3b82f6), muted edit icon (16px), muted trash icon (16px). Blue ellipsis icon (16px) to right of trash, shown when at least one ellipsis menu item applies (see Ellipsis Menu below). Share → renders workout as styled image card and presents iOS share sheet (see Share Image Card below). Edit → Log Workout in edit mode. Trash → standard delete confirmation → cascade delete, back to Workouts list.
+| Item | Visibility | Behavior |
+|---|---|---|
+| Save as workout template (`square.and.arrow.down`) | Strength Training / HIIT only | Naming prompt pre-filled with workout name → saves template (name, type, duration, exercises; not Effort/date/time/notes) → "Template saved!" toast |
+| Show on Plan (`calendar.badge.plus`) | `workout.hiddenFromPlan == true` | Flips flag to `false`. No confirmation. Toast: "Showing on Plan." |
+| Unlink from Apple Health (`link.badge.minus`) | `workout.healthKitUUID != nil` | Confirmation alert ("Unlink this workout from Apple Health? Imported values will be retained as editable fields. Cancel / Unlink") → on Unlink applies SERVICES § HealthKit Unlink → toast "Unlinked from Apple Health." Renders below other items. |
 
-**Ellipsis Menu:** Items appear conditionally based on workout type and state. The ellipsis icon itself is shown only when at least one item is visible.
+✦ divider. **"Summary" header** (sentence case). 2-column grid of bordered stat cards (`FortiFitStatCard`); each card opens the Metric Detail Sheet (§ below).
 
-- **"Save as workout template"** with SF Symbol `square.and.arrow.down` to the left → naming prompt (pre-filled with workout name) → saves template (name, type, duration, exercises — NOT Effort, date, time, notes) → "Template saved!" toast (~2s). Visible only for Strength Training / HIIT workouts.
-- **"Show on Plan"** with SF Symbol `calendar.badge.plus` to the left → flips `workout.hiddenFromPlan` from `true` to `false`. No confirmation alert (non-destructive, trivially reversible). Toast: "Showing on Plan." (~2s auto-dismiss). Visible only when `workout.hiddenFromPlan == true`. Applies to all workout types — if this is the only applicable item (e.g., a hidden Cardio workout), the ellipsis icon appears with just this single option. When both items apply (a hidden Strength/HIIT workout), "Show on Plan" is rendered immediately below "Save as workout template".
-- **"Unlink from Apple Health"** with SF Symbol `link.badge.minus` to the left → confirmation alert: "Unlink this workout from Apple Health? Imported values (duration, distance, heart rate, etc.) will be retained as editable fields. Cancel / Unlink." On confirm: applies § HealthKit Unlink (clears `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`; retains numeric values; bumps `lastModifiedDate`; no cascade). Toast: "Unlinked from Apple Health." (~2s). Visible only when `workout.healthKitUUID != nil`. Renders below all other items in the menu. See HEALTHKIT.md § 14 and SERVICES.md § HealthKit Unlink.
+**Stat card structure:**
+- Container: Card Surface bg, Border 1px, 12px corner radius, 16h × 14v internal padding.
+- Top row: SF symbol (left, metric color per CONSTANTS § Stat Card Colors) + sentence-case label (Primary Text 13/700) + `chevron.right` (top-right, Muted Text).
+- Below: metric value at 24px/800, color = icon color per CONSTANTS § Stat Card Colors. For numeric values, unit renders inline in smaller Secondary Text (e.g., `142 bpm`) — unit stays muted regardless of value color. Effort value color is dynamic per CONSTANTS § Effort Color Mapping (1–4 green, 5–6 yellow, 7–10 red).
+- Tap: 0.15s opacity dim → opens Metric Detail Sheet. IDs per TESTING.
 
-✦ divider. "Summary" header (sentence case). Below the header, the Summary block renders as a **2-column grid of bordered stat cards** — one card per non-nil metric. Each card is independently tappable and opens the **Metric Detail Sheet** (see § Metric Detail Sheet below).
-
-**Stat card structure (`FortiFitStatCard.swift`):**
-
-- Container: Card Surface `#1a1a1a` background, `#404040` 1px border, 12px corner radius, internal padding (16px horizontal, 14px vertical).
-- Top row: SF symbol (left) + sentence-case micro-label (immediately to the right of the symbol) + right-pointing chevron (`chevron.right`) in the top-right corner. The chevron signals tap affordance and matches the chevron treatment used on workout preview rows. **Icon** is rendered in the metric's color per CONSTANTS.md § Stat Card Colors (e.g., Duration purple, HR red, calories orange, distance teal, Effort multi-color palette). **Label** is Primary Text `#e5e5e5`, 13px, 700 weight, normal letter-spacing. **Chevron** stays Muted Text `#737373` at the same weight.
-- Below the top row: the metric **value** in heading typography — 24px, 800 weight, sentence case (for label-style values like Effort) or numeric (for everything else), color matches the icon color per CONSTANTS.md § Stat Card Colors. For numeric values, the unit renders inline immediately after the number in smaller muted text (Secondary Text `#a3a3a3`, 13px, 600 weight) — e.g., `142 bpm` where `142` is hero-sized and `bpm` is muted-and-smaller. The unit color stays muted regardless of the value color. Value left-aligned with the label. **Effort value color is dynamic**: maps from `workout.rpe` integer per CONSTANTS.md § Effort Color Mapping (1–4 green, 5–6 yellow, 7–10 red).
-- Tap state: subtle 0.15s opacity dim on press; tap opens the Metric Detail Sheet for that field.
-- Accessibility: each card has its own identifier — see TESTING.md.
-
-**Field order (top to bottom, left to right in the 2-column grid):**
+**Field order** (top-to-bottom, left-to-right):
 
 1. Effort
 2. Duration
 3. Distance (Cardio only)
-4. Avg HR · Max HR (each its own card; render side-by-side on one row when both are non-nil)
-5. Active kcal · Total kcal (each its own card; render side-by-side when both non-nil)
+4. Avg HR · Max HR (paired side-by-side when both non-nil)
+5. Active kcal · Total kcal (paired side-by-side when both non-nil)
 6. Elevation Ascended
 7. Exercise Minutes
 
-**Visibility rule:** each card renders only when its underlying value is non-nil. Pairs (Avg HR + Max HR; Active + Total) gracefully collapse to a single card if only one of the pair is set. The grid wraps left-to-right, top-to-bottom — no empty placeholders, no fixed row count. Manual workouts naturally collapse to 2–3 cards (Effort + Duration, plus Distance for Cardio); HK-linked workouts can show up to 9 cards.
+**Visibility:** each card renders only when its value is non-nil; pairs collapse to a single card when one is missing. No empty placeholders. Manual workouts collapse to 2–3 cards; HK-linked can show up to 9. Indoor/Outdoor removed entirely from Summary.
 
-**Per-field display values:**
+**Per-field display:**
 
 | Field | Label | Value Display |
 |---|---|---|
-| Effort | Effort | Descriptive label per CONSTANTS.md § Effort Label Mapping (e.g., `Hard`). The underlying integer is preserved on `workout.rpe` but not displayed on the card. |
-| Duration | Duration | `45 min` (number + inline muted unit) |
+| Effort | Effort | Label per CONSTANTS § Effort Label Mapping (e.g., `Hard`); underlying integer preserved on `workout.rpe` but not displayed |
+| Duration | Duration | `45 min` |
 | Distance | Distance | `5.2 km` or `3.2 mi` per `useMiles` |
 | Avg HR | Avg HR | `142 bpm` |
 | Max HR | Max HR | `168 bpm` |
@@ -631,132 +665,97 @@ Top-right icons: blue share icon (16px, `square.and.arrow.up`, #3b82f6), muted e
 | Elevation Ascended | Elevation | `240 ft` or `73 m` per `useMiles` |
 | Exercise Minutes | Exercise min | `32 min` |
 
-**Indoor/Outdoor:** removed entirely from Summary.
+Icons: CONSTANTS § Workout Detail Summary Icons (user-entered fields) and § Workout Detail Health Data Icons (HK-imported fields).
 
-**Icons:** see CONSTANTS.md § Workout Detail Summary Icons (Effort symbol updated from `heart.gauge.open` to `chart.bar.fill`) and § Workout Detail Health Data Icons (HK-imported field icons unchanged).
+**After Summary** (Strength/HIIT only, conditional): "Exercises" header + exercise list (name, sets, weight). Header + list hidden entirely when `exerciseSets.isEmpty` (regardless of manual vs HK-imported origin). Reappears once an exercise is added.
 
-**After Summary (for Strength/HIIT only, conditional):** "Exercises" header (sentence case) + exercise list (name, sets, weight). The header and list are **hidden entirely** when `workout.exerciseSets.isEmpty`. Applies regardless of how the workout was created (manual or HK-imported with empty sets). Header reappears as soon as the user adds an exercise via Edit Workout.
-
-✦ divider. "Session Notes" header + edit icon. Note card or textarea when editing + SAVE button.
+✦ divider. **"Session Notes"** header + edit icon. Note card, or textarea + SAVE button when editing.
 
 ### Source Indicator Info Sheet
 
-Opened via:
-1. Tapping the Source Indicator row on Workout Detail.
+Opens via tap on the Workout Detail Source Indicator row. iOS modal sheet, `.large` detent (or custom `.height(...)` sized to content — never `.medium`), swipe-down dismiss.
 
-Rendered as an iOS modal sheet (sheet presentation, swipe-down to dismiss).
+**Vertical structure:**
 
-**Detent:** uses `.large` (or a custom `.height(...)` detent sized to fit content). Do not use `.medium` — the new layout doesn't fit cleanly there.
+| Block | Content |
+|---|---|
+| 1. Header icon | Centered HealthKit-pink `heart.fill` (32pt) — system-level Apple Health brand mark, not the per-source glyph. |
+| 2. Title | "Imported from Apple Health" (Primary Text 18px semibold, centered). |
+| 3. Lead sentence | "This workout was imported from Apple Health." (Secondary Text 14px centered, `.fixedSize(horizontal: false, vertical: true)`). |
+| 4. Two-row callout | Stacked FortiFitCard rows (12px corner radius, 12px internal padding, 8px between rows). Each row: leading SF Symbol + multi-line body. **Row 1** — `pencil.slash` (Muted Text) + body "Date, Start Time, Effort, and Duration are read-only here. Edit in Apple Health, or unlink to edit in FitNavi." (first sentence Primary Text 14/600, second Muted Text 13/500). ID `sourceInfoSheet_readOnlyCallout`. **Row 2** — `arrow.uturn.backward.slash` (Alert Red) + body "Unlinking is permanent. Future Apple Health edits won't sync to this workout." (same dual-treatment). ID `sourceInfoSheet_permanentUnlinkCallout`. |
+| 5. Primary action | Full-width "Done" button (blue-outlined). Dismisses. ID `sourceInfoSheet_doneButton`. Largest visual element — safe path gets the prominence per iOS convention. |
+| 6. Destructive link | "Unlink from Apple Health" centered text-style link (Alert Red 14/600, 12px top spacing). Tap → confirmation dialog (next row). ID `workoutDetail_healthUnlinkButton` (preserves Phase 8 identifier per HEALTHKIT § 19). |
+| 7. Confirmation dialog | Title "Unlink this workout?" Message "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore." Actions: destructive "Unlink" + cancel "Cancel". On Unlink → `HealthKitSyncService.unlink(workout:)` (HEALTHKIT § 14; writes a `WorkoutMatchRejection`) → dismiss + "Unlinked from Apple Health." toast. IDs `sourceInfoSheet_unlinkConfirmButton`, `sourceInfoSheet_unlinkCancelButton`. |
+| 8. Footer metadata | 16px top spacer, then muted reference rows (12/600, Muted Text): `Activity Type · {workout.healthKitActivityType}` / `Source · {sourceName}` / `Imported · {formatted workout.dateCreated}` (omit if missing) / `Last synced · {relative}` (sourced from `HealthKitSyncService.lastSyncDate(for:)`; omit if never synced). ID `sourceInfoSheet_lastSyncedRow`. |
 
-**Vertical structure (top to bottom):**
+**Why footer placement:** keeps the destructive-link warning adjacent to its control; metadata is reference, not decision-relevant.
 
-1. **Header icon.** Centered HealthKit-pink heart SF Symbol (`heart.fill`, 32pt). Header icon stays the heart symbol — it's the system-level Apple Health brand mark, not the per-workout source glyph.
-2. **Title.** "Imported from Apple Health" (primary text, 18px semibold, centered).
-3. **Lead sentence.** "This workout was imported from Apple Health." (secondary text, 14px, centered, `.fixedSize(horizontal: false, vertical: true)`). One sentence — it sets context. The detail moves into the callout block.
-4. **Two-row callout.** A vertical stack of two FortiFitCard rows (Card Surface `#1a1a1a`, `#404040` 1px border, 12px corner radius, 12px internal padding, 8px vertical spacing between rows). Each row is `HStack(alignment: .top, spacing: 12)` of an SF Symbol leading + a multi-line body label trailing. Symbol stays on baseline of the first body line.
-   - **Row 1 — read-only fields.** Symbol `pencil.slash` (16pt, Muted Text). Body: "Date, Start Time, Effort, and Duration are read-only here. Edit in Apple Health, or unlink to edit in FitNavi." (Primary Text 14px 600 weight on the first line "Date, Start Time, Effort, and Duration are read-only here.", Muted Text 13px 500 weight on the second sentence). Accessibility identifier `sourceInfoSheet_readOnlyCallout`.
-   - **Row 2 — one-way unlink warning.** Symbol `arrow.uturn.backward.slash` (16pt, Alert Red `#ef4444`). Body: "Unlinking is permanent. Future Apple Health edits won't sync to this workout." (Primary Text 14px 600 weight on first sentence, Muted Text 13px 500 weight on second). Accessibility identifier `sourceInfoSheet_permanentUnlinkCallout`.
-5. **Primary safe action.** Full-width "Done" button — primary blue-outlined style (Primary Accent `#3b82f6` border + label, 12px corner radius). Dismisses the sheet. Accessibility identifier `sourceInfoSheet_doneButton`. This is the visually largest action so the safe path matches the iOS convention.
-6. **Demoted destructive link.** "Unlink from Apple Health" rendered as a centered text-style link below the Done button — Alert Red `#ef4444`, 14px, 600 weight, no fill, no border, 12px top spacing. Tap → opens a SwiftUI `.confirmationDialog` (see step 7). Accessibility identifier stays `workoutDetail_healthUnlinkButton` (preserves Phase 8 identifier per HEALTHKIT.md § 19).
-7. **Confirmation dialog (.confirmationDialog).** Title "Unlink this workout?" Message "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore." Actions: destructive "Unlink" + cancel "Cancel". On Unlink → invokes `HealthKitSyncService.unlink(workout:)` per HEALTHKIT.md § 14 (which now writes a `WorkoutMatchRejection` — see § 14) → sheet dismisses → toast "Unlinked from Apple Health." (~2s). Accessibility identifiers `sourceInfoSheet_unlinkConfirmButton` and `sourceInfoSheet_unlinkCancelButton`.
-8. **Footer metadata block.** Below the destructive link, separated by a 16px top spacer, render reference data as muted footer rows (left-label / right-value, both 12px, 600 weight, Muted Text `#737373`):
-   - "Activity Type · {workout.healthKitActivityType}"
-   - "Source · {sourceName}" (resolved via `HealthKitClient.sourceName(for:)` per § Source indicator — Apple Watch → `Apple Workout`, recognized sources → friendly name, unresolvable → `another app`. Never renders a raw bundle ID.)
-   - "Imported · {formatted workout.dateCreated}" (omit if not captured).
-   - "Last synced · {relative time, e.g., "5 min ago", "2 hours ago", "yesterday"}" — sourced from `HealthKitSyncService.lastSyncDate(for:)`. Helps the user trust that values are current. Omit if no sync has run since import. Accessibility identifier `sourceInfoSheet_lastSyncedRow`.
-
-**Why footer placement:** the metadata is reference data, not decision-relevant. Putting it after the destructive action keeps the warning copy adjacent to the destructive control and prevents the user from skimming past it.
-
-**Dismiss:** Swipe down, tap outside the sheet, or tap "Done."
+Dismiss: swipe down, outside tap, or "Done".
 
 ### Metric Detail Sheet
 
-Modal sheet opened by tapping any stat card in the Workout Detail Summary grid. Provides per-metric context — value display, comparative average against the user's typical session of the same Workout Type, 30-day sparkline, and an optional Personal Best chip.
+Tap any Summary stat card → opens `FortiFitMetricDetailSheet`. Component takes the tapped `Workout` and a `WorkoutMetric` enum case (SERVICES § WorkoutMetricService). All aggregates pulled from `WorkoutMetricService` — never queries SwiftData directly.
 
-**Component:** `FortiFitMetricDetailSheet.swift` (see PRD.md § Project Structure → Design/Components/). Takes the tapped `Workout` and a `WorkoutMetric` enum case (see SERVICES.md § WorkoutMetricService). Pulls all aggregate data from `WorkoutMetricService` — never queries SwiftData directly.
+Presentation: iOS modal sheet, `.medium` detent, swipe-down dismiss, Card Surface bg, drag indicator visible.
 
-**Presentation:** iOS modal sheet (sheet presentation, `.medium` detent). Swipe-down to dismiss. Background uses Card Surface `#1a1a1a`. Drag indicator visible at top.
+Header: no centered title (hero block serves as the de facto title — keeps content-focused). Close button top-right: plain `xmark` Muted Text 16px, no bg/border. ID `metricDetailSheet_closeButton` (shared across metrics).
 
-**Header:** No centered title — the hero block (below) serves as the de facto title. Removing the redundant `[Metric] details` heading keeps the sheet content-focused.
-
-**Close button:** Plain `xmark` SF Symbol in the top-right corner — Muted Text `#737373`, 16px, no circular background or border. Tap dismisses the sheet. Accessibility identifier `metricDetailSheet_closeButton` (shared across all metrics).
-
-**Body:** Scrollable. Standard 20px horizontal padding, 24px top padding below the close button. Four blocks rendered top-to-bottom (every block conditionally adapts when data is insufficient — see Empty States below):
+Body (scrollable, 20h × 24t padding) — four blocks top-to-bottom:
 
 **1. Hero block** (mirrors the tapped stat card, scaled up):
+- Top row: same SF symbol + label as the card (icon in metric color per CONSTANTS § Stat Card Colors; label Primary Text 13/700; no chevron).
+- Below: value at 32px/900, color = icon color. Numeric fields render unit inline in smaller Secondary Text (e.g., `142 bpm`); unit stays muted regardless of value color.
+- **Effort exception:** hero shows the label (e.g., `Hard`) at hero size in the band-mapped color, then a smaller `(7)` underneath — Secondary Text 15/600, always muted.
 
-- Top row: same SF symbol + sentence-case micro-label as the tapped card. **Icon** in the metric's color per CONSTANTS.md § Stat Card Colors (multi-color palette for Effort). **Label** is Primary Text `#e5e5e5`, 13px, 700 weight. No chevron in this context.
-- Below: the metric value at hero size — 32px, 900 weight, sentence case for label-style values, numeric for everything else. **Color matches the icon color** per CONSTANTS.md § Stat Card Colors. **Effort value color is dynamic** per CONSTANTS.md § Effort Color Mapping (1–4 green, 5–6 yellow, 7–10 red).
-- For **Effort specifically**: hero shows the descriptive label (`Hard`) at hero size in the band-mapped color; a smaller line below shows the underlying integer in parentheses (`(7)`) — Secondary Text `#a3a3a3`, 15px, 600 weight, **stays muted regardless of the value color**.
-- For numeric fields: unit renders inline immediately after the number in smaller muted text (e.g., `142 bpm`); the unit stays muted regardless of the value color.
+**2. Comparative context block** (two lines, Secondary Text 14/600 left-aligned):
+- Line 1: `Your typical [Workout Type] session — [comparison value]` (e.g., `Your typical Strength Training session — Moderate (5.4)` for Effort; `… — 52 min` for Duration).
+- Line 2: delta — `Harder than typical`, `+12 min vs typical`, `5 fewer kcal than typical`. Muted by default; Primary Accent Blue for positive-direction deltas on PR-eligible metrics when the workout is highest-ever.
+- Comparison window: all-time across same-`workoutType` workouts with the metric set. Computed by `WorkoutMetricService.comparativeAverage(for:workoutType:)`.
 
-**2. Comparative context block:**
+**3. 30-day sparkline block** (FortiFitCard container, ~120pt height):
+- Swift Charts `LineMark` over the same `workoutType`'s last 30 days. X/Y axes have no tick labels (range implied by caption).
+- Line color: metric-specific per CONSTANTS § Stat Card Colors.
+- **Effort exception:** per-segment color — each segment colored by its endpoint's effort band per CONSTANTS § Effort Color Mapping. Implementation: segmented `LineMark` series or `foregroundStyle(by:)` with a categorical effort-band scale.
+- Current workout's point: ~6pt filled circle, Primary Accent Blue (uniform across all metrics — always locatable). Other points: Secondary Text, ~3pt.
+- Caption: muted `Last 30 days · [Workout Type]`.
 
-- Two lines in body typography (Secondary Text `#a3a3a3`, 14px, 600 weight, left-aligned).
-- Line 1: `Your typical [Workout Type] session — [comparison value]` (e.g., `Your typical Strength Training session — Moderate (5.4)` for Effort, `Your typical Strength Training session — 52 min` for Duration).
-- Line 2: a delta line describing how this workout compares — `Harder than typical`, `+12 min vs typical`, `+4 bpm vs typical`, `5 fewer kcal than typical`, etc. Color is Muted Text by default; uses Primary Accent Blue for positive-direction deltas (only on PR-eligible metrics — see § 4 below) when the workout is the highest-ever.
-- **Comparison window:** all-time across all logged workouts of the same Workout Type with the relevant metric set. Computed by `WorkoutMetricService.comparativeAverage(for:workoutType:)`.
+**4. Personal Best chip (conditional):** Renders only when `WorkoutMetricService.isPersonalBest(for:workout:)` returns true. Inline pill, Primary Accent Blue 15%-opacity bg + Primary Accent Blue text, 12px corner, 8h × 4v padding. Copy: `Personal best for [Workout Type]` (11/700). 16px top margin from sparkline. PR-eligible metrics: Distance, Active Calories, Total Calories, Elevation Ascended only — `isPersonalBest` returns false for Effort, HR, Duration, Exercise Minutes by service contract.
 
-**3. 30-day sparkline block:**
+**Empty / insufficient data:**
+- Comparative context: < 3 same-type workouts (excluding this one) with the metric → replace both lines with muted `Not enough data yet — log a few more sessions.`
+- Sparkline: < 3 data points in 30 days → same muted message, chart container hidden.
+- PR chip: not rendered when false; no placeholder.
 
-- Swift Charts `LineMark` rendering of this metric across the same Workout Type's last 30 days of sessions. X-axis: dates (no tick labels — date range implied by caption). Y-axis: value range (auto-scaled, no tick labels).
-- **Line color** is metric-specific per CONSTANTS.md § Stat Card Colors (Duration purple, Distance teal, HR red, calories orange).
-- **Effort sparkline** is the exception: it uses **per-segment color**, where each line segment's color is determined by its endpoint's effort value per CONSTANTS.md § Effort Color Mapping. A 30-day Effort sparkline can therefore show multiple colors as effort varied across sessions. Implementation: render multiple `LineMark` series segmented by effort band, or use Swift Charts' `foregroundStyle(by:)` modifier with a categorical effort-band scale.
-- This workout's data point is highlighted: filled circle, larger radius (~6pt), Primary Accent Blue color (the highlighting color is uniform across all metrics — distinct from the line color so the user can always locate the current session). Other points: Secondary Text color, smaller radius (~3pt).
-- Caption below the chart: muted `Last 30 days · [Workout Type]`.
-- Chart container: Card Surface `#1a1a1a`, `#404040` 1px border, 12px corner radius, 16px internal padding, ~120pt height.
-
-**4. Personal Best chip (conditional):**
-
-- Renders only when `WorkoutMetricService.isPersonalBest(for:workout:)` returns true for the metric.
-- Inline pill: Primary Accent Blue (`#3b82f6`) at 15% opacity background, Primary Accent Blue text. 12px corner radius. Padding 8px horizontal, 4px vertical.
-- Copy: `Personal best for [Workout Type]`. Primary Accent Blue, 11px, 700 weight, sentence case.
-- Positioned below the sparkline block with 16px top margin.
-
-**PR-eligible metrics:** Distance, Active Calories, Total Calories, Elevation Ascended. The chip never renders for Effort, Avg HR, Max HR, Duration, or Exercise Minutes — `isPersonalBest` returns false for those by service contract.
-
-**Empty / insufficient data states (per block):**
-
-- **Comparative context:** when fewer than 3 logged workouts of the same Workout Type have the metric set (excluding this workout), replace both lines with muted `Not enough data yet — log a few more sessions.`
-- **30-day sparkline:** when fewer than 3 data points are available across the last 30 days, replace the chart with the same muted message and hide the chart container.
-- **Personal Best chip:** simply not rendered when `isPersonalBest` is false. No empty placeholder.
-
-**Accessibility:** sheet title is announced first by VoiceOver, followed by hero block, comparative context lines, sparkline (with summary trait), and the PR chip if present. Close button reads "Close, button". The chevron on the originating stat card has `accessibilityHint("Opens metric details")`.
+**Accessibility:** title announced first; hero, comparative, sparkline (with summary trait), and PR chip follow. Close button reads "Close, button". Stat card chevron has `accessibilityHint("Opens metric details")`.
 
 ### Share Image Card
 
-Tapping the share icon renders the workout as a styled PNG image card and presents the iOS share sheet (`UIActivityViewController`). The image is a self-contained card using FitNavi's design tokens, designed to be legible as a standalone image outside the app.
+Tap the share icon → renders the workout as a styled PNG via SwiftUI `ImageRenderer` at @3x → presents iOS share sheet (`UIActivityViewController`). Self-contained card using FitNavi tokens, legible standalone outside the app.
 
-**Card content:** workout name, date/time, workout type, **2-column stat-card grid** (mirrors the Workout Detail Summary grid), exercise list (Strength/HIIT only).
+**Card content:** workout name, date/time (time omitted when `workout.time == nil`), workout type, 2-column stat-card grid (mirrors the Workout Detail Summary), exercise list (Strength/HIIT only).
 
-**Stat-card grid:** Renders the same fields, in the same order, with the same icons, labels, value formats, **and color treatment** as the Workout Detail Summary grid (see § Workout Detail and CONSTANTS.md § Stat Card Colors). Differences for the share image:
+**Stat-card grid** mirrors Workout Detail Summary — same fields, order, icons, labels, value formats, color treatment (CONSTANTS § Stat Card Colors, § Effort Label Mapping, § Effort Color Mapping). Differences for the image:
+- Static — no chevron, no tap.
+- Smaller card sizing scaled for the 390pt-wide image.
+- Cards render only when their value is non-nil; manual workouts collapse to 2–3 cards.
 
-- Static — no chevron, no tap behavior.
-- Smaller card sizing scaled appropriately for the 390pt-wide image.
-- Effort renders as the descriptive label (e.g., `Hard`) per CONSTANTS.md § Effort Label Mapping — same as Workout Detail. The Effort icon uses the multi-color palette (green/yellow/red bars) and the Effort value color maps from `workout.rpe` per CONSTANTS.md § Effort Color Mapping — identical behavior to the on-screen card.
-- Cards render only when their underlying value is non-nil. Manual workouts collapse to 2–3 cards.
+**Exercise cap:** max 10 exercises displayed; overflow shows muted `+X more exercises` line.
 
-When `workout.time` is nil, the time component is omitted from the date line.
+**Excluded:** session notes, navigation chrome (back, icon tray).
 
-**Exercise cap:** Maximum 10 exercises displayed. If the workout has more than 10, the first 10 are shown followed by a muted "+X more exercises" line (e.g., "+3 more exercises").
-
-**Excluded from image:** Session notes, navigation chrome (back button, icon tray).
-
-**Card styling:** See `CONSTANTS.md` § Share Image Card Styling for the full token table (background, border, padding, header/footer, workout name, date, stat cards, exercise rows, dividers, image dimensions).
-
-**Rendering:** SwiftUI `ImageRenderer` at @3x scale. If rendering fails, show a brief toast: "Couldn't generate image. Try again." (auto-dismiss ~2s, matching existing toast pattern).
+**Card styling tokens:** CONSTANTS § Share Image Card Styling (bg, borders, padding, header/footer, name, date, stat cards, exercise rows, dividers, image dimensions).
 
 **Edge cases:**
 
 | Scenario | Behavior |
-|----------|----------|
-| All optional fields nil (no Effort, no duration, no distance) | No stat cards rendered; image shows name, date, type, and exercises (if any) |
-| Workout has >10 exercises | First 10 shown + "+X more exercises" in muted text |
-| Exercise with nil weight (bodyweight) | Displays as `{sets} × {reps} (BW)` |
+|---|---|
+| All optional fields nil | No stat cards; image shows name, date, type, and exercises (if any) |
+| > 10 exercises | First 10 + `+X more exercises` (muted) |
+| Bodyweight exercise (nil weight) | Displays as `{sets} × {reps} (BW)` |
 | Very long workout name | Truncated with ellipsis at 2 lines max |
 | Very long exercise name | Truncated with ellipsis at 1 line |
-| Share sheet cancelled by user | No action; dismiss cleanly |
-| Image render fails | Brief error toast (~2s) |
+| Share sheet cancelled | No action; dismiss cleanly |
+| Image render fails | Brief toast: "Couldn't generate image. Try again." (~2s) |
 
 ---
 
@@ -765,74 +764,51 @@ When `workout.time` is nil, the time component is omitted from the date line.
 **Purpose:** Visualize training trends with customizable chart layout.
 
 ### Chart Card System
-Per § Standard Patterns: Sortable Card System, backed by `TrendsChart` records. Default seed order (first launch only): **Strength Tracker, Training Frequency, Personal Records, Training Load Trend**. All charts auto-update when workouts are logged, edited, or deleted. Charts appear independently as data thresholds are met — an added chart that doesn't yet meet its data threshold renders its empty-state message.
+
+Standard Sortable Card System (§ Standard Patterns) backed by `TrendsChart` records. Default seed: **Strength Tracker, Training Frequency, Personal Records, Training Load Trend**. Charts auto-update on workout log/edit/delete. An added chart not yet meeting its data threshold renders its empty-state message.
 
 ### Layout
-Top: Left: blue ellipsis icon (functional — opens Trends ellipsis menu). ✦ divider. Chart cards render vertically per § Standard Patterns: Sortable Card System.
+
+Header: blue ellipsis (left). ✦ divider. Chart cards render vertically per Standard Sortable Card System.
 
 ### Trends Ellipsis Menu
-One option: **"Add Charts"** with SF Symbol `chart.xyaxis.line` to the left → opens Add Charts Menu overlay.
 
-### Add Charts Menu
-Per § Standard Patterns: Sortable Card System → Add Menu. Component: `FortiFitAddChartMenu` (mirrors `FortiFitAddWidgetMenu`).
+One option: **"Add Charts"** (`chart.xyaxis.line`) → Add Charts Menu overlay (`FortiFitAddChartMenu`, mirrors `FortiFitAddWidgetMenu`).
 
 ### Chart Card Context Menu (Long Press)
-Activated by long-pressing any chart card (uses Standard Long-Press Tease). Items render top-to-bottom in this order — all three apply to every chart type:
 
-**"See Info":** SF Symbol `info.circle` to the left of the label (see CONSTANTS.md § Trends Chart Context Menu SF Symbols). Opens the See Info Modal (see § Standard Patterns) for that chart, populated from CONSTANTS.md § Chart Info Modal Copy.
-
-**"Reorder Charts":** Enters Standard Reorder Edit Mode. Always visible regardless of chart count.
-
-**"Delete Chart":** Per § Standard Patterns: Sortable Card System → Delete. Confirmation: "Delete [Chart Display Name]? This cannot be undone."
-
-### Reorder Edit Mode
-Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `TrendsChart.sortOrder`.
-
-### Chart Info Modal
-Per § Standard Patterns: See Info Modal. Content source: CONSTANTS.md § Chart Info Modal Copy. Title format: "About [Chart Display Name]" (e.g., "About Strength Tracker").
+| Item | SF Symbol | Behavior |
+|---|---|---|
+| See Info | `info.circle` | Opens See Info Modal (§ Standard Patterns) populated from INFO_COPY § Chart Info Modal Copy. Title `About [Chart Display Name]`. |
+| Reorder Charts | — | Standard Reorder Edit Mode → persists to `TrendsChart.sortOrder`. |
+| Delete Chart | — | Standard delete confirmation: `Delete [Chart Display Name]? This cannot be undone.` |
 
 ### Chart Definitions
 
-**Strength Tracker** (`strengthTracker`): Exercise dropdown, 30D/60D/90D toggles, line chart of weight over time, latest value.
+| Chart (id) | Definition |
+|---|---|
+| **Strength Tracker** (`strengthTracker`) | Exercise dropdown + 30D/60D/90D toggles. Line chart of weight over time + latest value. |
+| **Training Frequency** (`trainingFrequency`) | Bar chart of weekly sessions (8 weeks). Blue dashed target reference line + legend. |
+| **Personal Records** (`personalRecords`) | Exercise dropdown listing only exercises with ≥1 PR event (§ PR Definition). Shows previous + current PR + dates as a 2-bar comparison (§ PR Layout). |
+| **Training Load Trend** (`trainingLoadTrend`) | Line chart, one dot per day colored by zone (Low/Moderate/High/Peak). Blue dashed 7-day rolling average + zone-colored background bands + legend. |
+| **Workout Volume** (`workoutVolume`) | Line chart of session volume (sets × reps × weight) for Strength/HIIT workouts. 30D/60D/90D toggles. Each dot = one workout. |
+| **Effort Trend** (`rpeTrend`) | Bar chart of weekly average Effort (8-week rolling window). Horizontal dashed reference at Effort 7. |
+| **Workout Type Breakdown** (`workoutTypeBreakdown`) | Donut (`SectorMark`) of workout-type proportions. Toggles: 30D / 60D / 90D / All Time. Segment colors per CONSTANTS § Workout Type Chart Colors. Type+count segment labels, legend below. |
+| **Session Duration** (`sessionDuration`) | Bar chart of weekly average duration (8-week rolling). Horizontal dashed reference at `targetMinutesPerWorkout`. Only includes workouts with recorded duration. Legend with "Target" label. |
 
-**Training Frequency** (`trainingFrequency`): Bar chart of weekly sessions (8 weeks), blue dashed target reference line, legend.
-
-**Personal Records** (`personalRecords`): Exercise dropdown listing only exercises with at least one PR event (see PR Definition below). On selection, displays most recent PR value + date and previous record value + date. Visualized as a bar chart comparing previous record vs. current record (see PR Layout below).
-
-**Training Load Trend** (`trainingLoadTrend`): Line chart, one dot per day colored by zone (Low/Moderate/High/Peak), blue dashed 7-day rolling average, zone-colored background bands, zone legend.
-
-**Workout Volume** (`workoutVolume`): Line chart of total session volume (sets × reps × weight) over time for Strength Training and HIIT workouts. 30D/60D/90D toggles. Each data point = one workout. Blue line with data point dots.
-
-**Effort Trend** (`rpeTrend`): Bar chart of weekly average Effort (8-week rolling window, same as Training Frequency). Horizontal dashed reference line at Effort 7. Includes workouts with and without recorded Effort.
-
-**Workout Type Breakdown** (`workoutTypeBreakdown`): Donut chart (`SectorMark`) showing proportion of each workout type. Time range toggles: 30D / 60D / 90D / All Time. Each segment colored by workout type (see CONSTANTS.md § Workout Type Chart Colors). Segments labeled with type name + count. Legend below chart.
-
-**Session Duration** (`sessionDuration`): Bar chart of weekly average workout duration (8-week rolling window). Horizontal dashed reference line at `targetMinutesPerWorkout` from UserSettings (primarytext color token). Only includes workouts with recorded duration. Legend along horizontal axis with dashed line indicator and text "Target". 
+**Visual treatment:** Every chart in the table above is wrapped in `FortiFitChartCard` and inherits the shared gradient backdrop, inner plot hairline, header summary block, latest-point highlight, rounded bar tops, smoothed line interpolation, and donut center label (Workout Type Breakdown only) defined in § Standard Patterns → Trends Chart Card Visual Treatment. Per-chart anchor color and hero / caption formula are listed in CONSTANTS.md § Trends Chart Visual Tokens — never hardcoded in views.
 
 ### PR Definition
-A **Personal Record (PR) event** occurs when a new maximum `weightKg` for a given `exerciseName` exceeds the previous maximum across all earlier workouts. The first workout logging an exercise establishes the baseline — it is **not** a PR. A PR requires a prior value to surpass.
 
-For a given `exerciseName`, collect all distinct max `weightKg` values across workouts ordered chronologically by `workout.date`. A PR is recorded each time a new chronological maximum exceeds all previous maximums. Exercises where `weightKg` is nil (bodyweight) are excluded from PR tracking.
+A **Personal Record (PR) event** occurs when a new max `weightKg` for an `exerciseName` exceeds the previous max across all earlier workouts. The first workout logging an exercise sets the baseline — not a PR (a PR requires a prior value to surpass). Collect distinct max `weightKg` values per `exerciseName`, ordered chronologically; record a PR each time a new chronological max exceeds all previous. Bodyweight exercises (nil `weightKg`) are excluded.
 
 ### PR Layout
 
-**Exercise Dropdown:** Top of the chart card. Lists only exercises with ≥ 1 PR event. Sorted alphabetically. Default selection: first exercise alphabetically.
+**Exercise dropdown** at the top of the card — lists only exercises with ≥1 PR event, sorted alphabetically; default = first alphabetically.
 
-**PR Summary Row:** Below dropdown. Two columns side by side:
+**PR summary row** below dropdown — two columns: "PREVIOUS RECORD" (left, value + muted date) and "CURRENT RECORD" (right, value in Primary Accent Blue + muted date). Values formatted per `useLbs`.
 
-| Column | Content |
-|--------|---------|
-| Left: "PREVIOUS RECORD" | Previous record value (formatted per `useLbs`) + date (muted, short format) |
-| Right: "CURRENT RECORD" | Most recent PR value (formatted per `useLbs`, Primary Accent Blue) + date (muted, short format) |
-
-**Bar Chart:** Swift Charts `BarMark`. Two bars side by side:
-
-| Bar | Color | Label |
-|-----|-------|-------|
-| Previous Record | Elevated Surface (#2d2d2d) with Border stroke (#404040) | 
-| Current Record | Primary Accent Blue (#3b82f6) | Value annotation above bar |
-
-Y-axis: weight (kg or lbs per `useLbs`). X-axis: two category labels — "Previous" and "Current". Y-axis origin at 0.
+**Bar chart** — Swift Charts `BarMark` with two bars: Previous Record (Elevated Surface bg + Border stroke) and Current Record (Primary Accent Blue, value annotation above bar). Y-axis weight per `useLbs`, origin at 0; X-axis "Previous" / "Current".
 
 ### PR Edge Cases
 
@@ -878,130 +854,106 @@ Left: blue ellipsis icon (functional — opens Goals ellipsis menu). Right: "+" 
 
 ### Goal Card Design
 
-Each goal card is divided into two regions: a **three-section left column** (goal details) and a **large circular/radial progress ring** right-justified on the trailing side (visual state).
+Each card has a three-section left column (goal details) and a large progress ring right-justified on the trailing side. Rings are ~120–140pt diameter, right-justified consistently across all goal types — even dual-arc Speed and Distance rings (no legend-induced centering).
 
-**Three-Section Left Column:** Three sentence-case headers stacked vertically, each using Primary Accent (`#3b82f6`) color for the label and Primary Text (`#e5e5e5`) for the value below. Labels use the existing uppercase-adjacent style but in sentence case (11px, 700 weight, 2px letter-spacing). Values below each label use the standard Primary Text treatment.
+**Three-section left column** — sentence-case Primary Accent labels (11/700, 2px spacing) over Primary Text values:
 
 | Label | Value |
-|-------|-------|
-| **Header (type-dependent — see Header Labels table below)** | Goal name (e.g., "Bench Press", "5K Run", "Weekly Workouts") |
-| **Target** | Target value with unit, type-dependent (see below) |
-| **Progress** | Current / target value with unit, type-dependent (see below) |
+|---|---|
+| Header (varies by type — see below) | Goal name (e.g., "Bench Press", "5K Run") |
+| Target | Type-dependent (table below) |
+| Progress | Type-dependent (table below) |
 
-**Header Labels by goal type:** The first header is not a static "Goal" label — it varies by goal type (and, for Speed and Distance, by which targets are set) to make the goal's nature scannable at a glance. Labels use the same sentence-case label treatment as Target and Progress (11px, 700 weight, 2px letter-spacing, Primary Accent `#3b82f6`). Strings live in `CONSTANTS.md` § Goal Card Header Labels — do not hardcode in views.
+**Header labels** (strings live in CONSTANTS § Goal Card Header Labels — never hardcoded):
 
-| Goal Type | Sub-case | Header Label |
-|-----------|----------|--------------|
+| Goal type | Sub-case | Header label |
+|---|---|---|
 | Strength PR | — | STRENGTH GOAL |
 | Repetitions PR | — | REPS GOAL |
-| Speed and Distance | Both distance and duration targets set | SPEED GOAL |
+| Speed and Distance | Both targets set | SPEED GOAL |
 | Speed and Distance | Duration only | ENDURANCE GOAL |
 | Speed and Distance | Distance only | DISTANCE GOAL |
 | Number of Weekly Workouts | — | FREQUENCY GOAL |
 
-**Target and Progress values by goal type:**
+**Target / Progress values:**
 
-| Goal Type | Target Value | Progress Value |
-|-----------|-------------|----------------|
-| Strength PR | e.g., "225 lbs" | e.g., "100 / 225 lbs" |
-| Repetitions PR | e.g., "25 reps" | e.g., "10 / 25 reps" |
-| Speed and Distance (distance only) | e.g., "5 miles" | e.g., "2.00 / 5.00 mi" |
-| Speed and Distance (duration only, endurance) | e.g., "30 minutes" | e.g., "45 / 30 min" |
-| Speed and Distance (both — speed target) | e.g., "5 miles in 30 minutes" (conversational phrasing) | Two stacked lines: "2.00 / 5.00 mi" on top, "45 / 30 min" below |
-| Number of Weekly Workouts | e.g., "3 workouts / week" | e.g., "14 / 3" |
+| Goal type | Target | Progress |
+|---|---|---|
+| Strength PR | `225 lbs` | `100 / 225 lbs` |
+| Repetitions PR | `25 reps` | `10 / 25 reps` |
+| Speed/Distance (distance only) | `5 miles` | `2.00 / 5.00 mi` |
+| Speed/Distance (duration only, endurance) | `30 minutes` | `45 / 30 min` |
+| Speed/Distance (both — speed target) | `5 miles in 30 minutes` | Two stacked lines: `2.00 / 5.00 mi` over `45 / 30 min` |
+| Number of Weekly Workouts | `3 workouts / week` | `14 / 3` |
 
-**Circular Progress Ring (trailing side, right-justified):** Approximately **double the size of earlier iterations** (~120–140pt diameter). All goal cards align their rings to the trailing edge consistently — Speed and Distance rings must right-justify identically to PR rings (no centering caused by a legend below).
+**Progress ring** (trailing, ~120–140pt). Centered inside the ring: the goal-type SF Symbol silhouette at dynamic opacity (see CONSTANTS § Goal Silhouette Opacity — 10% at 0% → ~40% at 100%, bumped to 50–60% on completion). The overall percentage is *not* rendered inside the ring — it surfaces via the ring-tap tooltip (§ below). Applies to all goal types including dual-arc.
 
-Centered inside the ring is a single element: the **Goal-type SF Symbol silhouette** at dynamic opacity (see § Silhouette Opacity in CONSTANTS.md).
+| Goal type | SF Symbol | Ring |
+|---|---|---|
+| Strength PR | `figure.strengthtraining.traditional` | Single ring, goal's `colorIndex` |
+| Repetitions PR | `figure.strengthtraining.traditional` | Single ring, goal's `colorIndex` |
+| Speed/Distance | `figure.run` | Dual-arc when both targets set; single ring otherwise (purple if distance-only, cyan if duration-only) |
+| Weekly Workouts | `calendar` | Single ring, goal's `colorIndex` |
 
-The overall progress percentage is NOT rendered inside the ring — it is surfaced via a tap-to-reveal tooltip (see § Ring Tap Behavior below). This applies to all goal types, including dual-arc Speed and Distance.
+**Dual-arc ring (Speed/Distance with both targets):** Two concentric arcs — outer = distance (purple `#4B2893`), inner = duration (light cyan `#8FE6F6`). Shared center symbol. Legend never inline; surfaced via ring-tap tooltip.
 
-**SF Symbol Mappings:**
+**Ring tap tooltip:** Tap toggles a subtle overlay tooltip just below the ring, arrow-pointer up. Overlay (not inline) — doesn't push card content. Re-tap or outside tap dismisses. Animation 0.15s opacity fade.
 
-| Goal Type | SF Symbol | Ring Color |
-|-----------|-----------|------------|
-| Strength PR | `figure.strengthtraining.traditional` | Goal's assigned color (cycling via `colorIndex`) |
-| Repetitions PR | `figure.strengthtraining.traditional` | Goal's assigned color |
-| Speed and Distance | `figure.run` | Dual-arc or single ring (see below) |
-| Number of Weekly Workouts | `calendar` | Goal's assigned color |
+| Goal type | Tooltip contents |
+|---|---|
+| Single-ring goals (incl. single-target Speed/Distance) | Overall progress percentage only (e.g., "44%"). Primary Text, ~18–20pt 800 weight. |
+| Dual-arc Speed/Distance | Three stacked: (1) overall percentage headline (lower of distance% and duration% after clamping), (2) Distance legend row (purple dot + "Distance"), (3) Duration legend row (cyan dot + "Duration"). Legend rows use Secondary Text 11/700/2px-spacing. |
 
-**Silhouette Opacity Scaling:** Starts at **10% at 0% progress**, scaling linearly up to **~40% at 100% progress**. Completed state bumps opacity to **50–60%**. See `CONSTANTS.md` § Goal Silhouette Opacity for full table.
+Completed (100%) ring still surfaces the tooltip — value is "100%". Dual-arc completed shows the full legend alongside "100%".
 
-**Speed and Distance — Dual-Arc Ring:** When both distance and duration targets are set, the ring renders as two concentric arcs: **outer ring for distance** (purple `#4B2893`) and **inner ring for duration** (light cyan `#8FE6F6`). Both arcs share the same center SF Symbol (`figure.run`). The overall percentage is surfaced via the tap tooltip, not inside the ring (see § Ring Tap Behavior below). The legend is NOT displayed inline — it is surfaced via an overlay tooltip on tap (see Ring Tap Behavior below). If only one target is set (distance-only or duration-only), the card renders a single ring like other goal types, using the color corresponding to the active metric (purple for distance, light cyan for duration). Single-ring Speed and Distance cards use the same single-ring tap behavior as other goal types (see § Ring Tap Behavior below).
+**Accessibility:** overall progress percentage is in each card's accessibility label so VoiceOver users hear it without discovering the tap. Dual-arc cards' accessibility label also describes the Distance/Duration color mapping.
 
-**Ring Tap Behavior:** Tapping any progress ring toggles a **subtle overlay tooltip** positioned just below the ring, with a small arrow pointer pointing up at the ring. The tooltip is an overlay (not inline) and does not push card content. Tap the ring again OR tap outside the ring to dismiss. Animation: 0.15s opacity fade-in/out.
-
-Tooltip contents vary by goal type:
-
-**Single-ring goals** (Strength PR, Repetitions PR, Number of Weekly Workouts, and single-target Speed and Distance): Tooltip displays the overall progress percentage only (e.g., "44%"). Primary Text (`#e5e5e5`), prominent size (~18–20pt, 800 weight) consistent with the app's heading treatment (see `PRD.md` § Typography).
-
-**Dual-arc Speed and Distance** (both distance and duration targets set): Tooltip displays three stacked elements, top-to-bottom:
-1. **Overall progress percentage** as a headline at the top (e.g., "11%"). Same styling as single-ring tooltip — Primary Text, ~18–20pt, 800 weight. Value is the lower of distance% and duration% after clamping (see "Speed target logic" below).
-2. **Distance legend row** — a purple dot (`#4B2893`, per `CONSTANTS.md` § Speed and Distance Dual-Arc Ring Colors) with the label "Distance". Label uses the standard app label treatment (11px, 700 weight, 2px letter-spacing, Secondary Text `#a3a3a3`).
-3. **Duration legend row** — a light cyan dot (`#8FE6F6`, per `CONSTANTS.md` § Speed and Distance Dual-Arc Ring Colors) with the label "Duration". Same label treatment as Distance row.
-
-**Completed goals (100%):** Tapping a completed ring still surfaces the tooltip. The percentage shown is "100%". For dual-arc completed goals, the full Distance/Duration legend is displayed alongside "100%".
-
-**Accessibility:** The overall progress percentage is included in each goal card's accessibility label so VoiceOver users hear it without needing to discover the tap gesture. For dual-arc cards, the accessibility label also describes the Distance/Duration color mapping.
-
-**Completed State Treatment:** When a goal reaches 100% (Completed), the card displays:
-- **Blue border** (`#3b82f6`) — unchanged from prior treatment.
-- **Faint blue wash** — a subtle Primary Accent tint at **3% opacity** across the card surface, giving completed cards a warmer feel than active ones.
-- **"COMPLETED [Formal Date]" micro-label** centered at the top of the card (e.g., "COMPLETED APR 17, 2026"). Uses Secondary Text color (`#a3a3a3`), 11px, 700 weight, 2px letter-spacing, uppercase. Date sourced from `Goal.lastCelebratedDate`.
+**Completed state treatment** (goal at 100%):
+- Blue border, faint Primary Accent wash (3% opacity) across card surface.
+- "COMPLETED [Formal Date]" micro-label centered at top (Secondary Text, 11/700, 2px spacing, uppercase). Date from `Goal.lastCelebratedDate` (e.g., "COMPLETED APR 17, 2026").
 - Ring fully filled.
-- **Silhouette tinted Primary Accent Blue** (`#3b82f6`) and bumped to **85–100% opacity** so the icon reads as "lit up" rather than dim. Replaces the default tint used in active states. Applies to all goal-type silhouettes (`dumbbell.fill`, `figure.strengthtraining.traditional`, `figure.run`, `calendar`).
-- **Color/opacity crossfade** — the silhouette transitions from its active-state appearance to the completed blue/lit state over **0.2–0.3s ease**, synchronized with the rest of the card's completion state change (border, wash, COMPLETED label appearing). Independent of the Completion Pulse Animation halo, which still fires once per visit when `lastCelebratedDate` matches today.
-- **No "✦ VICTORY ✦" label** — replaced entirely by the "COMPLETED" micro-label and visual treatment above.
+- Silhouette tinted Primary Accent Blue at 85–100% opacity ("lit up"). Applies to all goal-type silhouettes.
+- 0.2–0.3s ease crossfade on the silhouette transition, synchronized with border/wash/label appearing. Independent of the Completion Pulse Animation.
+- No "✦ VICTORY ✦" label — replaced by the COMPLETED micro-label + visual treatment.
 
-**Completion Pulse Animation:** When a user navigates to the Goals screen and a goal's `lastCelebratedDate` matches today (i.e., the goal completed today and the user hasn't yet acknowledged it on this visit), the ring fires a brief **glow/pulse animation** (approximately 1–1.5s total duration) to mark the achievement. The glow is a soft Primary Accent halo emanating from the ring and settling back into the static completed state. The pulse fires **once per visit** — not on every render while the user remains on the screen. Re-triggers only if the user leaves the Goals screen and returns while `lastCelebratedDate` is still today.
+**Completion Pulse Animation:** On Goals screen entry, if any goal's `lastCelebratedDate == today`, the ring fires a 1–1.5s soft Primary Accent halo glow that settles back into the static completed state. Once per visit; re-triggers only on screen re-entry while still today.
 
-**Card Tease Animation:** Per § Standard Patterns: Long-Press Tease.
+**Card Tease Animation:** Standard Long-Press Tease (§ Standard Patterns).
 
 ### Expandable Card with Sparkline
 
-A **gray chevron** (muted #737373) is always visible at the bottom center of each goal card, pointing **down when collapsed** and **up when expanded**. Tapping the chevron expands the card to reveal a **30-day sparkline** (Swift Charts) showing goal progress over time.
+Gray chevron always visible at the bottom center of each goal card — points down when collapsed, up when expanded. Tap → reveals a 30-day sparkline.
 
-**Section structure (always present when expanded, regardless of data state):**
+Expanded section structure (always present, regardless of data state):
+1. **"LAST 30 DAYS" header** — left-aligned, muted 11/700 uppercase 2px-spacing.
+2. **Sparkline chart area** — Swift Charts, full content width.
+3. **Footer note** — muted italic, content per the data-state table below.
 
-1. **"LAST 30 DAYS" header** — Positioned above the sparkline chart area. Muted Text `#737373`, 11px, 700 weight, 2px letter-spacing, uppercase. Left-aligned within the expanded area. This header appears for ALL expanded cards — populated, partial, and brand-new. It anchors the section visually and tells the user what the chart represents before they look at the data.
-2. **Sparkline chart area** — Swift Charts rendering, fills the width of the card's content region.
-3. **Footer note below the chart** — Muted italic text, content varies by data state (see below).
+| Data state | Chart | Footer note |
+|---|---|---|
+| Populated (≥2 snapshots) | Swift Charts `LineMark`. One point per workout day plotting the day's best-of-day session value (top set weight for Strength PR, highest reps for Reps PR, best matching-workout `overallProgress %` for Speed/Distance, end-of-day count for Weekly Workouts; see SERVICES § GoalSnapshotService → Per-Workout Value Computation). Reflects per-session performance including regressions/light sessions — not just PR events. Days with no matching workout carry forward the previous value. Only days that exist are plotted (no zero-padding for goals with <30 days of history). | "Goal progress over the last 30 days" |
+| Brand-new (0–1 snapshots) | Skeleton flat dashed line at chart midpoint, full width (Border color, `StrokeStyle(dash: [4, 4])`). No data point, no axis ticks. | "Log a workout to start tracking progress" |
 
-**Sparkline rendering by data state:**
+Once the goal has 2+ snapshots, the chart transitions to the real line on next expand (no special animation).
 
-| State | Chart Rendering | Footer Note |
-|-------|----------------|-------------|
-| Populated (≥ 2 snapshots) | Swift Charts `LineMark` connecting data points. One point per workout day, plotting that day's **best-of-day session value** for the goal (e.g., top set weight for Strength PR, highest reps for Repetitions PR, best matching-workout `overallProgress %` for Speed and Distance, end-of-day workout count for Weekly Workouts). See `SERVICES.md` § GoalSnapshotService → Per-Workout Value Computation for the exact value per goal type. Reflects actual per-session performance — including regressions and light sessions — not just PR events. Days with no matching workout carry forward the previous value. Only days that exist are plotted — no zero-padding for goals with less than 30 days of history. | "Goal progress over the last 30 days" |
-| Brand-new (0 or 1 snapshot) | **Skeleton flat dashed line** at a neutral midpoint (~50% of chart height) spanning the full chart width, rendered in Border `#404040` with a dashed stroke pattern (`StrokeStyle(dash: [4, 4])` or similar). No data point dot. No axis ticks. | "Log a workout to start tracking progress" |
+**Other rules:** multiple cards can be expanded simultaneously · 0.3s ease expand/collapse + sparkline fade-in on expand · default collapsed · after "Reset Goal Progress" all snapshots are wiped, sparkline returns to brand-new skeleton until new in-scope workouts produce snapshots (SERVICES § Reset Goal Progress, § Reset Scoping) · data source: `GoalSnapshot` (PRD § Data Model, SERVICES § GoalSnapshotService).
 
-As soon as the goal has 2+ snapshots, the chart transitions to the real line on the next expand (no special animation required).
-
-**Other rules:**
-
-- **Multiple expand:** Users can have multiple cards expanded simultaneously.
-- **Animation:** 0.3s ease expand/collapse, sparkline fades in on expand.
-- **Default state:** Collapsed.
-- **After "Reset Goal Progress":** All snapshots for that goal are wiped. The sparkline returns to the brand-new skeleton state until new in-scope workouts produce snapshots (see `SERVICES.md` § Reset Goal Progress and § Reset Scoping).
-- **Data source:** `GoalSnapshot` model (see `PRD.md` § Data Model, `SERVICES.md` § GoalSnapshotService).
-
-**Goal Auto-Update:** See `SERVICES.md` for full behavior, including updated Speed Target logic.
+Goal auto-update behavior (including speed-target logic): SERVICES § Goal Auto-Update.
 
 ### Goals Ellipsis Menu
 
-Two options:
-
-**"Filter Goals"** with SF Symbol `line.3.horizontal.decrease.circle` to the left: Opens a submenu with three filter options: **Active** (goals below 100%), **Completed** (goals at 100% / Completed state), **All** (default). The selected filter is indicated with a checkmark. Filters reset to "All" on every app launch — not persisted to UserDefaults.
-
-**"Expand All / Collapse All"** with a toggling SF Symbol to the left: Toggles all goal cards open or closed. Label reflects the current dominant state: if most cards are collapsed, show "Expand All" with SF Symbol `rectangle.expand.vertical`; if most are expanded, show "Collapse All" with SF Symbol `rectangle.compress.vertical`. The symbol swaps alongside the label.
+| Item | SF Symbol | Behavior |
+|---|---|---|
+| Filter Goals | `line.3.horizontal.decrease.circle` | Submenu: **Active** (below 100%), **Completed** (at 100%), **All** (default ✓). Checkmarks indicate selection. Resets to "All" on every app launch — not persisted. |
+| Expand / Collapse All | `rectangle.expand.vertical` (when most cards collapsed → label "Expand All") / `rectangle.compress.vertical` (when most expanded → label "Collapse All") | Toggles all goal cards. Symbol swaps with the label. |
 
 ### Long-Press Context Menu
-Long-pressing any goal card opens a context menu (uses Standard Long-Press Tease). Three options:
 
-**"Delete Goal":** Tapping opens the standard delete confirmation ("Delete [Goal Title] goal? This cannot be undone."). On confirm: goal removed from SwiftData, associated GoalSnapshot records cascade-deleted, remaining goals re-index sortOrder.
-
-**"Reset Goal Progress":** Tapping opens a confirmation dialog ("Reset [Goal Title] progress to zero? This cannot be undone."). On confirm: all current values on the goal reset to zero, `lastCelebratedDate` cleared. **Hidden entirely for Weekly Workouts goals** since their current value is derived at runtime and cannot be manually reset. This option does not appear in the ellipsis menu — it is exclusively per-card via long-press.
-
-**"Reorder Goals":** Tapping enters reorder edit mode (see below). Always visible in the context menu regardless of goal count.
+| Item | Behavior |
+|---|---|
+| Delete Goal | Standard delete confirmation: `Delete [Goal Title] goal? This cannot be undone.` On confirm: removes goal + cascade-deletes GoalSnapshot records + re-indexes `sortOrder`. |
+| Reset Goal Progress | Confirmation: `Reset [Goal Title] progress to zero? This cannot be undone.` On confirm: zeros current values + clears `lastCelebratedDate`. **Hidden entirely for Weekly Workouts** (runtime-derived value, can't be manually reset). Long-press only — not in the ellipsis menu. |
+| Reorder Goals | Standard Reorder Edit Mode. Always visible regardless of goal count. |
 
 ### Reorder Edit Mode
 Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrder`.
@@ -1026,19 +978,19 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 **Purpose:** Create a new goal.
 
 ### Layout
-← BACK. "Add Goal" heading. Goal Type selector: "STRENGTH PR" (default), "REPETITIONS PR", "SPEED AND DISTANCE", "NUMBER OF WEEKLY WORKOUTS".
 
-**Strength PR:** Exercise dropdown (Bench Press, Barbell Squats, Deadlifts, Overhead Press, Barbell Rows, Incline Bench Press, Custom). Custom → name input with autocomplete. Current weight / Target weight side by side.
+← BACK · "Add Goal" heading · Goal Type selector: "STRENGTH PR" (default), "REPETITIONS PR", "SPEED AND DISTANCE", "NUMBER OF WEEKLY WORKOUTS".
 
-**Repetitions PR:** Same exercise dropdown + Custom with autocomplete. Current reps / Target reps side by side.
+| Type | Fields | Validation |
+|---|---|---|
+| Strength PR | Exercise dropdown (Bench Press, Barbell Squats, Deadlifts, Overhead Press, Barbell Rows, Incline Bench Press, Custom) — Custom uses autocomplete name input. Current weight / Target weight side by side. | Exercise + target weight > 0 |
+| Repetitions PR | Same exercise dropdown + Custom + autocomplete. Current reps / Target reps side by side. | Exercise + target reps > 0 |
+| Speed and Distance | Goal name input. Optional Current/Target distance (km or mi per `useMiles`). Optional Current/Target duration (minutes). Both targets = speed target (completion requires both); duration alone = endurance (higher = better). Distance stored as km. | Name + ≥1 target > 0 |
+| Number of Weekly Workouts | Target shown read-only from `targetWorkoutsPerWeek` (UserSettings). Muted italic note below: *"This goal tracks your weekly workout target. To change the target, long-press the Weekly Streak widget on the Home screen and tap Configure Settings."* No editable fields — target controlled via Weekly Streak Settings Modal. Auto-updates from current week's workout count (Mon–Sun). | Always valid; save enabled immediately |
 
-**Speed and Distance:** Goal name input. Optional: Current distance / Target distance (km or mi per useMiles). Optional: Current duration / Target duration (minutes). At least one target required. Both = speed target (completion requires both). Duration alone = endurance (higher = better). Distance values stored as km.
+"Save Goal" button at bottom. **Singleton constraint:** only one Weekly Workouts goal can exist; if one already exists, that option in the Goal Type selector is grayed out with a muted "Already added" label.
 
-**Number of Weekly Workouts:** Target workouts per week displayed as a read-only value reflecting the current `targetWorkoutsPerWeek` from UserSettings. Below the target value, an informational note in muted italic text: "This goal tracks your weekly workout target. To change the target, long-press the Weekly Streak widget on the Home screen and tap Configure Settings." No editable fields — the target is controlled exclusively via the Weekly Streak Settings Modal. The goal auto-updates its current value based on the current week's workout count (Mon–Sun).
-
-"Save Goal" button. Validation: Strength PR → exercise + target weight > 0. Reps PR → exercise + target reps > 0. Speed/Distance → name + at least one target > 0. Weekly Workouts → always valid (target read from Settings; save button enabled immediately). Only one Weekly Workouts goal can exist at a time — if one already exists, the "NUMBER OF WEEKLY WORKOUTS" option in the Goal Type selector is grayed out with a muted "Already added" label.
-
-**Edit mode:** The same view is used for editing an existing goal (entered from a tap on a goal card or from a future edit action). On save in edit mode, if the goal's `resetDate` is non-nil, it is cleared to nil — treating a deliberate goal-definition edit as a re-baselining action that brings previously out-of-scope workouts back into scope (see `SERVICES.md` § Reset Scoping and § Reset Goal Progress). Clearing `resetDate` also triggers `GoalSnapshotService.rebuildSnapshots(goal:)` to repopulate the sparkline from the now-in-scope workout history. The user is not shown an explicit "this will bring old workouts back" warning — the interaction is treated as intentional. In edit mode, Workout Type, Exercise, and Current fields are read-only.
+**Edit mode:** Same view, entered by tapping a goal card. On save, if the goal's `resetDate` is non-nil it's cleared to nil — treating a definition edit as deliberate re-baselining that brings previously out-of-scope workouts back into scope (SERVICES § Reset Scoping, § Reset Goal Progress). Clearing also triggers `GoalSnapshotService.rebuildSnapshots(goal:)` to repopulate the sparkline. No explicit "this will bring old workouts back" warning — the interaction is treated as intentional. Workout Type, Exercise, and Current fields are read-only in edit mode.
 
 ---
 
@@ -1047,27 +999,22 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 **Purpose:** Configure unit preferences and manage Apple Health integration.
 
 ### Layout
-← BACK. "Settings" heading.
 
-**"General" header.** Weight Unit card (KG/LBS toggle). Distance Unit card (KM/MILES toggle).
+← BACK · "Settings" heading.
 
-All General changes take effect immediately.
+**General** section: Weight Unit (KG/LBS toggle) · Distance Unit (KM/MILES toggle). Changes take effect immediately.
 
 ✦ divider.
 
-**"Apple Health" header.** Section managing HealthKit integration. See HEALTHKIT.md § 16 for architectural detail and HEALTHKIT.md § 17 for authorization behavior.
+**Apple Health** section: HealthKit integration controls. See HEALTHKIT § 16 (settings architecture) and § 17 (authorization).
 
 ### Apple Health Section
 
-**Toggle:** "Connect to Apple Health" — FortiFitSegmentedToggle styled consistently with Weight Unit and Distance Unit toggles in the General section, but functionally a two-state on/off switch rather than a unit selector. Accessibility identifier: `settings_appleHealthToggle`.
+Toggle: "Connect to Apple Health" — FortiFitSegmentedToggle styled like the General toggles but functionally on/off, not a unit selector. ID `settings_appleHealthToggle`.
 
-**Description text (below toggle):** Muted text, 13px, 700 weight. Reads:
+Description below toggle (muted, 13/700): *"Import workouts from Apple Watch and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk."*
 
-> "Import workouts from Apple Watch and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk."
-
-**Status line (below description):** Muted text, 11px, 700 weight, uppercase, 2px letter-spacing. Content depends on state — see State Table below.
-
-**Buttons (below status line, conditional):** Full-width or inline depending on state. See State Table.
+Status line below description (muted, 11/700, uppercase, 2px spacing) and conditional buttons — content per the state table below.
 
 ### Apple Health Section — State Table
 
@@ -1076,7 +1023,7 @@ Four possible states driven by (toggle on/off) × (iOS authorization status):
 | Toggle | iOS Auth | Status Line | Visible Buttons | Behavior on Toggle Tap |
 |---|---|---|---|---|
 | Off | Any (including not-yet-requested) | *(hidden — no status shown)* | None | Flipping on triggers authorization request (if not yet granted/denied); otherwise simply re-enables sync using cached authorization. |
-| On | Granted | `CONNECTED · LAST SYNC {relative time}` OR `CONNECTED · NEVER SYNCED YET` | **"Sync Now"** (blue outlined, full-width) — accessibility identifier `settings_appleHealthSyncNowButton`. Tap → triggers immediate `HealthKitSyncService.importPendingWorkouts()`. Shows transient "Syncing…" label on button until complete, then updates status line. | Flipping off immediately suspends all sync activity. Existing linked workouts retain `healthKitUUID`. Confirmation alert: "Turn off Apple Health sync? Imported workouts will remain in FortiFit but new workouts from Apple Health won't appear automatically. Cancel / Turn Off." |
+| On | Granted | `CONNECTED · LAST SYNC {relative time}` OR `CONNECTED · NEVER SYNCED YET` | **"Sync Now"** (blue outlined, full-width) — accessibility identifier `settings_appleHealthSyncNowButton`. Tap → triggers immediate `HealthKitSyncService.importPendingWorkouts()`. Shows transient "Syncing…" label on button until complete, then updates status line. | Flipping off immediately suspends all sync activity. Existing linked workouts retain `healthKitUUID`. Confirmation alert: "Turn off Apple Health sync? Imported workouts will remain in FitNavi but new workouts from Apple Health won't appear automatically. Cancel / Turn Off." |
 | On | Denied | `PERMISSION DENIED IN IOS SETTINGS` | **"Open iOS Settings"** (blue outlined, full-width) — accessibility identifier `settings_appleHealthOpenSettingsButton`. Tap → deep-links via `UIApplication.openSettingsURLString`. | Same as granted — confirmation alert, then flip off. |
 | On | Not yet requested | *(transient, typically <1s)* | None during transient state | The authorization prompt fires immediately; this state resolves to granted or denied within a second. UI doesn't need to handle the transient case explicitly — just render the previous state until the prompt resolves. |
 
@@ -1091,29 +1038,15 @@ The "Last sync" timestamp follows iOS's relative date conventions:
 
 Source: `UserSettings.healthKitLastSyncDate`. Updated after every successful sync by `HealthKitSyncService`.
 
-### First-Time Toggle-On Flow
+### Toggle-On Flows
 
-On the first time a user flips the toggle to on:
-1. FortiFit calls `HealthKitClient.requestAuthorization()`.
-2. iOS presents the native permission prompt with the read permission list (see HEALTHKIT.md § 17).
-3. User grants or denies. iOS returns control to FortiFit.
-4. On grant: Settings status line updates to "CONNECTED · NEVER SYNCED YET." FortiFit immediately triggers a catch-up sync. Status line updates to "CONNECTED · JUST NOW" on completion.
-5. On deny: Settings status line updates to "PERMISSION DENIED IN IOS SETTINGS." Toggle remains on (user's expressed intent), but no sync activity occurs. "Open iOS Settings" button becomes visible.
+**First-time toggle-on:** FitNavi calls `HealthKitClient.requestAuthorization()` → iOS presents the native prompt (HEALTHKIT § 17) → user grants or denies → control returns to FitNavi. On grant: status updates to "CONNECTED · NEVER SYNCED YET", catch-up sync fires immediately, status updates to "CONNECTED · JUST NOW" on completion. On deny: status shows "PERMISSION DENIED IN IOS SETTINGS"; toggle stays on (user's expressed intent), but no sync runs; "Open iOS Settings" button appears.
 
-### Subsequent Toggle-Off → Toggle-On Flow
-
-If the user previously granted authorization, toggles off, then toggles back on later:
-- No re-authorization prompt (iOS caches the original grant).
-- Sync resumes immediately from the persisted `HKQueryAnchor`. Any workouts added, updated, or deleted upstream during the off period are processed in the next catch-up sweep.
+**Subsequent toggle-off → toggle-on:** No re-authorization prompt (iOS caches the original grant). Sync resumes immediately from the persisted `HKQueryAnchor`; any upstream changes during the off period processed in the next catch-up sweep.
 
 ### Confirmation Alert Copy
 
-**Turn-off confirmation:**
-> Title: "Turn off Apple Health sync?"
-> Message: "Imported workouts will remain in FortiFit but new workouts from Apple Health won't appear automatically."
-> Buttons: "Cancel" / "Turn Off"
-
-Destructive action — "Turn Off" button styled in the standard destructive red.
+Turn-off confirmation: Title "Turn off Apple Health sync?" / Message "Imported workouts will remain in FitNavi but new workouts from Apple Health won't appear automatically." / "Cancel" + destructive-red "Turn Off".
 
 ### States
 
@@ -1129,70 +1062,59 @@ Destructive action — "Turn Off" button styled in the standard destructive red.
 
 ## Match Prompt Sheet
 
-**Purpose:** Resolve lower-confidence deduplication matches between HealthKit-imported workouts and existing FortiFit workouts. See HEALTHKIT.md § 13 and SERVICES.md § WorkoutMatcher for the matcher logic that produces pending matches.
+**Purpose:** Resolve lower-confidence deduplication matches between HealthKit-imported workouts and existing FitNavi workouts. See HEALTHKIT.md § 13 and SERVICES.md § WorkoutMatcher for the matcher logic that produces pending matches.
 
 ### Trigger
 
-Appears as a modal sheet on app foreground transition when `WorkoutMatcher.pendingMatches()` returns one or more pending pairings. One sheet per pending match — if multiple are queued, they appear sequentially (next sheet presents after the previous is resolved).
-
-**Not triggered by:** navigation to any specific screen, user tap, or settings toggle. Foreground transition is the sole automatic trigger. The sheet is dismissible via "Decide Later" (leaves the match in the queue) so the user is never trapped.
+Modal sheet on app foreground transition when `WorkoutMatcher.pendingMatches()` returns ≥1 pairing. One sheet per match; multiple queue sequentially (next presents after previous resolves). Foreground transition is the *sole* automatic trigger — never on navigation, tap, or settings toggle. Always dismissible via "Decide Later" (leaves match in queue) — user never trapped.
 
 ### Layout
 
-iOS modal sheet (sheet presentation). The sheet uses the `.large` detent (or a custom `.height(...)` detent sized to fit the full content) so the entire body paragraph and both summary cards are visible without the user having to scroll or drag the sheet up. The previous `.medium` detent truncated the body paragraph beneath "Possible Match" — do not use `.medium` here. Swipe-down dismissal maps to "Decide Later."
+iOS modal sheet, `.large` detent (or custom `.height(...)` sized to content — never `.medium`, which truncates the body paragraph). Swipe-down maps to "Decide Later".
 
-- **Header:** "Possible Match" (primary text, 20px 900 weight, centered).
-- **Body paragraph:** "Apple Health imported a workout that looks similar to one you already logged. Would you like to link them?" (secondary text, 14px, centered, standard paragraph spacing). Use `.fixedSize(horizontal: false, vertical: true)` so the paragraph is never vertically clipped by the sheet.
-- **Side-by-side summary cards:** Two FortiFitCards rendered horizontally side-by-side. Each card displays the workout's key metadata in a compact layout.
+- **Header:** "Possible Match" (Primary Text 20/900, centered).
+- **Body paragraph:** *"Apple Health imported a workout that looks similar to one you already logged. Would you like to link them?"* (Secondary Text 14px centered, `.fixedSize(horizontal: false, vertical: true)` to prevent vertical clip).
+- **Side-by-side summary cards** (two FortiFitCards):
 
-  **Left card — HealthKit workout:**
-  - HealthKit-pink heart icon (`heart.fill`) + "FROM APPLE HEALTH" label (HealthKit Pink color, 11px 700 weight uppercase, 2px letter-spacing). The label **must wrap to a second line** within the card rather than truncate — apply `.lineLimit(nil)` and `.fixedSize(horizontal: false, vertical: true)` to the label, and use `.minimumScaleFactor(1.0)` (no shrinking). The heart icon stays on the same baseline as the first line of the wrapped label.
-  - Workout type pill (using FortiFit category mapped from HK type)
-  - `healthKitActivityType` display string (primary text, 14px semibold)
-  - Start time (e.g., "7:02 PM", muted 13px)
-  - Duration (e.g., "45 min", muted 13px)
-  - Distance if present (e.g., "5.2 km", muted 13px; unit per useMiles)
-  - Avg HR if present (e.g., "142 bpm avg", muted 13px)
-  - Active calories if present (e.g., "487 kcal", muted 13px)
+  | Field | Left card (HealthKit) | Right card (FitNavi) |
+  |---|---|---|
+  | Header label | HealthKit-pink heart (`heart.fill`) + "FROM APPLE HEALTH" (HealthKit Pink, 11/700 uppercase, 2px spacing) | "YOUR LOG" (Primary Accent Blue, same treatment) |
+  | Type | Workout type pill (FortiFit category mapped from HK type) | Workout type pill |
+  | Title | `healthKitActivityType` (Primary Text 14/semibold) | `workout.name` (Primary Text 14/semibold) |
+  | Time | Start time (e.g., "7:02 PM", muted 13px) | `workout.time` (muted 13px) |
+  | Duration | If present (muted 13px) | If present (muted 13px) |
+  | Other | Distance (per `useMiles`) · avg HR · active kcal — each muted 13px when present | Effort (e.g., "Effort 7") · ExerciseSets count — each muted 13px when present |
 
-  **Right card — FortiFit workout:**
-  - "YOUR LOG" label (Primary Accent Blue `#3b82f6` via `FortiFitColors.primaryAccent`, 11px 700 weight uppercase, 2px letter-spacing). Mirrors the standard sentence-case Primary-Accent label treatment used elsewhere (see CONSTANTS.md line 448). Same wrap rules as the left card's label: `.lineLimit(nil)` + `.fixedSize(horizontal: false, vertical: true)` so the cards stay visually balanced if either label expands.
-  - Workout type pill
-  - `workout.name` (primary text, 14px semibold)
-  - Start time from `workout.time` (muted 13px)
-  - Duration if present (muted 13px)
-  - Effort if rated (e.g., "Effort 7", muted 13px)
-  - ExerciseSets count if present (e.g., "5 exercises", muted 13px)
+  Both header labels must wrap to a second line rather than truncate — `.lineLimit(nil)` + `.fixedSize(horizontal: false, vertical: true)` + `.minimumScaleFactor(1.0)`. Heart/dot stays on the first wrapped line's baseline.
 
-- **Primary action row (three vertically stacked buttons):**
-  - **"Link these workouts"** — Full-width blue-filled button (Primary Accent #3b82f6). Accessibility identifier `matchPromptSheet_linkButton`. Tap → `WorkoutMatcher.resolvePending(...decision: .link)` → applies link per SERVICES.md § WorkoutMatcher → Link Application → sheet dismisses → toast "Workouts linked." (~2s).
-  - **"Keep separate"** — Full-width blue-outlined button. Accessibility identifier `matchPromptSheet_keepSeparateButton`. Tap → `WorkoutMatcher.resolvePending(...decision: .keepSeparate)` → creates `WorkoutMatchRejection` → sheet dismisses → no toast.
-  - **"Decide later"** — Text-only link-style button (muted text). Accessibility identifier `matchPromptSheet_decideLaterButton`. Tap → `WorkoutMatcher.resolvePending(...decision: .decideLater)` → leaves match in queue → sheet dismisses → no toast.
+- **Primary action row** (three vertically stacked buttons):
 
-### Button Ordering Rationale
+  | Button | Style | ID | Action |
+  |---|---|---|---|
+  | "Link these workouts" | Full-width blue-filled | `matchPromptSheet_linkButton` | `WorkoutMatcher.resolvePending(decision: .link)` → SERVICES § WorkoutMatcher → Link Application → dismiss + "Workouts linked." toast (~2s) |
+  | "Keep separate" | Full-width blue-outlined | `matchPromptSheet_keepSeparateButton` | `WorkoutMatcher.resolvePending(decision: .keepSeparate)` → creates `WorkoutMatchRejection` → dismiss, no toast |
+  | "Decide later" | Text-only link (muted) | `matchPromptSheet_decideLaterButton` | `WorkoutMatcher.resolvePending(decision: .decideLater)` → leaves match in queue → dismiss, no toast |
 
-Link is primary because it's the most common correct answer when the matcher has already filtered for same-type, same-day, within-4-hours workouts. Keep Separate is secondary (less common but deliberate). Decide Later is de-emphasized (punt action, low commitment).
+  **Ordering rationale:** Link is primary — most common correct answer when the matcher has already filtered for same-type, same-day, within-4-hours. Keep Separate secondary (deliberate but less common). Decide Later de-emphasized (low-commitment punt).
 
 ### Post-Resolution Behavior
 
-**On Link:** `WorkoutMatcher.applyLink()` runs — HK-owned fields copied from the snapshot to the FortiFit Workout, user-owned fields preserved, `lastModifiedDate` bumped, Workout Cascade fires. The Workout is now surfaced as HK-linked everywhere (source indicator on Workout Detail, peripheral glyph on Home/Workouts/Plan).
+- **Link:** HK-owned fields copy from snapshot to the FitNavi Workout per SERVICES § WorkoutMatcher → Link Application; user-owned fields preserved; `lastModifiedDate` bumped; Workout Cascade fires. Workout now appears HK-linked everywhere.
+- **Keep Separate:** `WorkoutMatchRejection` persists the `(healthKitUUID, workoutId)` pair; future sync won't re-propose. HK workout proceeds to auto-create as a separate FitNavi Workout if not already created.
+- **Decide Later:** Match stays queued; re-prompts next foreground. No auto-create yet — HK workout remains in candidate pool.
 
-**On Keep Separate:** `WorkoutMatchRejection` record persists the (`healthKitUUID`, `workoutId`) pair. Future sync events will not re-propose this pairing. The HK workout proceeds to auto-create as a new separate FortiFit Workout (if it hasn't already been auto-created by a prior sync pass).
+### Sequential Multi-Match
 
-**On Decide Later:** Match stays queued. Re-prompts on next foreground transition. No auto-create yet — the HK workout remains in `WorkoutMatcher`'s candidate pool pending resolution.
-
-### Sequential Multi-Match Handling
-
-If 3 pending matches are queued, the user sees 3 sheets in sequence. Each resolves independently. No batch-resolve option in MVP — the sequential approach is simpler and keeps each decision explicit.
+3 pending matches → 3 sequential sheets. Each resolves independently. No batch-resolve in MVP.
 
 ### Accessibility
 
-All three buttons have accessibility identifiers (see § Button list above). The summary card contents use standard VoiceOver traversal (header → cards left-to-right → buttons top-to-bottom). No custom accessibility actions needed.
+Button IDs above. VoiceOver traversal: header → cards left-to-right → buttons top-to-bottom. No custom accessibility actions needed.
 
 ### States
 
-| State | What the User Sees |
-|-------|-------------------|
-| Match queued | Sheet presents on foreground transition with side-by-side summary cards and three actions |
-| Resolving (transient) | After tap, sheet dismisses immediately; toast or next sheet appears |
-| No pending matches | Sheet does not present — normal app state |
+| State | What the user sees |
+|---|---|
+| Match queued | Sheet presents on foreground; summary cards + three actions |
+| Resolving (transient) | After tap: dismiss; toast or next sheet appears |
+| No pending matches | No sheet — normal app state |

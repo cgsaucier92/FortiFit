@@ -61,27 +61,31 @@ struct HomeWidgetModelTests {
 
 struct HomeWidgetServiceTests {
 
-    @Test func seedDefaultWidgetsCreates2Records() throws {
+    @Test func seedDefaultWidgetsCreates3Records() throws {
         let context = try makeTestContext()
+        UserSettings.shared.hasSeededDefaultHomeWidgets = false
 
         HomeWidgetService.seedDefaultWidgets(context: context)
 
         let widgets = HomeWidgetService.fetchAll(context: context)
-        #expect(widgets.count == 2)
-        #expect(widgets[0].widgetType == "trainingLoad")
+        #expect(widgets.count == 3)
+        #expect(widgets[0].widgetType == "todaysPlan")
         #expect(widgets[0].sortOrder == 0)
-        #expect(widgets[1].widgetType == "weekStreak")
+        #expect(widgets[1].widgetType == "trainingLoad")
         #expect(widgets[1].sortOrder == 1)
+        #expect(widgets[2].widgetType == "powerLevel")
+        #expect(widgets[2].sortOrder == 2)
     }
 
     @Test func seedDefaultWidgetsIsIdempotent() throws {
         let context = try makeTestContext()
+        UserSettings.shared.hasSeededDefaultHomeWidgets = false
 
         HomeWidgetService.seedDefaultWidgets(context: context)
         HomeWidgetService.seedDefaultWidgets(context: context)
 
         let widgets = HomeWidgetService.fetchAll(context: context)
-        #expect(widgets.count == 2)
+        #expect(widgets.count == 3)
     }
 
     @Test func addWidgetAssignsMaxSortOrderPlusOne() throws {
@@ -249,7 +253,7 @@ struct WorkoutInfoRemovalMigrationTests {
 struct WidgetInfoModalCopyTests {
 
     @Test func eachConfigurableWidget_hasInfoModalCopy() {
-        let configurableWidgets = ["trainingLoad", "powerLevel"]
+        let configurableWidgets = ["trainingLoad", "powerLevel", "appleActivity"]
         for widgetType in configurableWidgets {
             let copy = AppConstants.widgetInfoModalCopy[widgetType]
             #expect(copy != nil, "Missing widgetInfoModalCopy for \(widgetType)")

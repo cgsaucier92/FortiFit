@@ -332,11 +332,11 @@ final class PlanViewModel {
     func removeConfirmationMessage(_ item: PlanCardItem) -> String {
         switch item {
         case .scheduled(let sw) where sw.status == "completed":
-            return "The workout will remain in your log."
+            return "The workout will remain in your log"
         case .loggedOnly:
-            return "The workout will remain in your log."
+            return "The workout will remain in your log"
         default:
-            return "This cannot be undone."
+            return "This can't be undone"
         }
     }
 }

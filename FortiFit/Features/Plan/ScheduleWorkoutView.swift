@@ -48,17 +48,21 @@ struct ScheduleWorkoutView: View {
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geo in
             ZStack(alignment: .top) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                    if templates.isEmpty {
-                        Text("You'll need to create a template before scheduling a workout. You can create a template from the Workouts or Saved Templates screens.")
-                            .font(FortiFitTypography.body)
-                            .foregroundStyle(FortiFitColors.mutedText)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity, minHeight: geo.size.height * 0.6)
-                    } else {
+            if templates.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("You'll need to create a template before scheduling a workout. You can create a template from the Workouts or Saved Templates screens.")
+                        .font(FortiFitTypography.body)
+                        .foregroundStyle(FortiFitColors.mutedText)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, FortiFitSpacing.screenHorizontal)
+                    Spacer()
+                }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
                         // Template selection
                         FortiFitLabel("Template", color: FortiFitColors.primaryText)
                         templateSelectionSection
@@ -140,12 +144,12 @@ struct ScheduleWorkoutView: View {
                         }
                         .accessibilityIdentifier(AccessibilityID.scheduleWorkoutConfirmButton)
                     }
+                    .padding(.horizontal, FortiFitSpacing.screenHorizontal)
+                    .padding(.top, headerHeight)
+                    .padding(.bottom, FortiFitSpacing.gapXLarge)
                 }
-                .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                .padding(.top, headerHeight)
-                .padding(.bottom, FortiFitSpacing.gapXLarge)
+                .scrollClipDisabled()
             }
-            .scrollClipDisabled()
 
             // Fixed header
             FortiFitFixedHeader(headerHeight: $headerHeight) {
@@ -174,7 +178,6 @@ struct ScheduleWorkoutView: View {
             #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
             #endif
-            } // GeometryReader
         }
     }
 

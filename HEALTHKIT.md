@@ -1,4 +1,4 @@
-# HEALTHKIT.md: FortiFit HealthKit Integration
+# HEALTHKIT.md: FitNavi HealthKit Integration
 
 > Authoritative spec for HealthKit integration. Cross-references PRD.md, SERVICES.md, SCREENS.md, CONSTANTS.md, and TESTING.md for domain-specific details rather than duplicating them.
 > For data models, see `PRD.md` § Data Model. For service implementations, see `SERVICES.md`. For UI layouts, see `SCREENS.md`. For static tables, see `CONSTANTS.md`.
@@ -7,17 +7,17 @@
 
 ## 1. Overview
 
-HealthKit integration lets FortiFit import workouts recorded on Apple Watch (or any Health-connected source — Peloton, Strava, Garmin, etc.) and reconcile them against FortiFit's own records. It is **read-only in MVP**. FortiFit does not write to HealthKit under any circumstance.
+HealthKit integration lets FitNavi import workouts recorded on Apple Watch (or any Health-connected source — Peloton, Strava, Garmin, etc.) and reconcile them against FitNavi's own records. It is **read-only in MVP**. FitNavi does not write to HealthKit under any circumstance.
 
-The product intent: a user records a workout on Apple Watch, opens FortiFit, and sees the workout already logged — ready for them to add exercise sets, RPE, and notes.
+The product intent: a user records a workout on Apple Watch, opens FitNavi, and sees the workout already logged — ready for them to add exercise sets, RPE, and notes.
 
 ---
 
 ## 2. Scope
 
 ### In Scope (MVP — Phases 1+2 ship together)
-- Workout import (auto-create new records when no FortiFit match exists)
-- Dedup and linking (match incoming HK workouts against existing FortiFit records; bidirectional matcher)
+- Workout import (auto-create new records when no FitNavi match exists)
+- Dedup and linking (match incoming HK workouts against existing FitNavi records; bidirectional matcher)
 - Background sync (observer queries + background refresh)
 - Catch-up sync on launch (anchored queries)
 - Upstream delete handling (promote to manual)
@@ -26,9 +26,9 @@ The product intent: a user records a workout on Apple Watch, opens FortiFit, and
 - iOS 18+ `workoutEffortScore` import into `rpe` (nil-fill only)
 
 ### Explicitly Out of Scope (MVP)
-- **Write-back** (FortiFit → HealthKit). Deferred indefinitely. See § 20.
-- **Biometrics** (resting HR, HRV, body weight, VO₂ max, etc.). Deferred to Phase 3. See § 20.
-- **Sleep data**. Deferred to Phase 4. See § 20.
+- **Write-back** (FitNavi → HealthKit). Deferred indefinitely. See § 21.
+- **Biometrics** (resting HR, HRV, body weight, VO₂ max, etc.). Deferred to Phase 3. See § 21.
+- **Sleep data**. Deferred to Phase 4. See § 21.
 - **GPS / route data**. Not loaded, not stored.
 - **User-configurable HK-to-FortiFit type mapping**. Static table only.
 - **`estimatedWorkoutEffortScore`**. Ignored entirely; only user-entered `workoutEffortScore` imports.
@@ -38,57 +38,14 @@ The product intent: a user records a workout on Apple Watch, opens FortiFit, and
 
 ## 3. Phases
 
-HealthKit integration is **Phase 8** in the FortiFit development roadmap (see CLAUDE.md § Development Phases). Launch Prep shifts from Phase 8 to Phase 9.
+HealthKit integration is **Phase 8** in the FitNavi roadmap. The full feature index is in CLAUDE.md § Phase 8 — this section only adds HK-internal phasing detail.
 
-Phases 1 and 2 below ship together as a single Claude Code implementation pass. They are separated conceptually so the test matrix and integration-test cascade are easier to reason about, but there is no user-facing release between them.
+**Phase 1 (Foundation + Import)** and **Phase 2 (Background Delivery)** ship together as a single Claude Code implementation pass. The split is conceptual — separated so the test matrix is easier to reason about, but no user-facing release between them.
 
-### Phase 1: Foundation + Workout Import
+- **Phase 1 — Foundation + Workout Import.** Authorization, anchored catch-up queries on launch/foreground, auto-create flow, bidirectional matcher, all UI surfaces, Settings section, manual "Sync Now". After Phase 1 alone, workouts arrive on next foreground.
+- **Phase 2 — Background Delivery.** Adds `HKObserverQuery` with `enableBackgroundDelivery`, `BGAppRefreshTask` registration + handler, and `@MainActor` marshaling. Workouts arrive without user opening the app.
 
-**Goal:** Authorization flow works. Workouts recorded on Apple Watch (or any Health-connected source) are auto-created in FortiFit on app launch or foreground. Linking works bidirectionally. UI surfaces the HealthKit relationship. Settings section is functional.
-
-| Feature | Where to find spec |
-|---|---|
-| `HealthKitClient` protocol + `DefaultHealthKitClient` concrete | § 4 Architecture Decisions, § 19 Testing Strategy |
-| New `Workout` fields (10 optional) | § 5 Data Model; PRD.md § Data Model |
-| `WorkoutMatchRejection` entity | § 5 Data Model; PRD.md § Data Model |
-| HK-to-FortiFit type mapping table | § 6 Workout Type Taxonomy; CONSTANTS.md § HealthKit Mapping |
-| Sprints → Cardio one-time migration | § 18 Platform and Migration |
-| Field ownership rules (HK-owned vs user-owned) | § 7 Field Ownership |
-| Log Workout read-only fields + inline `info.circle` popovers | § 7 Field Ownership; § 15 UI Surfaces; SCREENS.md § Log Workout |
-| `workoutEffortScore` import (iOS 18+ gated) | § 8 Effort Score |
-| `HealthKitSyncService` with `HKAnchoredObjectQuery` catch-up on launch/foreground | § 9 Sync Lifecycle |
-| Persisted `HKQueryAnchor` (UserDefaults-serialized Data) | § 9 Sync Lifecycle |
-| Auto-create flow + 2-minute minimum-duration floor | § 10 Auto-Create Flow |
-| Upstream delete handling (promote to manual, null out pointer) | § 11 Upstream Updates and Deletes |
-| Upstream update handling (HK wins on HK-owned fields) | § 11 Upstream Updates and Deletes |
-| `WorkoutMatcher` service (bidirectional, tiered confidence) | § 12 Deduplication |
-| Match Prompt Sheet (sheet-on-foreground) | § 13 Prompt UX; SCREENS.md § Match Prompt Sheet |
-| Unlink action (three entry points) | § 14 Unlink |
-| Workout Detail source indicator + info sheet | § 15 UI Surfaces; SCREENS.md § Workout Detail |
-| Workout Detail Summary two-column grid (HK-linked) | § 15 UI Surfaces; SCREENS.md § Workout Detail |
-| Peripheral HK glyph on Home / Workouts / Plan | § 15 UI Surfaces; SCREENS.md § Home, § Workouts, § Plan |
-| Settings "Apple Health" section (toggle, status line, Sync Now, deep link) | § 16 Settings; SCREENS.md § Settings |
-| Authorization flow + Info.plist `NSHealthShareUsageDescription` | § 17 Authorization |
-| Accessibility identifiers for all new interactive elements | § 19 Testing Strategy; TESTING.md |
-| Unit tests (`FortiFitTests`): HK-to-category mapping, matcher rules, field ownership, auto-create defaults | § 19 Testing Strategy |
-| Integration tests (`FortiFitIntegrationTests`): auto-create cascade, link flow (both directions), upstream delete, rejection persistence, effort score nil-fill, Sprints migration | § 19 Testing Strategy |
-| UI smoke tests (`FortiFitUITests`): Settings section states, Workout Detail source indicator + info sheet, unlink flow, Match Prompt Sheet actions, Log Workout read-only field popovers | § 19 Testing Strategy |
-
-### Phase 2: Ongoing Sync (Background Delivery)
-
-**Goal:** Workouts recorded on Apple Watch appear in FortiFit without the user having to open the app. Phase 1's catch-up-on-launch is augmented with live background sync.
-
-| Feature | Where to find spec |
-|---|---|
-| `HKObserverQuery` with `enableBackgroundDelivery` | § 9 Sync Lifecycle |
-| `BGAppRefreshTask` registration + handler | § 9 Sync Lifecycle |
-| Deleted-object handler wired into anchored query | § 9 Sync Lifecycle; § 11 Upstream Updates and Deletes |
-| Threading: `@MainActor` marshaling in sync service | § 4 Architecture Decisions; § 9 Sync Lifecycle |
-| Manual QA: background wake, anchor persistence, force-quit recovery | § 19 Testing Strategy |
-
-### What's Explicitly Out of Both Phases
-
-See § 2 Scope → Explicitly Out of Scope. Biometrics (future Phase 10), sleep (future Phase 11), and write-back (future Phase 12+) are separate implementation passes with their own future specs. See § 20 Future Phases for shape-level descriptions.
+Out of both phases: biometrics (future Phase 10), sleep (future Phase 11), write-back (future Phase 12+). See § 21.
 
 ---
 
@@ -106,59 +63,32 @@ All HealthKit access goes through `HealthKitClient` (protocol). Integration test
 Observer query callbacks fire on background threads. The sync service marshals to `@MainActor` before touching `ModelContext`. All SwiftData writes happen on main.
 
 ### No Write-Back (MVP)
-FortiFit never writes to HealthKit. `typesToShare` is an empty set in the authorization request. `NSHealthUpdateUsageDescription` is not included in Info.plist.
+FitNavi never writes to HealthKit. `typesToShare` is an empty set in the authorization request. `NSHealthUpdateUsageDescription` is not included in Info.plist.
 
-**Consequence:** manually logged FortiFit workouts do not contribute to the Apple Move/Exercise rings. Accepted tradeoff.
+**Consequence:** manually logged FitNavi workouts do not contribute to the Apple Move/Exercise rings. Accepted tradeoff.
 
 ---
 
 ## 5. Data Model
 
-### New `Workout` Fields (all optional)
+The 10 new `Workout` fields and the `WorkoutMatchRejection` entity are defined in PRD.md § Data Model — that's the canonical schema. Notes specific to HK behavior:
 
-| Field | Type | Notes |
-|---|---|---|
-| `healthKitUUID` | UUID? | Pointer to source HK workout. Nil = manual. |
-| `healthKitSourceBundleID` | String? | Bundle ID of the writing app (e.g., `com.apple.health.WatchApp`). Used only for display via `HKSource.name`. |
-| `healthKitActivityType` | String? | Friendly display string (e.g., "Traditional Strength Training"). |
-| `avgHeartRate` | Int? | bpm |
-| `maxHeartRate` | Int? | bpm |
-| `activeEnergyKcal` | Double? | Active calories only (Move ring metric) |
-| `totalEnergyBurnedKcal` | Double? | Active + basal combined |
-| `elevationAscendedMeters` | Double? | Outdoor workouts only |
-| `exerciseMinutes` | Int? | Apple Exercise ring credit. Differs from `durationMinutes`. |
-| `indoor` | Bool? | Metadata flag |
+- All 10 new `Workout` fields are optional. `healthKitUUID == nil` means manual; non-nil means HK-imported or HK-linked.
+- `WorkoutMatchRejection` is standalone (UUID-pair lookup, no `@Relationship`). Orphan rejections after a `Workout` is deleted are retained — harmless, no cleanup in MVP.
 
-See PRD.md § Data Model for the full `Workout` schema. Add these 10 fields to the existing table.
-
-### New Entity: `WorkoutMatchRejection`
-
-| Property | Type | Required | Notes |
-|---|---|---|---|
-| `id` | UUID | Yes | Auto-generated |
-| `healthKitUUID` | UUID | Yes | The HK workout rejected |
-| `workoutId` | UUID | Yes | The FortiFit workout it was rejected against |
-| `rejectedDate` | Date | Yes | Set to `.now` on creation |
-
-Standalone. No `@Relationship` to `Workout`. Lookup by UUID pair. Orphan records (when a linked `Workout` is deleted) are harmless and remain. No cleanup logic in MVP.
+Field ownership (HK-owned vs user-owned) is in § 7 below.
 
 ---
 
 ## 6. Workout Type Taxonomy
 
-### Six FortiFit Types (Sprints removed)
-Strength Training, HIIT, Cardio, Yoga, Pilates, **Other**.
+Six FitNavi types: **Strength Training, HIIT, Cardio, Yoga, Pilates, Other**. "Other" is the catch-all for HK types without a clean category match (Kickboxing, Tai Chi, Dance, Rock Climbing, etc.) and the forward-compatibility bucket for new HK types in future iOS versions.
 
-"Other" is the catch-all for HK types without a clean category match (e.g., Kickboxing, Tai Chi, Dance, Rock Climbing) and serves as forward-compatibility for new HK types introduced by future iOS versions.
-
-### Two-Level Categorization
+Two-level categorization:
 - **FortiFit `workoutType`** (high-level): drives all algorithms, Workouts-screen organization, goal matching. One of the six types.
 - **`healthKitActivityType`** (low-level, display-only): UI specificity. Never consumed by any algorithm.
 
-### HK-to-Category Mapping
-Static table in CONSTANTS.md § HealthKit Mapping. Not user-configurable. Claude Code consults this table at import time in `HealthKitSyncService`.
-
-**Rule:** every `HKWorkoutActivityType` currently defined by Apple must have an explicit entry. New types introduced by future iOS versions fall through to "Other" via a default-case fallback in the mapping function.
+The static `HKWorkoutActivityType` → FortiFit `workoutType` mapping lives in **HK_MAPPING.md**. Not user-configurable. Every Apple-defined `HKWorkoutActivityType` has an explicit entry; future-iOS unknowns fall through to "Other" via a `default` case.
 
 ---
 
@@ -195,7 +125,7 @@ All effort-score reads are gated `if #available(iOS 18, *)`. iOS 17 users don't 
 
 ### Rules (Option 2 — nil-fill only)
 - **On import:** if `rpe == nil` and HK has a `workoutEffortScore` for this workout, set `rpe = workoutEffortScore`. Otherwise leave `rpe` unchanged.
-- **Never overwrite:** if `rpe != nil` (user has set a value in FortiFit), HK `workoutEffortScore` is ignored regardless of whether it changes later.
+- **Never overwrite:** if `rpe != nil` (user has set a value in FitNavi), HK `workoutEffortScore` is ignored regardless of whether it changes later.
 - **Estimated scores ignored:** `estimatedWorkoutEffortScore` is never imported. Only user-entered `workoutEffortScore` contributes.
 
 ### API Mechanics
@@ -209,7 +139,7 @@ All effort-score reads are gated `if #available(iOS 18, *)`. iOS 17 users don't 
 
 | Layer | Purpose | When It Runs |
 |---|---|---|
-| `HKObserverQuery` w/ `enableBackgroundDelivery` | Live sync | HK writes a new workout; iOS wakes FortiFit |
+| `HKObserverQuery` w/ `enableBackgroundDelivery` | Live sync | HK writes a new workout; iOS wakes FitNavi |
 | `BGAppRefreshTask` | Belt-and-suspenders | Periodically, when iOS permits |
 | `HKAnchoredObjectQuery` catch-up | Mandatory backstop | Every cold launch and foreground |
 
@@ -219,20 +149,20 @@ All three converge on the same entry point: `HealthKitSyncService.importPendingW
 `HKQueryAnchor` is persisted to UserDefaults (serialized `Data`). Every successful anchored query updates the anchor. Catch-up on launch uses the persisted anchor as the "since" marker.
 
 ### Deleted-Object Handler
-Anchored queries MUST wire the `deletedObjectHandler`. Without it, HK-side deletions never reach FortiFit. See § 11 for behavior.
+Anchored queries MUST wire the `deletedObjectHandler`. Without it, HK-side deletions never reach FitNavi. See § 11 for behavior.
 
 ### Known Failure Modes (documented, no UI)
-- User force-quit FortiFit → background delivery does not fire. Catch-up on next launch recovers.
+- User force-quit FitNavi → background delivery does not fire. Catch-up on next launch recovers.
 - User disabled Background App Refresh at OS level → imports only during foreground. Catch-up on launch still runs.
 
 ---
 
 ## 10. Auto-Create Flow
 
-Happy path: HK workout arrives, no matching FortiFit record exists (after `WorkoutMatcher` runs), create a new first-class `Workout`.
+Happy path: HK workout arrives, no matching FitNavi record exists (after `WorkoutMatcher` runs), create a new first-class `Workout`.
 
 ### Minimum-Duration Floor
-HK workouts under **2 minutes** are skipped entirely. No FortiFit record created. Not added to the matching pool.
+HK workouts under **2 minutes** are skipped entirely. No FitNavi record created. Not added to the matching pool.
 
 **Scope:** applies only to auto-create. If a user manually logs a 90-second sprint and an HK record under 2 minutes matches, linking still works (via manual-side matcher entry point).
 
@@ -269,13 +199,13 @@ User-owned fields (`name`, `note`, `time`, `ExerciseSets`, `rpe`) are never touc
 
 ### Upstream Delete
 When `deletedObjectHandler` reports a HK workout deletion:
-1. Find the FortiFit `Workout` with matching `healthKitUUID`.
+1. Find the FitNavi `Workout` with matching `healthKitUUID`.
 2. Clear `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType` (set to nil).
 3. Retain all HK-sourced measurement values as-is. The record is now a manual workout.
 4. Bump `lastModifiedDate` to `.now`. This re-scopes the workout against any goal `resetDate` (see SERVICES.md § Goal Auto-Update → Reset Scoping).
 5. **Do NOT fire the deletion cascade.** This is not a deletion.
 
-**Rationale:** conservative, non-destructive. User retains their training history even if they clean up the Health app. Accepts that FortiFit data may diverge from HealthKit after this point.
+**Rationale:** conservative, non-destructive. User retains their training history even if they clean up the Health app. Accepts that FitNavi data may diverge from HealthKit after this point.
 
 ---
 
@@ -306,8 +236,8 @@ AM+PM sessions of the same type on the same day, if non-overlapping AND >4 hours
 
 ### Field Application on Link
 Regardless of direction:
-1. Populate `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType` on the FortiFit `Workout`.
-2. Apply HK-owned field values from the HK record (overwrites prior FortiFit values for HK-owned fields only).
+1. Populate `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType` on the FitNavi `Workout`.
+2. Apply HK-owned field values from the HK record (overwrites prior FitNavi values for HK-owned fields only).
 3. User-owned fields unchanged.
 4. Bump `lastModifiedDate` to `.now`.
 5. Fire Workout Cascade (any changed measured fields affect Training Load, goals, snapshots).
@@ -323,7 +253,7 @@ When `WorkoutMatcher` queues a lower-confidence match, present a modal sheet the
 - **Title:** "Possible Match"
 - **Side-by-side summary:**
   - Left column (HK workout): date/time, `healthKitActivityType`, duration, key HK metrics (distance if present, avg HR, active kcal)
-  - Right column (FortiFit workout): name, `workoutType`, RPE, ExerciseSets count, notes preview
+  - Right column (FitNavi workout): name, `workoutType`, RPE, ExerciseSets count, notes preview
 - **Primary actions** (three buttons):
   - **"Link these workouts"** — applies high-confidence link logic
   - **"Keep separate"** — creates a `WorkoutMatchRejection` and dismisses
@@ -356,22 +286,22 @@ Unlink is **always** gated behind a SwiftUI `.confirmationDialog` regardless of 
 4. Bump `lastModifiedDate` to `.now`.
 5. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. This guarantees:
    - The matcher (`WorkoutMatcher.findCandidates(for:)`) skips the (UUID, workoutId) pair forever.
-   - If the same HK UUID re-imports (e.g., the user removes and re-installs the Health source), auto-create proceeds normally as a new workout, but auto-link to this specific FortiFit workout is short-circuited. Other FortiFit workouts can still match it via the normal flow.
+   - If the same HK UUID re-imports (e.g., the user removes and re-installs the Health source), auto-create proceeds normally as a new workout, but auto-link to this specific FitNavi workout is short-circuited. Other FitNavi workouts can still match it via the normal flow.
    - Re-linking via the Match Prompt Sheet for this same pairing is impossible — the matcher never queues it.
 6. Do NOT fire the deletion cascade.
 
 ### Why one-way
-Phase 8.5 user research surfaced two issues with reversible unlinking: (a) users who unlinked to edit a field would see the matcher re-propose the link on next foreground, creating confusion; (b) the copy needed to explain "unlink" honestly was longer and weaker when the action was reversible. Committing to one-way makes the warning crisp ("Unlinking is permanent") and removes a class of bugs around stale re-prompts. The user can still get the same outcome as a re-link by deleting the FortiFit-side workout and letting auto-create rebuild from the Apple Health record.
+Reversible unlink caused confused re-prompts and weaker warning copy. One-way unlink → "Unlinking is permanent" reads crisply and the matcher never re-proposes a rejected pair. Same-outcome workaround: delete the FitNavi workout and let auto-create rebuild from HK.
 
 ---
 
 ## 15. UI Surfaces
 
 ### Workout Detail Source Indicator
-Below the Workout Type row, when `workout.healthKitUUID != nil`. Format: `{sourceName} [glyph]` — source name only, no activity type prefix. Glyph trails the source name **only when source is Apple Watch**.
+Below the Workout Type row, when `workout.healthKitUUID != nil`. Format: `[glyph] {sourceName}` — glyph leads the source name, no activity type prefix. Glyph renders **only when source is Apple Watch**.
 
 - Source name resolved via `HealthKitClient.sourceName(for:)` per SERVICES.md § HealthKitClient. Apple Watch → `Apple Workout`; other recognized sources keep their `HKSource.name`; unresolvable bundle IDs fall back to `another app`. Never displays a raw bundle ID.
-- Trailing glyph: `FortiFitHealthGlyph` (Apple Workout running figure on green) — renders only when source is Apple Watch. Other sources show no trailing glyph.
+- Leading glyph: `FortiFitHealthGlyph` (Apple Workout running figure on green) — renders only when source is Apple Watch, positioned left of the source name. Other sources show no glyph.
 - Styled as secondary/muted text using the app's Label treatment (11px, 700 weight, 2px letter-spacing, Muted Text color).
 - Tappable → opens info sheet.
 
@@ -398,15 +328,15 @@ Each card is independently tappable and opens the **Metric Detail Sheet** (per-m
 
 Full layout spec (including stat-card structure, field order, per-field display values, and Metric Detail Sheet behavior) is in SCREENS.md § Workout Detail → Summary and § Workout Detail → Metric Detail Sheet.
 
-### Peripheral Glyph (Apple Workout)
-The Apple Workout glyph (`FortiFitHealthGlyph` — running figure on green circular background) renders trailing the metadata row on these surfaces, **only when source is Apple Watch**:
+### Peripheral Apple Workout Label
+On compact surfaces (Home, Workouts, Plan), Apple-Watch-sourced workouts display the text "Apple Workout" (styled `bodySmall` / muted) instead of the glyph icon. Renders trailing on the metadata row, separated by ` · `, **only when source is Apple Watch**:
 - Recent Workouts list rows (Home)
 - Workout Type card preview rows (Workouts tab)
 - Scheduled Workout cards / logged-only cards (Plan tab)
 
-Non-Apple-Watch HK sources (Strava, Peloton, etc.) do not render this glyph on peripheral surfaces — they are visually indistinguishable from manual workouts on those compact surfaces. Future updates may add per-source glyphs.
+Non-Apple-Watch HK sources (Strava, Peloton, etc.) do not render this label on peripheral surfaces — they are visually indistinguishable from manual workouts on those compact surfaces.
 
-Visible only when `healthKitUUID != nil`. Full "from {source}" label stays on Workout Detail only.
+Visible only when `healthKitUUID != nil`. Full glyph + source name indicator stays on Workout Detail only.
 
 ### Log Workout Read-Only Fields
 When `healthKitUUID != nil`:
@@ -452,7 +382,7 @@ Update `SCREENS.md § Settings` to include the Apple Health section layout.
 ## 17. Authorization
 
 ### Info.plist Requirements
-- `NSHealthShareUsageDescription` — required. Copy: TBD in SCREENS.md. Must be specific enough for App Store review (e.g., "FortiFit uses your Apple Health workout data to automatically log sessions recorded on Apple Watch or other connected apps.")
+- `NSHealthShareUsageDescription` — required. Copy: TBD in SCREENS.md. Must be specific enough for App Store review and now must explicitly mention activity rings since Stand-hour and daily-summary access have been added to scope. Suggested: "FitNavi uses your Apple Health workout data to automatically log sessions recorded on Apple Watch or other connected apps, and reads your daily Move, Exercise, and Stand activity to display your activity rings inside FitNavi." Update before release.
 - `NSHealthUpdateUsageDescription` — NOT included. Not needed; write-back is out of scope.
 
 ### Entitlement
@@ -460,25 +390,28 @@ HealthKit capability added to the target.
 
 ### Read Permission List (requested at first enable)
 
-| Type | iOS |
-|---|---|
-| `HKWorkoutType` | 17+ |
-| `HKQuantityTypeIdentifierHeartRate` | 17+ |
-| `HKQuantityTypeIdentifierActiveEnergyBurned` | 17+ |
-| `HKQuantityTypeIdentifierBasalEnergyBurned` | 17+ |
-| `HKQuantityTypeIdentifierDistanceWalkingRunning` | 17+ |
-| `HKQuantityTypeIdentifierDistanceCycling` | 17+ |
-| `HKQuantityTypeIdentifierDistanceSwimming` | 17+ |
-| `HKQuantityTypeIdentifierFlightsClimbed` | 17+ |
-| `HKQuantityTypeIdentifierAppleExerciseTime` | 17+ |
-| `HKQuantityTypeIdentifierWorkoutEffortScore` | 18+ (gated) |
+| Type | iOS | Notes |
+|---|---|---|
+| `HKWorkoutType` | 17+ | Per-workout reads. |
+| `HKQuantityTypeIdentifierHeartRate` | 17+ | Per-workout. |
+| `HKQuantityTypeIdentifierActiveEnergyBurned` | 17+ | Used both per-workout (existing) and as a daily-summary source for the Activity Rings widget's Move ring (see § 20 Activity Rings Daily Summary). |
+| `HKQuantityTypeIdentifierBasalEnergyBurned` | 17+ | Per-workout. |
+| `HKQuantityTypeIdentifierDistanceWalkingRunning` | 17+ | Per-workout. |
+| `HKQuantityTypeIdentifierDistanceCycling` | 17+ | Per-workout. |
+| `HKQuantityTypeIdentifierDistanceSwimming` | 17+ | Per-workout. |
+| `HKQuantityTypeIdentifierFlightsClimbed` | 17+ | Per-workout. |
+| `HKQuantityTypeIdentifierAppleExerciseTime` | 17+ | Used both per-workout (existing) and as a daily-summary source for the Activity Rings widget's Exercise ring. |
+| `HKCategoryTypeIdentifierAppleStandHour` | 17+ | **New.** Daily-summary source for the Activity Rings widget's Stand ring (see § 20). Stored as a category type, not a quantity type — count distinct hours where `value == .stood` for the day. |
+| `HKQuantityTypeIdentifierWorkoutEffortScore` | 18+ (gated) | Per-workout. |
 
 `typesToShare` is an empty set. Only `typesToRead` is populated.
 
-### Denial Handling
-HealthKit authorization is one-shot and opaque. FortiFit cannot re-prompt programmatically. Denial path surfaces via the Settings "Open iOS Settings" deep link.
+**Auth scope expansion note:** Adding `HKCategoryTypeIdentifierAppleStandHour` plus broadening the read intent for `ActiveEnergyBurned` and `AppleExerciseTime` to daily-summary use means users who previously granted permission for the workout-only scope will be re-prompted on first launch of the build that ships the Activity Rings widget. Acceptable in a pre-launch product. Once the app ships, any future scope expansion will need a more careful migration plan (HK does not allow programmatic re-prompts; users must visit iOS Settings → Privacy → Health → FitNavi to grant new types).
 
-**Read denial is indistinguishable from empty data.** FortiFit treats "no HK workouts found" uniformly regardless of cause. The Settings status line is the only place denial status is surfaced.
+### Denial Handling
+HealthKit authorization is one-shot and opaque. FitNavi cannot re-prompt programmatically. Denial path surfaces via the Settings "Open iOS Settings" deep link.
+
+**Read denial is indistinguishable from empty data.** FitNavi treats "no HK workouts found" uniformly regardless of cause. The Settings status line is the only place denial status is surfaced.
 
 ---
 
@@ -536,7 +469,47 @@ Add to `AccessibilityIdentifiers.swift`:
 
 ---
 
-## 20. Future Phases (Scope-Only)
+## 20. Activity Rings Daily Summary
+
+The Activity Rings widget (see SCREENS.md § Home Screen → Activity Rings widget, SERVICES.md § AppleActivityService) requires daily totals for Move, Exercise, and Stand on top of the per-workout HK reads Phase 8 already does. This section documents the read patterns and the Apple Watch source-detection helper that gates the widget's empty states.
+
+### Daily Totals — Three Read Patterns
+
+`HealthKitClient` exposes the following methods (concrete signatures finalized by Claude Code):
+
+**`fetchActivitySummary(for date: Date) -> HKActivitySummary?`** — preferred path. Wraps `HKActivitySummaryQuery` for a single calendar day (00:00:00–23:59:59 in the user's local time zone). Returns the summary record Apple maintains for the day; this single object exposes Move (`activeEnergyBurned`), Exercise (`appleExerciseTime`), Stand hours (`appleStandHours`), plus the user's **current Apple Health goals** for each ring (`activeEnergyBurnedGoal`, `appleExerciseTimeGoal`, `appleStandHoursGoal`). Used both for live ring values and for first-config goal import.
+
+**`fetchActivitySummaries(from start: Date, to end: Date) -> [HKActivitySummary]`** — range version. Used by the Activity Detail Sheet's 7-day and 30-day breakdowns and by the weekly closure rate chip on the widget. Returns one summary per day in the inclusive range; days with no summary are returned as nil (caller treats as 0).
+
+**`observeActivitySummaryChanges(handler: @escaping () -> Void)`** — register an observer for activity-summary changes. Fires when HK's daily summary updates (e.g., the Watch pushes a new minute of Exercise time). Handler hops to `@MainActor` before any SwiftData work. Same pattern as the existing `observeWorkoutChanges` (see § 9 Sync Lifecycle).
+
+### Apple Watch Source-Detection Helper
+
+`HealthKitClient.hasAppleWatchData(within days: Int = 7) -> Bool` — returns true if any HK sample sourced from an Apple Watch (i.e., `HKSource.bundleIdentifier` matches Apple's Watch source pattern) exists within the lookback window. Used by the Activity Rings widget to decide between its three dynamic states (see SCREENS.md § Home Screen → Activity Rings widget, States table). Implementation queries a cheap aggregate over `HKQuantityTypeIdentifierActiveEnergyBurned` filtered by source predicate and returns true on the first match.
+
+This helper does **not** gate the Add Widgets menu — the widget is always offered. It only drives the in-card empty-state messaging post-add.
+
+### First-Config Goal Import
+
+When the user adds the Activity Rings widget for the first time, `AppleActivityService.importGoalsFromAppleHealth()` runs (see SERVICES.md). The flow:
+1. Call `fetchActivitySummary(for: .now)`.
+2. If the returned summary's `*Goal` fields are non-zero, write them into `UserSettings.targetMoveCalories`, `targetExerciseMinutes`, `targetStandHours` respectively (rounded to the slider's increment — 10 cal / 5 min / 1 hr).
+3. If HK returns no summary or the goals are zero (user has not configured Apple Health goals), fall back to FitNavi defaults: 500 cal / 30 min / 12 hours.
+
+The "Import from Apple Health" button in the Activity Rings Settings Modal re-runs this flow on demand (overwriting whatever the user has set in FitNavi).
+
+### Refresh Triggers
+
+The Activity Rings widget refreshes on:
+- App foreground (existing HK catch-up sync — § 9).
+- The new activity-summary observer query firing.
+- The Workout Cascade — but **only** when the saved/edited/imported workout has `healthKitUUID != nil`. A purely manual log without HK linkage cannot have changed any HK-side daily total, so the cascade skips the activity-rings refresh hook for those. See SERVICES.md § Workout Cascade for the gate.
+
+Local midnight is the day boundary. At rollover, the widget refetches and renders 0/goal across all three rings until movement registers.
+
+---
+
+## 21. Future Phases (Scope-Only)
 
 ### Phase 3: Biometrics
 **Net-new entity:** `DailyBiometricSnapshot` (one record per calendar day). Fields include derived values: resting HR, HRV avg, body weight, VO₂ max, etc.
@@ -550,33 +523,9 @@ Add to `AccessibilityIdentifiers.swift`:
 
 **Attribution convention:** sleep is attributed to the **wake-up date**, not the bedtime date. Sleep ending Wednesday morning lives on Wednesday's snapshot.
 
-**New UI surfaces required.** Sleep has no current home in FortiFit. Phase 4 requires a dedicated PRD pass for UX (home widget, dedicated screen, or both). Currently listed as "out of scope" in PRD.md § Out of Scope — gets revisited at Phase 4.
+**New UI surfaces required.** Sleep has no current home in FitNavi. Phase 4 requires a dedicated PRD pass for UX (home widget, dedicated screen, or both). Currently listed as "out of scope" in PRD.md § Out of Scope — gets revisited at Phase 4.
 
 **No Phase 1 constraints.**
 
 ### Phase 5 (Possible): Write-Back
 Deferred indefinitely. Revisit requires: `NSHealthUpdateUsageDescription`, extended authorization request with `typesToShare`, active energy estimation for manual workouts, delete/edit propagation added to Workout Cascade, retroactive-write decision.
-
----
-
-## 21. Companion Documents Updated for This Feature
-
-| Document | Sections Added or Modified |
-|---|---|
-| PRD.md | § Data Model (Workout: 10 new fields, new entity WorkoutMatchRejection). § Technical Foundation (HealthKit added, moved out of Out of Scope). § Screen Summaries (Workout Detail Summary becomes a two-column grid for HK-linked workouts; Settings adds Apple Health section). |
-| SERVICES.md | New sections: HealthKitClient (protocol), HealthKitSyncService, WorkoutMatcher. Extensions to Workout Cascade (fires on HK import). Field ownership rules. Effort score rules. |
-| SCREENS.md | Workout Detail (source indicator + info sheet + Summary two-column grid for HK-linked workouts). Log Workout (read-only fields + inline `info.circle` popovers). Settings (Apple Health section). New section: Match Prompt Sheet. |
-| CONSTANTS.md | New section: HealthKit Mapping (full HK-to-FortiFit type table). New SF Symbol entries. |
-| CLAUDE.md | Out of Scope updated (HealthKit read removed, write-back explicitly retained). Development Phases: new "Phase 9: HealthKit Integration" entry (or similar numbering). |
-| TESTING.md | New section: HealthKit Test Strategy (protocol stubbing, fixture pattern). New accessibility identifier entries. |
-
----
-
-## 22. Open Items Deferred to Drafting Time
-
-- Exact Info.plist copy for `NSHealthShareUsageDescription` (SCREENS.md).
-- Exact SF Symbol names for each Health Data row (CONSTANTS.md).
-- Full `HKWorkoutActivityType` → FortiFit mapping table (CONSTANTS.md — all ~80 entries).
-- ~~Final row grouping and ordering for Summary two-column grid right column~~ — superseded by Phase 8.5 stat-card grid (see SCREENS.md § Workout Detail → Summary, CONSTANTS.md § Stat Card Colors).
-- Source indicator info sheet exact copy (SCREENS.md).
-- Match Prompt Sheet exact layout and copy (SCREENS.md).

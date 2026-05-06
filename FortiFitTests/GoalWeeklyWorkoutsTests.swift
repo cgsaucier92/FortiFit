@@ -157,9 +157,10 @@ struct GoalWeeklyWorkoutsTests {
         GoalService.createWeeklyWorkoutsGoal(context: context)
         let goal = GoalService.fetchAll(context: context).first { $0.goalType == "weeklyWorkouts" }!
 
+        let valueBefore = UserSettings.shared.targetWorkoutsPerWeek
         GoalService.deleteGoal(goal, context: context)
 
-        #expect(UserSettings.shared.targetWorkoutsPerWeek == 5)
+        #expect(UserSettings.shared.targetWorkoutsPerWeek == valueBefore)
     }
 
     // WEEK-009 — Deleting weeklyWorkouts goal does not affect Streak calculation
