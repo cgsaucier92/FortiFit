@@ -169,10 +169,10 @@ final class AppleActivityService {
 
                 if moveGoalHK > 0 || exerciseGoalHK > 0 || standGoalHK > 0 {
                     settings.targetMoveCalories = moveGoalHK > 0
-                        ? snapToIncrement(Int(moveGoalHK.rounded()), increment: Int(AppConstants.ActivityRings.moveIncrement))
+                        ? AppConstants.ActivityRings.snapToIncrement(Int(moveGoalHK.rounded()), increment: Int(AppConstants.ActivityRings.moveIncrement))
                         : AppConstants.ActivityRings.moveDefault
                     settings.targetExerciseMinutes = exerciseGoalHK > 0
-                        ? snapToIncrement(Int(exerciseGoalHK.rounded()), increment: Int(AppConstants.ActivityRings.exerciseIncrement))
+                        ? AppConstants.ActivityRings.snapToIncrement(Int(exerciseGoalHK.rounded()), increment: Int(AppConstants.ActivityRings.exerciseIncrement))
                         : AppConstants.ActivityRings.exerciseDefault
                     settings.targetStandHours = standGoalHK > 0
                         ? standGoalHK
@@ -208,11 +208,6 @@ final class AppleActivityService {
         settings.targetMoveCalories = AppConstants.ActivityRings.moveDefault
         settings.targetExerciseMinutes = AppConstants.ActivityRings.exerciseDefault
         settings.targetStandHours = AppConstants.ActivityRings.standDefault
-    }
-
-    private func snapToIncrement(_ value: Int, increment: Int) -> Int {
-        guard increment > 0 else { return value }
-        return Int((Double(value) / Double(increment)).rounded()) * increment
     }
 
     private func setupForegroundObserver() {

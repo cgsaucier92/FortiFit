@@ -405,18 +405,11 @@ struct StreakServiceTests {
     // TEST.md line 178: returns currentStreak = 0 and tier "Dormant" when target is 0
     @Test func targetZeroReturnsDormant() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 0
 
         // Log some workouts anyway
         createWorkouts(count: 5, inWeekStarting: mondayAt(1), context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 0)
         #expect(result.streak == 0)
         #expect(result.tier == .dormant)
     }

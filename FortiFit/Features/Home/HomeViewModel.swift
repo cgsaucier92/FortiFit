@@ -1,6 +1,6 @@
 import Foundation
+import Observation
 import SwiftData
-import SwiftUI
 
 @Observable
 final class HomeViewModel {
@@ -26,9 +26,10 @@ final class HomeViewModel {
     var todaysScheduledWorkouts: [ScheduledWorkout] = []
     /// Plan surface items for today (includes logged-only workouts) — used for green dot logic.
     var todaysPlanSurfaceItems: [PlanCardItem] = []
-    var currentPlannedWorkout: ScheduledWorkout? { todaysScheduledWorkouts.first { $0.status == "planned" } }
-    var additionalPlannedCount: Int { max(todaysScheduledWorkouts.filter { $0.status == "planned" }.count - 1, 0) }
-    var todaysPlannedDotCount: Int { todaysScheduledWorkouts.filter { $0.status == "planned" }.count }
+    private var plannedWorkouts: [ScheduledWorkout] { todaysScheduledWorkouts.filter { $0.status == "planned" } }
+    var currentPlannedWorkout: ScheduledWorkout? { plannedWorkouts.first }
+    var additionalPlannedCount: Int { max(plannedWorkouts.count - 1, 0) }
+    var todaysPlannedDotCount: Int { plannedWorkouts.count }
     /// Green dots: completed scheduled workouts + logged-only workouts (via Plan surface dedup).
     var todaysCompletedDotCount: Int {
         todaysPlanSurfaceItems.filter { item in
@@ -96,13 +97,6 @@ final class HomeViewModel {
 
     func reorderWidgets(orderedTypes: [String], context: ModelContext) {
         HomeWidgetService.reorder(orderedTypes: orderedTypes, context: context)
-        activeWidgets = HomeWidgetService.fetchAll(context: context)
-    }
-
-    func reorderWidgets(from source: IndexSet, to destination: Int, context: ModelContext) {
-        var types = activeWidgets.map(\.widgetType)
-        types.move(fromOffsets: source, toOffset: destination)
-        HomeWidgetService.reorder(orderedTypes: types, context: context)
         activeWidgets = HomeWidgetService.fetchAll(context: context)
     }
 

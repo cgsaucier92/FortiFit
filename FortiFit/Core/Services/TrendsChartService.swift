@@ -79,7 +79,7 @@ struct TrendsChartService {
         try? context.save()
     }
 
-    // MARK: - Header Summary Computation (Phase 6.1)
+    // MARK: - Header Summary Computation
 
     static func headerSummary(
         for chartType: String,
@@ -141,19 +141,8 @@ struct TrendsChartService {
     }
 
     private static func trainingFrequencySummary(workouts: [Workout]) -> ChartSummary? {
-        var calendar = Calendar(identifier: .iso8601)
-        calendar.firstWeekday = 2
-        let now = Date()
-        let currentWeekStart = now.startOfWeek
-
         var fullWeeks: [Int] = []
-        for weeksAgo in (0..<8).reversed() {
-            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: currentWeekStart) else { continue }
-            guard let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
-            let endOfWeek = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: weekEnd) ?? weekEnd
-
-            guard endOfWeek < currentWeekStart else { continue }
-
+        forEachCompletedWeek { weekStart, endOfWeek in
             let count = workouts.filter { $0.date >= weekStart && $0.date <= endOfWeek }.count
             fullWeeks.append(count)
         }
@@ -263,21 +252,10 @@ struct TrendsChartService {
     }
 
     private static func rpeTrendSummary(workouts: [Workout]) -> ChartSummary? {
-        var calendar = Calendar(identifier: .iso8601)
-        calendar.firstWeekday = 2
-        let now = Date()
-        let currentWeekStart = now.startOfWeek
-
         var allRPEs: [Int] = []
         var hasFullWeek = false
 
-        for weeksAgo in (0..<8).reversed() {
-            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: currentWeekStart) else { continue }
-            guard let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
-            let endOfWeek = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: weekEnd) ?? weekEnd
-
-            guard endOfWeek < currentWeekStart else { continue }
-
+        forEachCompletedWeek { weekStart, endOfWeek in
             let weekRPEs = workouts
                 .filter { $0.date >= weekStart && $0.date <= endOfWeek && $0.rpe != nil }
                 .compactMap(\.rpe)
@@ -311,21 +289,10 @@ struct TrendsChartService {
     }
 
     private static func sessionDurationSummary(workouts: [Workout]) -> ChartSummary? {
-        var calendar = Calendar(identifier: .iso8601)
-        calendar.firstWeekday = 2
-        let now = Date()
-        let currentWeekStart = now.startOfWeek
-
         var allDurations: [Int] = []
         var hasFullWeek = false
 
-        for weeksAgo in (0..<8).reversed() {
-            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: currentWeekStart) else { continue }
-            guard let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
-            let endOfWeek = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: weekEnd) ?? weekEnd
-
-            guard endOfWeek < currentWeekStart else { continue }
-
+        forEachCompletedWeek { weekStart, endOfWeek in
             let weekDurations = workouts
                 .filter { $0.date >= weekStart && $0.date <= endOfWeek && $0.durationMinutes != nil }
                 .compactMap(\.durationMinutes)
@@ -344,6 +311,20 @@ struct TrendsChartService {
     }
 
     // MARK: - Private
+
+    private static func forEachCompletedWeek(_ body: (_ weekStart: Date, _ endOfWeek: Date) -> Void) {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.firstWeekday = 2
+        let currentWeekStart = Date().startOfWeek
+
+        for weeksAgo in (0..<8).reversed() {
+            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: currentWeekStart),
+                  let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
+            let endOfWeek = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: weekEnd) ?? weekEnd
+            guard endOfWeek < currentWeekStart else { continue }
+            body(weekStart, endOfWeek)
+        }
+    }
 
     /// Re-indexes sortOrder values to close gaps after a deletion.
     private static func reindexSortOrder(context: ModelContext) {

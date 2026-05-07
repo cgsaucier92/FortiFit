@@ -106,7 +106,6 @@ final class WorkoutViewModel {
     // MARK: - Data
     var workouts: [Workout] = []
     var workoutsByType: [String: [Workout]] = [:]
-    var prTimeline: [PREntry] = []
     var typeOrders: [WorkoutTypeOrder] = []
 
     // MARK: - Log Workout Form State
@@ -129,8 +128,6 @@ final class WorkoutViewModel {
     var workoutToDelete: Workout?
     var showDeleteTypeConfirmation = false
     var workoutTypeToDelete: String?
-    var draggingTypeID: UUID?
-
     // MARK: - Reorder Mode
     var isReorderMode = false
 
@@ -216,7 +213,6 @@ final class WorkoutViewModel {
     func loadWorkouts(context: ModelContext) {
         workouts = WorkoutService.fetchAll(context: context)
         workoutsByType = Dictionary(grouping: workouts, by: \.workoutType)
-        prTimeline = WorkoutService.computePRTimeline(context: context)
         typeOrders = WorkoutTypeOrderService.fetchAll(context: context)
         exerciseHistory = ExerciseSuggestionService.fetchExerciseHistory(context: context)
     }
@@ -697,44 +693,12 @@ final class WorkoutViewModel {
         workoutDate = Date()
         selectedRPE = nil
 
-        let settings = UserSettings.shared
-        let sorted = snapshot.exercises.sorted { $0.sortOrder < $1.sortOrder }
-        var seen = Set<String>()
-        var uniqueNames: [String] = []
-        for ex in sorted {
-            if seen.insert(ex.name).inserted { uniqueNames.append(ex.name) }
-        }
-        let grouped = Dictionary(grouping: sorted, by: { $0.name })
-
-        if uniqueNames.isEmpty {
-            exercises = [ExerciseFormEntry()]
-        } else {
-            exercises = uniqueNames.map { name in
-                let entry = ExerciseFormEntry()
-                entry.name = name
-                if let rows = grouped[name] {
-                    entry.rows = rows.map { ex in
-                        let row = SetRow()
-                        row.sets = String(ex.sets)
-                        row.reps = String(ex.reps)
-                        if let weightKg = ex.weightKg {
-                            if settings.useLbs, let lbs = UnitConversion.kgToLbs(weightKg) {
-                                row.weight = String(Int(round(lbs)))
-                            } else {
-                                row.weight = String(format: "%g", weightKg)
-                            }
-                        }
-                        return row
-                    }
-                }
-                return entry
-            }
-        }
+        let entries = formEntries(from: snapshot.exercises)
+        exercises = entries.isEmpty ? [ExerciseFormEntry()] : entries
     }
 
     func applyTemplateToEditingWorkout(_ template: WorkoutTemplate) {
         let snapshot = WorkoutTemplateService.snapshot(from: template)
-        let settings = UserSettings.shared
 
         let isFormEmpty = exercises.count == 1
             && exercises[0].name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -743,34 +707,7 @@ final class WorkoutViewModel {
             exercises.removeAll()
         }
 
-        let sorted = snapshot.exercises.sorted { $0.sortOrder < $1.sortOrder }
-        var seen = Set<String>()
-        var uniqueNames: [String] = []
-        for ex in sorted {
-            if seen.insert(ex.name).inserted { uniqueNames.append(ex.name) }
-        }
-        let grouped = Dictionary(grouping: sorted, by: { $0.name })
-
-        for name in uniqueNames {
-            let entry = ExerciseFormEntry()
-            entry.name = name
-            if let rows = grouped[name] {
-                entry.rows = rows.map { ex in
-                    let row = SetRow()
-                    row.sets = String(ex.sets)
-                    row.reps = String(ex.reps)
-                    if let weightKg = ex.weightKg {
-                        if settings.useLbs, let lbs = UnitConversion.kgToLbs(weightKg) {
-                            row.weight = String(Int(round(lbs)))
-                        } else {
-                            row.weight = String(format: "%g", weightKg)
-                        }
-                    }
-                    return row
-                }
-            }
-            exercises.append(entry)
-        }
+        exercises.append(contentsOf: formEntries(from: snapshot.exercises))
 
         if workoutName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             workoutName = snapshot.name
@@ -859,6 +796,38 @@ final class WorkoutViewModel {
     #endif
 
     // MARK: - Helpers
+
+    private func formEntries(from exerciseData: [WorkoutTemplateService.ExerciseData]) -> [ExerciseFormEntry] {
+        let settings = UserSettings.shared
+        let sorted = exerciseData.sorted { $0.sortOrder < $1.sortOrder }
+        var seen = Set<String>()
+        var uniqueNames: [String] = []
+        for ex in sorted {
+            if seen.insert(ex.name).inserted { uniqueNames.append(ex.name) }
+        }
+        let grouped = Dictionary(grouping: sorted, by: { $0.name })
+
+        return uniqueNames.map { name in
+            let entry = ExerciseFormEntry()
+            entry.name = name
+            if let rows = grouped[name] {
+                entry.rows = rows.map { ex in
+                    let row = SetRow()
+                    row.sets = String(ex.sets)
+                    row.reps = String(ex.reps)
+                    if let weightKg = ex.weightKg {
+                        if settings.useLbs, let lbs = UnitConversion.kgToLbs(weightKg) {
+                            row.weight = String(Int(round(lbs)))
+                        } else {
+                            row.weight = String(format: "%g", weightKg)
+                        }
+                    }
+                    return row
+                }
+            }
+            return entry
+        }
+    }
 
     private func parseDuration() -> Int? {
         let value = Int(durationMinutes)

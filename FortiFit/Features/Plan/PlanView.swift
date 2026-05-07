@@ -16,7 +16,7 @@ struct PlanView: View {
         }
     }
 
-    // MARK: - Content Layers (split to help the compiler)
+    // MARK: - Content Layers
 
     private var planContentWithAlerts: some View {
         planContentWithSheets

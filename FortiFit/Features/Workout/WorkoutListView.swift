@@ -121,7 +121,7 @@ struct WorkoutListView: View {
                     }
                 }
             } message: {
-                Text("This can't be undone")
+                Text("This can't be undone.")
             }
             .alert(
                 "Delete all \(viewModel.workoutTypeToDelete ?? "") workouts?",
@@ -139,7 +139,7 @@ struct WorkoutListView: View {
             } message: {
                 if let workoutType = viewModel.workoutTypeToDelete {
                     let count = viewModel.workoutsByType[workoutType]?.count ?? 0
-                    Text("This will permanently delete all \(count) \(workoutType) workouts. This can't be undone")
+                    Text("This will permanently delete all \(count) \(workoutType) workouts. This can't be undone.")
                 }
             }
             .sheet(isPresented: $viewModel.showCustomDateRangePicker) {

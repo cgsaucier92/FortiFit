@@ -13,75 +13,93 @@ struct AddGoalView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-        ScrollView {
-            VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                FortiFitScreenHeading(viewModel.isEditMode ? "Edit Goal" : "Add Goal")
-
-                // Goal Type Selector — hidden in edit mode (type is locked)
-                if !viewModel.isEditMode {
-                    FortiFitLabel("Goal Type", color: FortiFitColors.primaryText)
-                    goalTypeSelector
-                }
-
-                // Conditional form — only shown after a type is selected
+            ScrollView {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                    if !viewModel.selectedGoalType.isEmpty {
-                        if !viewModel.isEditMode {
-                            FortiFitDivider()
-                        }
+                    FortiFitScreenHeading(viewModel.isEditMode ? "Edit Goal" : "Add Goal")
 
-                        switch viewModel.selectedGoalType {
-                        case "Strength PR":
-                            exercisePRForm
-                        case "Repetitions PR":
-                            repetitionsPRForm
-                        case "Speed and Distance":
-                            speedDistanceForm
-                        case "Number of Weekly Workouts":
-                            weeklyWorkoutsForm
-                        default:
-                            EmptyView()
+                    // Goal Type Selector — hidden in edit mode (type is locked)
+                    if !viewModel.isEditMode {
+                        FortiFitLabel("Goal Type", color: FortiFitColors.primaryText)
+                        goalTypeSelector
+                    }
+
+                    // Conditional form — only shown after a type is selected
+                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
+                        if !viewModel.selectedGoalType.isEmpty {
+                            if !viewModel.isEditMode {
+                                FortiFitDivider()
+                            }
+
+                            switch viewModel.selectedGoalType {
+                            case "Strength PR":
+                                exercisePRForm
+                            case "Repetitions PR":
+                                repetitionsPRForm
+                            case "Speed and Distance":
+                                speedDistanceForm
+                            case "Number of Weekly Workouts":
+                                weeklyWorkoutsForm
+                            default:
+                                EmptyView()
+                            }
                         }
                     }
-                }
-                .zIndex(1)
+                    .zIndex(1)
 
-                // Save Button
-                FortiFitButton(
-                    viewModel.isEditMode ? "Save Changes" : "Save Goal",
-                    style: .primary,
-                    isEnabled: viewModel.canSaveGoal
-                ) {
-                    #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                    if viewModel.isEditMode {
-                        viewModel.saveEditedGoal(context: modelContext)
-                    } else {
-                        viewModel.saveGoal(context: modelContext)
+                    // Save Button
+                    FortiFitButton(
+                        viewModel.isEditMode ? "Save Changes" : "Save Goal",
+                        style: .primary,
+                        isEnabled: viewModel.canSaveGoal
+                    ) {
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        if viewModel.isEditMode {
+                            viewModel.saveEditedGoal(context: modelContext)
+                        } else {
+                            viewModel.saveGoal(context: modelContext)
+                        }
+                        dismiss()
                     }
-                    dismiss()
+                    .accessibilityIdentifier(AccessibilityID.saveGoalButton)
                 }
-                .accessibilityIdentifier(AccessibilityID.saveGoalButton)
+                .padding(.horizontal, FortiFitSpacing.screenHorizontal)
+                .padding(.top, headerHeight)
+                .padding(.bottom, FortiFitSpacing.gapXLarge)
             }
-            .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-            .padding(.top, headerHeight)
-            .padding(.bottom, FortiFitSpacing.gapXLarge)
-        }
-        .scrollClipDisabled()
+            .scrollClipDisabled()
 
-        // Fixed header
-        FortiFitFixedHeader(headerHeight: $headerHeight) {
-            HStack {
-                FortiFitBackButton { dismiss() }
-                Spacer()
+            FortiFitFixedHeader(headerHeight: $headerHeight) {
+                HStack {
+                    FortiFitBackButton { dismiss() }
+                    Spacer()
+                }
             }
-        }
         }
         .background(FortiFitColors.background)
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+    }
+
+    // MARK: - Shared Exercise Input
+
+    private var customExerciseInput: some View {
+        VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
+            if viewModel.isCustomExercise {
+                FortiFitLabel("Exercise Name", color: FortiFitColors.primaryText)
+                FortiFitExerciseAutocomplete(
+                    placeholder: "e.g. Front Squat",
+                    text: $viewModel.customExerciseName,
+                    suggestions: viewModel.customExerciseSuggestions,
+                    onQueryChanged: { query in
+                        viewModel.updateCustomExerciseSuggestions(query: query)
+                    }
+                )
+            }
+        }
+        .zIndex(1)
     }
 
     // MARK: - Strength PR Form
@@ -97,20 +115,7 @@ struct AddGoalView: View {
                 optionIdentifierPrefix: AccessibilityID.goalExerciseOptionPrefix
             )
 
-            VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                if viewModel.isCustomExercise {
-                    FortiFitLabel("Exercise Name", color: FortiFitColors.primaryText)
-                    FortiFitExerciseAutocomplete(
-                        placeholder: "e.g. Front Squat",
-                        text: $viewModel.customExerciseName,
-                        suggestions: viewModel.customExerciseSuggestions,
-                        onQueryChanged: { query in
-                            viewModel.updateCustomExerciseSuggestions(query: query)
-                        }
-                    )
-                }
-            }
-            .zIndex(1)
+            customExerciseInput
 
             if viewModel.isEditMode {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
@@ -155,20 +160,7 @@ struct AddGoalView: View {
                 placeholder: "Select Exercise"
             )
 
-            VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                if viewModel.isCustomExercise {
-                    FortiFitLabel("Exercise Name", color: FortiFitColors.primaryText)
-                    FortiFitExerciseAutocomplete(
-                        placeholder: "e.g. Front Squat",
-                        text: $viewModel.customExerciseName,
-                        suggestions: viewModel.customExerciseSuggestions,
-                        onQueryChanged: { query in
-                            viewModel.updateCustomExerciseSuggestions(query: query)
-                        }
-                    )
-                }
-            }
-            .zIndex(1)
+            customExerciseInput
 
             if viewModel.isEditMode {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {

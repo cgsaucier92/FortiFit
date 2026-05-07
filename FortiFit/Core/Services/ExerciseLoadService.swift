@@ -96,6 +96,12 @@ struct ExerciseLoadService {
 
     // MARK: - Main Calculation
 
+    /// Returns true if the workout is an empty shell (no exercises, no RPE, no duration)
+    /// and should be excluded from Training Load calculations.
+    static func isEmptyWorkout(_ workout: Workout) -> Bool {
+        return workout.exerciseSets.isEmpty && workout.rpe == nil && workout.durationMinutes == nil
+    }
+
     /// Calculates the daily training load score (0–100) using a 10-day exponential decay model.
     ///
     /// - Parameters:
@@ -103,12 +109,6 @@ struct ExerciseLoadService {
     ///   - experienceLevel: 0=Beginner, 1=Intermediate, 2=Advanced
     ///   - targetMinutesPerWorkout: Fallback duration when workout.durationMinutes is nil
     ///   - now: Reference date for decay calculation (defaults to current time)
-    /// Returns true if the workout is an empty shell (no exercises, no RPE, no duration)
-    /// and should be excluded from Training Load calculations.
-    static func isEmptyWorkout(_ workout: Workout) -> Bool {
-        return workout.exerciseSets.isEmpty && workout.rpe == nil && workout.durationMinutes == nil
-    }
-
     static func calculateLoad(
         workouts: [Workout],
         experienceLevel: Int,

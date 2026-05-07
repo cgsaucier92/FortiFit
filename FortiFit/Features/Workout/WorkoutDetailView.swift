@@ -201,7 +201,7 @@ struct WorkoutDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("This can't be undone")
+            Text("This can't be undone.")
         }
         .alert(
             AppConstants.HealthKit.ellipsisUnlinkConfirmTitle,
@@ -479,7 +479,7 @@ struct WorkoutDetailView: View {
             let displayVal: String
             let displayUnit: String
             if settings.useMiles {
-                displayVal = "\(Int(elevation * 3.28084))"
+                displayVal = "\(Int(elevation * UnitConversion.metersToFeetFactor))"
                 displayUnit = "ft"
             } else {
                 displayVal = "\(Int(elevation))"

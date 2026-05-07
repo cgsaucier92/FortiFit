@@ -76,7 +76,7 @@ struct FortiFitProgressView: View {
             }
             .background(FortiFitColors.background)
 
-            // Add Chart Menu Overlay (Task 8)
+            // Add Chart Menu Overlay
             if viewModel.showAddChartMenu {
                 FortiFitAddChartMenu(
                     isPresented: $viewModel.showAddChartMenu,
@@ -135,7 +135,7 @@ struct FortiFitProgressView: View {
         } // NavigationStack
     }
 
-    // MARK: - Chart Card with Context Menu & Reorder (Tasks 9, 16)
+    // MARK: - Chart Card with Context Menu & Reorder
 
     @ViewBuilder
     private func chartCard(for chart: TrendsChart) -> some View {
@@ -198,7 +198,7 @@ struct FortiFitProgressView: View {
         }
     }
 
-    // MARK: - Chart Content Factory (Task 16)
+    // MARK: - Chart Content Factory
 
     @ViewBuilder
     private func chartContent(for chart: TrendsChart) -> some View {
@@ -899,12 +899,6 @@ struct FortiFitProgressView: View {
     }
 
     // MARK: - Helpers
-
-    private func emptyChartMessage(_ message: String) -> some View {
-        Text(message)
-            .font(FortiFitTypography.note)
-            .foregroundStyle(FortiFitColors.mutedText)
-    }
 
     private func weekLabel(_ date: Date) -> String {
         let formatter = DateFormatter()

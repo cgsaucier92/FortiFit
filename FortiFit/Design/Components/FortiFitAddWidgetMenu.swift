@@ -93,9 +93,7 @@ struct FortiFitAddWidgetMenu: View {
             } else {
                 Button {
                     #if canImport(UIKit)
-                    #if canImport(UIKit)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
                     #endif
                     onAdd(widgetType)
                     isPresented = false

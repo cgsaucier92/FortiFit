@@ -65,7 +65,7 @@ enum SummaryItemBuilder {
             ))
         }
         if let elevation = workout.elevationAscendedMeters {
-            let displayValue = useMiles ? "\(Int(elevation * 3.28084)) ft" : "\(Int(elevation)) m"
+            let displayValue = useMiles ? "\(Int(elevation * UnitConversion.metersToFeetFactor)) ft" : "\(Int(elevation)) m"
             result.append(SummaryItem(
                 symbol: "arrow.up.right",
                 symbolColor: FortiFitColors.primaryText,

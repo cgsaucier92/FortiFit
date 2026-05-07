@@ -336,7 +336,7 @@ final class PlanViewModel {
         case .loggedOnly:
             return "The workout will remain in your log"
         default:
-            return "This can't be undone"
+            return "This can't be undone."
         }
     }
 }

@@ -192,7 +192,7 @@ struct GoalsView: View {
                     }
                 }
             } message: {
-                Text("This can't be undone")
+                Text("This can't be undone.")
             }
             .alert(
                 "Reset \(viewModel.goalToReset?.title ?? "") progress to zero?",

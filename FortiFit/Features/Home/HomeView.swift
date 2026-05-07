@@ -513,97 +513,26 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Training Load Settings Modal
+    // MARK: - Settings Modal Wrapper
 
-    private var trainingLoadSettingsModal: some View {
+    private func settingsModalWrapper<Content: View>(
+        title: String,
+        onDismiss: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         ZStack {
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
-                .onTapGesture { dismissTrainingLoadSettings() }
+                .onTapGesture { onDismiss() }
 
             VStack(spacing: FortiFitSpacing.gapLarge) {
-                // Header
-                Text("Configure Training Load")
+                Text(title)
                     .font(FortiFitTypography.widgetHeader)
                     .kerning(FortiFitTypography.labelKerning)
                     .foregroundStyle(FortiFitColors.primaryAccent)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Training Experience
-                FortiFitCard(borderColor: FortiFitColors.border) {
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        HStack {
-                            Text("Training Experience")
-                                .font(FortiFitTypography.tabLabel)
-                                .foregroundStyle(FortiFitColors.primaryText)
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(AppConstants.experienceLevels[settings.experienceLevel])
-                                    .font(FortiFitTypography.dataValue)
-                                    .foregroundStyle(FortiFitColors.primaryAccent)
-                                Text(AppConstants.experienceDescriptions[settings.experienceLevel])
-                                    .font(FortiFitTypography.bodySmall)
-                                    .foregroundStyle(FortiFitColors.mutedText)
-                            }
-                        }
-                        Slider(
-                            value: Binding(
-                                get: { Double(settings.experienceLevel) },
-                                set: { settings.experienceLevel = Int($0.rounded()) }
-                            ),
-                            in: 0...2,
-                            step: 1
-                        )
-                        .tint(FortiFitColors.primaryAccent)
-                        HStack {
-                            Text("BEGINNER")
-                            Spacer()
-                            Text("INTERMEDIATE")
-                            Spacer()
-                            Text("ADVANCED")
-                        }
-                        .font(FortiFitTypography.labelSmall)
-                        .kerning(FortiFitTypography.labelKerning)
-                        .foregroundStyle(FortiFitColors.mutedText)
-                    }
-                }
-
-                // Target Workout Duration
-                FortiFitCard(borderColor: FortiFitColors.border) {
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        HStack {
-                            Text("Target Workout Duration")
-                                .font(FortiFitTypography.tabLabel)
-                                .foregroundStyle(FortiFitColors.primaryText)
-                            Spacer()
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text("\(settings.targetMinutesPerWorkout)")
-                                    .font(FortiFitTypography.largeValue)
-                                    .foregroundStyle(FortiFitColors.primaryAccent)
-                                Text("min")
-                                    .font(FortiFitTypography.bodySmall)
-                                    .foregroundStyle(FortiFitColors.mutedText)
-                            }
-                        }
-                        Slider(
-                            value: Binding(
-                                get: { Double(settings.targetMinutesPerWorkout) },
-                                set: { settings.targetMinutesPerWorkout = Int($0.rounded()) }
-                            ),
-                            in: 0...300,
-                            step: 1
-                        )
-                        .tint(FortiFitColors.primaryAccent)
-                        HStack {
-                            Text("0")
-                            Spacer()
-                            Text("300 MIN")
-                        }
-                        .font(FortiFitTypography.labelSmall)
-                        .kerning(FortiFitTypography.labelKerning)
-                        .foregroundStyle(FortiFitColors.mutedText)
-                    }
-                }
+                content()
             }
             .padding(FortiFitSpacing.cardPadding)
             .background(
@@ -612,7 +541,7 @@ struct HomeView: View {
                     .stroke(FortiFitColors.border, lineWidth: 1)
             )
             .overlay(alignment: .topTrailing) {
-                Button { dismissTrainingLoadSettings() } label: {
+                Button { onDismiss() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(FortiFitColors.mutedText)
@@ -627,6 +556,86 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Training Load Settings Modal
+
+    private var trainingLoadSettingsModal: some View {
+        settingsModalWrapper(title: "Configure Training Load", onDismiss: dismissTrainingLoadSettings) {
+            FortiFitCard(borderColor: FortiFitColors.border) {
+                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                    HStack {
+                        Text("Training Experience")
+                            .font(FortiFitTypography.tabLabel)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(AppConstants.experienceLevels[settings.experienceLevel])
+                                .font(FortiFitTypography.dataValue)
+                                .foregroundStyle(FortiFitColors.primaryAccent)
+                            Text(AppConstants.experienceDescriptions[settings.experienceLevel])
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.mutedText)
+                        }
+                    }
+                    Slider(
+                        value: Binding(
+                            get: { Double(settings.experienceLevel) },
+                            set: { settings.experienceLevel = Int($0.rounded()) }
+                        ),
+                        in: 0...2,
+                        step: 1
+                    )
+                    .tint(FortiFitColors.primaryAccent)
+                    HStack {
+                        Text("BEGINNER")
+                        Spacer()
+                        Text("INTERMEDIATE")
+                        Spacer()
+                        Text("ADVANCED")
+                    }
+                    .font(FortiFitTypography.labelSmall)
+                    .kerning(FortiFitTypography.labelKerning)
+                    .foregroundStyle(FortiFitColors.mutedText)
+                }
+            }
+
+            FortiFitCard(borderColor: FortiFitColors.border) {
+                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                    HStack {
+                        Text("Target Workout Duration")
+                            .font(FortiFitTypography.tabLabel)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                        Spacer()
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("\(settings.targetMinutesPerWorkout)")
+                                .font(FortiFitTypography.largeValue)
+                                .foregroundStyle(FortiFitColors.primaryAccent)
+                            Text("min")
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.mutedText)
+                        }
+                    }
+                    Slider(
+                        value: Binding(
+                            get: { Double(settings.targetMinutesPerWorkout) },
+                            set: { settings.targetMinutesPerWorkout = Int($0.rounded()) }
+                        ),
+                        in: 0...300,
+                        step: 1
+                    )
+                    .tint(FortiFitColors.primaryAccent)
+                    HStack {
+                        Text("0")
+                        Spacer()
+                        Text("300 MIN")
+                    }
+                    .font(FortiFitTypography.labelSmall)
+                    .kerning(FortiFitTypography.labelKerning)
+                    .foregroundStyle(FortiFitColors.mutedText)
+                }
+            }
+        }
+    }
+
     private func dismissTrainingLoadSettings() {
         showTrainingLoadSettings = false
         viewModel.loadData(context: modelContext)
@@ -635,70 +644,37 @@ struct HomeView: View {
     // MARK: - Weekly Streak Settings Modal
 
     private var streakSettingsModal: some View {
-        ZStack {
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-                .onTapGesture { dismissStreakSettings() }
-
-            VStack(spacing: FortiFitSpacing.gapLarge) {
-                // Header
-                Text("Configure Streak Widget")
-                    .font(FortiFitTypography.widgetHeader)
-                    .kerning(FortiFitTypography.labelKerning)
-                    .foregroundStyle(FortiFitColors.primaryAccent)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Target Workouts Per Week
-                FortiFitCard(borderColor: FortiFitColors.border) {
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        HStack {
-                            Text("Target Workouts Per Week")
-                                .font(FortiFitTypography.tabLabel)
-                                .foregroundStyle(FortiFitColors.primaryText)
-                            Spacer()
-                            Text("\(settings.targetWorkoutsPerWeek)")
-                                .font(FortiFitTypography.largeValue)
-                                .foregroundStyle(FortiFitColors.primaryAccent)
-                        }
-                        Slider(
-                            value: Binding(
-                                get: { Double(settings.targetWorkoutsPerWeek) },
-                                set: { settings.targetWorkoutsPerWeek = Int($0.rounded()) }
-                            ),
-                            in: 0...99,
-                            step: 1
-                        )
-                        .tint(FortiFitColors.primaryAccent)
-                        HStack {
-                            Text("0")
-                            Spacer()
-                            Text("99")
-                        }
-                        .font(FortiFitTypography.labelSmall)
-                        .kerning(FortiFitTypography.labelKerning)
-                        .foregroundStyle(FortiFitColors.mutedText)
+        settingsModalWrapper(title: "Configure Streak Widget", onDismiss: dismissStreakSettings) {
+            FortiFitCard(borderColor: FortiFitColors.border) {
+                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                    HStack {
+                        Text("Target Workouts Per Week")
+                            .font(FortiFitTypography.tabLabel)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                        Spacer()
+                        Text("\(settings.targetWorkoutsPerWeek)")
+                            .font(FortiFitTypography.largeValue)
+                            .foregroundStyle(FortiFitColors.primaryAccent)
                     }
+                    Slider(
+                        value: Binding(
+                            get: { Double(settings.targetWorkoutsPerWeek) },
+                            set: { settings.targetWorkoutsPerWeek = Int($0.rounded()) }
+                        ),
+                        in: 0...99,
+                        step: 1
+                    )
+                    .tint(FortiFitColors.primaryAccent)
+                    HStack {
+                        Text("0")
+                        Spacer()
+                        Text("99")
+                    }
+                    .font(FortiFitTypography.labelSmall)
+                    .kerning(FortiFitTypography.labelKerning)
+                    .foregroundStyle(FortiFitColors.mutedText)
                 }
             }
-            .padding(FortiFitSpacing.cardPadding)
-            .background(
-                RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
-                    .fill(FortiFitColors.cardSurface)
-                    .stroke(FortiFitColors.border, lineWidth: 1)
-            )
-            .overlay(alignment: .topTrailing) {
-                Button { dismissStreakSettings() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(FortiFitColors.mutedText)
-                        .frame(
-                            width: FortiFitSpacing.minTouchTarget,
-                            height: FortiFitSpacing.minTouchTarget
-                        )
-                }
-                .padding([.top, .trailing], FortiFitSpacing.cardPadding / 2)
-            }
-            .padding(.horizontal, FortiFitSpacing.screenHorizontal + 8)
         }
     }
 

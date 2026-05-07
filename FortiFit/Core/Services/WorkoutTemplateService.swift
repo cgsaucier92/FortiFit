@@ -129,8 +129,6 @@ struct WorkoutTemplateService {
         try? context.save()
     }
 
-    // MARK: - Snapshot (data copy for pre-populating Log Workout form)
-
     // MARK: - Apply to Existing Workout (Edit Mode)
 
     static func applyToExistingWorkout(template: WorkoutTemplate, workout: Workout) {

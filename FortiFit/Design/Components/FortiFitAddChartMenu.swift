@@ -97,9 +97,7 @@ struct FortiFitAddChartMenu: View {
             } else {
                 Button {
                     #if canImport(UIKit)
-                    #if canImport(UIKit)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
                     #endif
                     onAdd(chartType)
                 } label: {

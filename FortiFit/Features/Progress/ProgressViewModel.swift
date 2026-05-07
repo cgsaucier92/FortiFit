@@ -30,7 +30,6 @@ final class ProgressViewModel {
         let avg: Double
     }
 
-    // Task 5: PR Comparison struct
     struct PRComparison {
         let exerciseName: String
         let currentRecord: Double    // weightKg
@@ -39,28 +38,24 @@ final class ProgressViewModel {
         let previousDate: Date
     }
 
-    // Task 6A: Workout Volume data point
     struct VolumePoint: Identifiable {
         let id = UUID()
         let date: Date
         let volume: Double
     }
 
-    // Task 6B: RPE Trend weekly entry
     struct RPEWeekEntry: Identifiable {
         let id = UUID()
         let weekStart: Date
         let averageRPE: Double
     }
 
-    // Task 6C: Workout Type Breakdown entry
     struct TypeBreakdownEntry: Identifiable {
         let id = UUID()
         let workoutType: String
         let count: Int
     }
 
-    // Task 6D: Session Duration weekly entry
     struct DurationWeekEntry: Identifiable {
         let id = UUID()
         let weekStart: Date
@@ -69,9 +64,8 @@ final class ProgressViewModel {
 
     // MARK: - Data
     var allWorkouts: [Workout] = []
-    var prTimeline: [PREntry] = []
 
-    // MARK: - TrendsChart Management (Task 7)
+    // MARK: - TrendsChart Management
     var charts: [TrendsChart] = []
     var isReorderMode: Bool = false
     var showAddChartMenu: Bool = false
@@ -93,21 +87,21 @@ final class ProgressViewModel {
     var dailyLoadScores: [LoadScoreEntry] = []
     var rollingAverage: [RollingAverageEntry] = []
 
-    // MARK: - Personal Records (Task 5)
+    // MARK: - Personal Records
     var selectedPRExercise: String = ""
 
-    // MARK: - Workout Volume (Task 6A)
+    // MARK: - Workout Volume
     var selectedVolumeTimeRange: TimeRange = .thirtyDays
     var volumeDataPoints: [VolumePoint] = []
 
-    // MARK: - RPE Trend (Task 6B)
+    // MARK: - RPE Trend
     var rpeWeeklyData: [RPEWeekEntry] = []
 
-    // MARK: - Workout Type Breakdown (Task 6C)
+    // MARK: - Workout Type Breakdown
     var selectedBreakdownTimeRange: BreakdownTimeRange = .allTime
     var typeBreakdownData: [TypeBreakdownEntry] = []
 
-    // MARK: - Session Duration (Task 6D)
+    // MARK: - Session Duration
     var durationWeeklyData: [DurationWeekEntry] = []
 
     enum TimeRange: String, CaseIterable {
@@ -159,12 +153,10 @@ final class ProgressViewModel {
         !exercisesWithPRs().isEmpty
     }
 
-    // Task 6A threshold: >= 2 qualifying workouts with >= 1 ExerciseSet
     var hasVolumeData: Bool {
         volumeDataPoints.count >= 2
     }
 
-    // Task 6B threshold: >= 1 full week with >= 1 RPE-rated workout
     var hasRPEData: Bool {
         let now = Date()
         return rpeWeeklyData.contains { entry in
@@ -173,12 +165,10 @@ final class ProgressViewModel {
         }
     }
 
-    // Task 6C threshold: >= 2 workouts total
     var hasTypeBreakdownData: Bool {
         typeBreakdownData.reduce(0) { $0 + $1.count } >= 2
     }
 
-    // Task 6D threshold: >= 1 full week with >= 1 workout with duration
     var hasDurationData: Bool {
         let now = Date()
         return durationWeeklyData.contains { entry in
@@ -198,18 +188,15 @@ final class ProgressViewModel {
     // MARK: - Actions
 
     func loadData(context: ModelContext) {
-        // Seed default charts on first launch (Task 7)
         TrendsChartService.seedDefaultsIfNeeded(context: context)
         charts = TrendsChartService.fetchAll(context: context)
 
         allWorkouts = WorkoutService.fetchAll(context: context)
-        prTimeline = WorkoutService.computePRTimeline(context: context)
         computeAvailableExercises()
         computeStrengthData()
         computeWeeklyFrequency()
         computeDailyLoadTrend()
 
-        // Task 5: PR exercises
         let prExercises = exercisesWithPRs()
         if !prExercises.contains(selectedPRExercise) {
             if let saved = UserDefaults.standard.string(forKey: "trendsSelectedPRExercise"),
@@ -220,7 +207,6 @@ final class ProgressViewModel {
             }
         }
 
-        // Task 6: New chart data
         computeVolumeData()
         computeRPETrend()
         computeTypeBreakdown()
@@ -253,7 +239,7 @@ final class ProgressViewModel {
         computeTypeBreakdown()
     }
 
-    // MARK: - Chart Management (Task 7)
+    // MARK: - Chart Management
 
     func addChart(chartType: String, context: ModelContext) {
         TrendsChartService.addChart(chartType: chartType, context: context)
@@ -315,18 +301,22 @@ final class ProgressViewModel {
         strengthDataPoints = dataPoints
     }
 
-    private func computeWeeklyFrequency() {
-        // Compute 8 weeks of data
+    private func forEachRecentWeek(_ body: (_ weekStart: Date, _ endOfWeek: Date) -> Void) {
         var calendar = Calendar(identifier: .iso8601)
         calendar.firstWeekday = 2
-        let now = Date()
-        var weeks: [FrequencyEntry] = []
+        let currentWeekStart = Date().startOfWeek
 
         for weeksAgo in (0..<8).reversed() {
-            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: now.startOfWeek) else { continue }
-            guard let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
+            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: currentWeekStart),
+                  let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
             let endOfWeek = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: weekEnd) ?? weekEnd
+            body(weekStart, endOfWeek)
+        }
+    }
 
+    private func computeWeeklyFrequency() {
+        var weeks: [FrequencyEntry] = []
+        forEachRecentWeek { weekStart, endOfWeek in
             let count = allWorkouts.filter { $0.date >= weekStart && $0.date <= endOfWeek }.count
             weeks.append(FrequencyEntry(weekStart: weekStart, count: count))
         }
@@ -376,7 +366,7 @@ final class ProgressViewModel {
         rollingAverage = averages
     }
 
-    // MARK: - Task 5: PR Detection
+    // MARK: - PR Detection
 
     /// Returns alphabetically sorted exercise names that have at least one genuine PR event.
     /// Excludes bodyweight exercises and exercises with no weight increase.
@@ -458,7 +448,7 @@ final class ProgressViewModel {
         )
     }
 
-    // MARK: - Chart Summaries (Phase 6.1)
+    // MARK: - Chart Summaries
 
     func chartSummary(for chartType: String, context: ModelContext) -> ChartSummary? {
         let exerciseName: String?
@@ -490,7 +480,7 @@ final class ProgressViewModel {
         )
     }
 
-    // MARK: - Task 6A: Workout Volume
+    // MARK: - Workout Volume Computation
 
     private func computeVolumeData() {
         let cutoffDate = Calendar.current.date(byAdding: .day, value: -selectedVolumeTimeRange.days, to: Date()) ?? Date()
@@ -507,19 +497,11 @@ final class ProgressViewModel {
         volumeDataPoints = points
     }
 
-    // MARK: - Task 6B: RPE Trend
+    // MARK: - RPE Trend Computation
 
     private func computeRPETrend() {
-        var calendar = Calendar(identifier: .iso8601)
-        calendar.firstWeekday = 2
-        let now = Date()
         var weeks: [RPEWeekEntry] = []
-
-        for weeksAgo in (0..<8).reversed() {
-            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: now.startOfWeek) else { continue }
-            guard let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
-            let endOfWeek = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: weekEnd) ?? weekEnd
-
+        forEachRecentWeek { weekStart, endOfWeek in
             let weekWorkouts = allWorkouts.filter { $0.date >= weekStart && $0.date <= endOfWeek && $0.rpe != nil }
             let avgRPE = weekWorkouts.isEmpty ? 0 : Double(weekWorkouts.compactMap(\.rpe).reduce(0, +)) / Double(weekWorkouts.count)
             weeks.append(RPEWeekEntry(weekStart: weekStart, averageRPE: avgRPE))
@@ -527,7 +509,7 @@ final class ProgressViewModel {
         rpeWeeklyData = weeks
     }
 
-    // MARK: - Task 6C: Workout Type Breakdown
+    // MARK: - Workout Type Breakdown Computation
 
     private func computeTypeBreakdown() {
         let filteredWorkouts: [Workout]
@@ -548,21 +530,14 @@ final class ProgressViewModel {
             .sorted { $0.count > $1.count }
     }
 
-    // MARK: - Task 6D: Session Duration
+    // MARK: - Session Duration Computation
 
     private func computeDurationTrend() {
-        var calendar = Calendar(identifier: .iso8601)
-        calendar.firstWeekday = 2
-        let now = Date()
         var weeks: [DurationWeekEntry] = []
-
-        for weeksAgo in (0..<8).reversed() {
-            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -weeksAgo, to: now.startOfWeek) else { continue }
-            guard let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else { continue }
-            let endOfWeek = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: weekEnd) ?? weekEnd
+        forEachRecentWeek { weekStart, endOfWeek in
 
             let weekWorkouts = allWorkouts.filter { $0.date >= weekStart && $0.date <= endOfWeek && $0.durationMinutes != nil }
-            guard !weekWorkouts.isEmpty else { continue }
+            guard !weekWorkouts.isEmpty else { return }
 
             let avgDuration = Double(weekWorkouts.compactMap(\.durationMinutes).reduce(0, +)) / Double(weekWorkouts.count)
             weeks.append(DurationWeekEntry(weekStart: weekStart, averageDuration: avgDuration))

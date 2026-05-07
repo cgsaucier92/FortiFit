@@ -412,7 +412,7 @@ enum AppConstants {
         // Source Indicator Info Sheet
         static let infoSheetTitle = "Imported from Apple Health"
         static let infoSheetLead = "This workout's summary details are imported from Apple Health"
-        static let infoSheetReadOnlyHeadline = "Date, Start Time, Effort, and Duration are read-only for this workout."
+        static let infoSheetReadOnlyHeadline = "Date, Start Time, and Duration are read-only for this workout."
         static let infoSheetReadOnlySubline = "Edit in Apple Health, or unlink to edit in FitNavi."
         static let infoSheetPermanentHeadline = "Unlinking is permanent."
         static let infoSheetPermanentSubline = "Future Apple Health edits won't sync to this workout."
@@ -437,7 +437,7 @@ enum AppConstants {
 
         // Unlink Confirmation Alert (Ellipsis Menu)
         static let ellipsisUnlinkConfirmTitle = "Unlink workout from Apple Health?"
-        static let ellipsisUnlinkConfirmMessage = "This can't be undone"
+        static let ellipsisUnlinkConfirmMessage = "This can't be undone."
         static let ellipsisUnlinkConfirmDestructive = "Unlink"
 
         // Source Name Display
@@ -500,9 +500,9 @@ enum AppConstants {
 
         // Settings Modal
         static let settingsModalHeading = "Configure Activity Rings"
-        static let settingsModalMoveSliderLabel = "Move (calories)"
-        static let settingsModalExerciseSliderLabel = "Exercise (minutes)"
-        static let settingsModalStandSliderLabel = "Stand (hours)"
+        static let settingsModalMoveSliderLabel = "Move Goal (calories)"
+        static let settingsModalExerciseSliderLabel = "Exercise Goal (minutes)"
+        static let settingsModalStandSliderLabel = "Stand Goal (hours)"
         static let settingsModalResetButton = "Reset to defaults"
         static let settingsModalImportButton = "Import from Apple Health"
         static let settingsModalImportDisabledCaption = "Connect Apple Health to import your goals."
@@ -532,6 +532,11 @@ enum AppConstants {
         static let standRange: ClosedRange<Double> = 1...24
         static let standIncrement: Double = 1
         static let standDefault = 12
+
+        static func snapToIncrement(_ value: Int, increment: Int) -> Int {
+            guard increment > 0 else { return value }
+            return Int((Double(value) / Double(increment)).rounded()) * increment
+        }
     }
 
     // MARK: - Chart Info Modal Copy

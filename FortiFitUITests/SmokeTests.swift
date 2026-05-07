@@ -950,7 +950,7 @@ final class HealthKitSmokeTests: XCTestCase {
         XCTAssertTrue(unlinkButton.waitForExistence(timeout: 3))
         unlinkButton.tap()
 
-        let confirmButton = app.buttons["sourceInfoSheet_unlinkConfirmButton"]
+        let confirmButton = app.buttons["sourceInfoSheet_unlinkConfirmButton"].firstMatch
         XCTAssertTrue(confirmButton.waitForExistence(timeout: 3), "Unlink confirmation dialog should appear")
         confirmButton.tap()
 

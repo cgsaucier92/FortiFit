@@ -229,7 +229,7 @@ struct LogWorkoutView: View {
                 onDeleteWorkout?()
             }
         } message: {
-            Text("This can't be undone")
+            Text("This can't be undone.")
         }
     }
 
@@ -449,21 +449,6 @@ struct LogWorkoutView: View {
         }
     }
 
-    // MARK: - Source Name Resolution
-
-    static func resolveSourceName(bundleID: String?) -> String {
-        guard let bundleID else { return "another app" }
-        if bundleID.hasPrefix("com.apple.health") { return "Apple Workout" }
-        let knownSources: [String: String] = [
-            "com.strava": "Strava",
-            "com.fiit.fiit": "Fiit",
-            "com.onepeloton.peloton": "Peloton"
-        ]
-        for (prefix, name) in knownSources {
-            if bundleID.hasPrefix(prefix) { return name }
-        }
-        return "another app"
-    }
 }
 
 // MARK: - ExerciseCardView (isolated observation scope)

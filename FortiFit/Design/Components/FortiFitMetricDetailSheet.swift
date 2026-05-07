@@ -213,7 +213,7 @@ struct FortiFitMetricDetailSheet: View {
             return "\(Int(val))"
         case .elevation:
             if settings.useMiles {
-                return "\(Int(val * 3.28084))"
+                return "\(Int(val * UnitConversion.metersToFeetFactor))"
             }
             return "\(Int(val))"
         case .effort:
@@ -251,7 +251,7 @@ struct FortiFitMetricDetailSheet: View {
             return "\(Int(avg.rounded())) kcal"
         case .elevation:
             if settings.useMiles {
-                return "\(Int((avg * 3.28084).rounded())) ft"
+                return "\(Int((avg * UnitConversion.metersToFeetFactor).rounded())) ft"
             }
             return "\(Int(avg.rounded())) m"
         default:
@@ -291,7 +291,7 @@ struct FortiFitMetricDetailSheet: View {
             return "About typical"
         case .elevation:
             let unit = settings.useMiles ? "ft" : "m"
-            let displayDiff = settings.useMiles ? diff * 3.28084 : diff
+            let displayDiff = settings.useMiles ? diff * UnitConversion.metersToFeetFactor : diff
             let d = Int(displayDiff.rounded())
             if d > 0 { return "+\(d) \(unit) vs typical" }
             if d < 0 { return "\(d) \(unit) vs typical" }

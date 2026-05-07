@@ -3,6 +3,7 @@ import Foundation
 enum UnitConversion {
     static let kgToLbsFactor: Double = 2.205
     static let kmToMilesFactor: Double = 0.621371
+    static let metersToFeetFactor: Double = 3.28084
 
     /// Converts km to miles, rounded to 2 decimal places.
     static func kmToMiles(_ km: Double) -> Double {

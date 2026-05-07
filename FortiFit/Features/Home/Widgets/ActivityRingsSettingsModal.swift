@@ -9,14 +9,14 @@ struct ActivityRingsSettingsModal: View {
     private var moveValue: Binding<Double> {
         Binding(
             get: { Double(settings.targetMoveCalories ?? AppConstants.ActivityRings.moveDefault) },
-            set: { settings.targetMoveCalories = snapToIncrement(Int($0.rounded()), increment: Int(AppConstants.ActivityRings.moveIncrement)) }
+            set: { settings.targetMoveCalories = AppConstants.ActivityRings.snapToIncrement(Int($0.rounded()), increment: Int(AppConstants.ActivityRings.moveIncrement)) }
         )
     }
 
     private var exerciseValue: Binding<Double> {
         Binding(
             get: { Double(settings.targetExerciseMinutes ?? AppConstants.ActivityRings.exerciseDefault) },
-            set: { settings.targetExerciseMinutes = snapToIncrement(Int($0.rounded()), increment: Int(AppConstants.ActivityRings.exerciseIncrement)) }
+            set: { settings.targetExerciseMinutes = AppConstants.ActivityRings.snapToIncrement(Int($0.rounded()), increment: Int(AppConstants.ActivityRings.exerciseIncrement)) }
         )
     }
 
@@ -161,8 +161,4 @@ struct ActivityRingsSettingsModal: View {
         }
     }
 
-    private func snapToIncrement(_ value: Int, increment: Int) -> Int {
-        guard increment > 0 else { return value }
-        return Int((Double(value) / Double(increment)).rounded()) * increment
-    }
 }

@@ -186,7 +186,7 @@ struct WorkoutShareCardView: View {
                 cards.append(ShareStatData(
                     symbol: WorkoutMetric.elevation.sfSymbol,
                     label: "Elevation",
-                    value: "\(Int(elevation * 3.28084))",
+                    value: "\(Int(elevation * UnitConversion.metersToFeetFactor))",
                     unit: "ft",
                     iconColor: color,
                     valueColor: color,
