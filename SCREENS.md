@@ -61,6 +61,20 @@ Each screen specifies only seed defaults, card definitions, and deviations.
 
 **Accessibility:** title announced first; section headings traverse as headers (`accessibilityAddTraits(.isHeader)`); close button reads "Close, button".
 
+**Back Navigation Chevron:** Every drill-down screen (Workout Detail, Edit Workout, Create Template, Saved Templates, Add Goal, Schedule Workout, Settings, Trends Chart Detail, etc.) uses a single shared back control — a blue left-pointing chevron at the top-leading edge of the screen.
+
+| Property | Value |
+|---|---|
+| SF Symbol | `chevron.left` |
+| Color | Primary Accent Blue `#3b82f6` |
+| Tap target | 24×24pt circular, 44×44pt hit area (Apple HIG) |
+| Position | Top-leading, inset under the Scroll Fade Header (when present) |
+| Action | Pops one level on the navigation stack. iOS edge-swipe-back gesture also works (free with `NavigationStack`). |
+| Identifier convention | `{screenId}_backButton` — e.g., `workoutDetail_backButton`, `trendsChartDetail_strengthTracker_backButton` |
+| VoiceOver label | "Back, button" |
+
+Replaces the previously documented "← BACK" text button. Any earlier reference to `← BACK` in this doc points to this pattern.
+
 **Trends Chart Card Visual Treatment:** Shared visual styling for every chart card on the Trends screen. Implemented via `FortiFitChartCard` (Design/Components/), which wraps `FortiFitCard` and composes a gradient backdrop, inner plot hairline, header summary block, latest-point highlight, rounded bar tops, smoothed line interpolation, donut center label, and tap-to-select state. Per-chart values (gradient anchor, header summary formula, selection availability) live in CONSTANTS.md § Trends Chart Visual Tokens — never hardcoded in views.
 
 **Component:** `FortiFitChartCard.swift`. Public API takes `chartId: ChartType`, `title: String`, `summary: ChartSummary?`, `gradientAnchor: ChartGradientAnchor`, plus `@ViewBuilder` slots for controls (toggles, dropdowns), the chart marks themselves, and an optional footer (legend).
@@ -310,7 +324,7 @@ Long-press card header. Items:
 
 ### Layout
 
-← BACK · Heading "Log Workout" (new) / "Edit Workout" (edit) · top-right blue ellipsis. Ellipsis visibility:
+Back chevron (§ Standard Patterns → Back Navigation Chevron) · Heading "Log Workout" (new) / "Edit Workout" (edit) · top-right blue ellipsis. Ellipsis visibility:
 - **New mode:** always visible.
 - **Edit mode:** visible only when `workout.workoutType` is Strength Training or HIIT (templates support only those). Hidden on Cardio/Yoga/Pilates/Other. Top-right header in edit mode is `trash | ellipsis` left-to-right.
 
@@ -394,7 +408,7 @@ When `healthKitUUID != nil`, three fields are read-only with inline `info.circle
 
 ### Layout
 
-← BACK · Heading "Create Template" (new) / "Edit Template" (edit). Form fields: Template Name (required), Workout Type dropdown (Strength Training / HIIT only), Duration (optional), exercise cards (identical to Log Workout Strength/HIIT), "+ Add Exercise". No Effort, no DatePicker, no distance.
+Back chevron (§ Standard Patterns → Back Navigation Chevron) · Heading "Create Template" (new) / "Edit Template" (edit). Form fields: Template Name (required), Workout Type dropdown (Strength Training / HIIT only), Duration (optional), exercise cards (identical to Log Workout Strength/HIIT), "+ Add Exercise". No Effort, no DatePicker, no distance.
 
 "SAVE TEMPLATE" / "Save Changes" button. Disabled until name + ≥1 exercise with sets/reps. Saves to SwiftData, navigates back.
 
@@ -409,7 +423,7 @@ When `healthKitUUID != nil`, three fields are read-only with inline `info.circle
 **Purpose:** View, edit, delete, and share saved templates.
 
 ### Layout
-← BACK. "Saved Templates" heading. Right: "+" button (→ Create Template in new-template mode). Scrollable list sorted by dateCreated (newest first). Each row: template name (16px semibold), workout type (muted), date created (muted), trailing chevron.
+Back chevron (§ Standard Patterns → Back Navigation Chevron). "Saved Templates" heading. Right: "+" button (→ Create Template in new-template mode). Scrollable list sorted by dateCreated (newest first). Each row: template name (16px semibold), workout type (muted), date created (muted), trailing chevron.
 
 Tap row → Create Template in edit mode. Template deletion has no effect on workouts, goals, PRs, streaks, or Training Load.
 
@@ -615,7 +629,7 @@ Edit/delete on a recurring instance prompts **"This workout only"** or **"This a
 
 ### Layout
 
-Header: ← BACK · "Workout" label · workout name (blue) · `{date} · {time} · {type}` (muted; time omitted when nil).
+Header: Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Workout" label · workout name (blue) · `{date} · {time} · {type}` (muted; time omitted when nil).
 
 Top-right icon tray (right-to-left): blue ellipsis (rendered only if ≥1 ellipsis item applies) · muted trash · muted edit · blue share. Share → renders Share Image Card and presents iOS share sheet. Edit → Log Workout in edit mode. Trash → standard delete confirmation → cascade delete → back to Workouts.
 
@@ -669,7 +683,7 @@ Icons: CONSTANTS § Workout Detail Summary Icons (user-entered fields) and § Wo
 
 **After Summary** (Strength/HIIT only, conditional): "Exercises" header + exercise list (name, sets, weight). Header + list hidden entirely when `exerciseSets.isEmpty` (regardless of manual vs HK-imported origin). Reappears once an exercise is added.
 
-✦ divider. **"Session Notes"** header + edit icon. Note card, or textarea + SAVE button when editing.
+✦ divider. **"Notes"** header + edit icon. Note card, or textarea + SAVE button when editing.
 
 ### Source Indicator Info Sheet
 
@@ -843,6 +857,63 @@ A **Personal Record (PR) event** occurs when a new max `weightKg` for an `exerci
 | Reorder edit mode | line.3.horizontal SF symbol drag handles visible on all chart cards; cards draggable; context menu disabled; tap outside to exit |
 | All Charts Removed | Centered muted message: "Tap the menu to add charts to your Trends screen." Ellipsis remains accessible. |
 
+### Expand Affordance
+
+Every chart card on the Trends screen renders a left-chevron-style expand button at the top-trailing edge of the card (mirrors the chevron treatment on Workout Detail's `FortiFitStatCard`). Tapping pushes the corresponding `FortiFitChartDetailView` onto the navigation stack — see § Trends Chart Detail. The button uses identifier `trendsChart_{chartId}_expandButton`. Long-press context menu (See Info, Reorder, Delete) on the card body is unchanged.
+
+---
+
+## Trends Chart Detail
+
+**Purpose:** Per-chart expanded view that gives users a larger canvas, wider time ranges, comparison-period delta, tap/scrub data-point inspection, See Info access, and lateral swipe between charts.
+
+### Entry & Navigation
+
+Pushed onto the navigation stack by the chart card's expand button (§ Trends → Expand Affordance). Standard iOS right-to-left push transition. Back navigation via the Back Navigation Chevron (§ Standard Patterns) at top-leading; iOS edge-swipe-back also works.
+
+### Layout (top-to-bottom)
+
+| Slot | Content |
+|---|---|
+| Top bar | Back chevron (leading) · chart title (centered) · See Info `info.circle` (trailing, identifier `trendsChartDetail_{chartId}_seeInfoButton`) |
+| Header summary block | Hero value + caption + comparison-delta band — see CONSTANTS.md § Trends Chart Detail View → Header Summary (Detail Variant) |
+| Range toggles | Per-chart eligible toggles (D / W / M / 6M / 1Y / All Time) per CONSTANTS.md § Trends Chart Detail View → Range Toggle by Chart Type |
+| Plot area | Larger variant of `FortiFitChartCard` plot area — same gradient, hairline, latest-point highlight, smoothed line, rounded bars; full-numeric Y-axis labels (no `K`/`M` abbreviation) |
+| Selection layer | Tap-to-select on every data point + scrub-to-select on line charts — see § Selection & Scrubbing |
+| Footer (per-chart) | Chart-specific extras (PR timeline labels, donut legend table, etc. — see Per-Chart Detail Variants) |
+
+### Selection & Scrubbing
+
+Tapping a `BarMark` or line-chart data point selects it; non-selected marks fade to 35% opacity; a floating annotation appears above the selected mark with auto-flip near the chart top edge. Drag along a line chart scrubs continuously: a vertical `RuleMark` follows the finger, the annotation updates live, and a light haptic fires on each new snapped data point. Drag-release leaves the last-touched point selected (no auto-deselect on lift). Selection clears on range-toggle change, swipe-paging to a different chart, or back navigation.
+
+Selection availability per chart type lives in CONSTANTS.md § Trends Chart Detail View → Selection State.
+
+### Swipe Paging
+
+Horizontal swipe (left/right) within the detail view pages between the user's other Trends charts in `TrendsChart.sortOrder`. Wraps at both ends. Active chart's identity is preserved across back-and-re-enter from the same card.
+
+### Per-Chart Detail Variants
+
+Most charts are a faithful larger version of the compact card with selection + scrubbing. Two charts get structural changes available only on the detail view:
+
+| Chart (id) | Detail Variant |
+|---|---|
+| `personalRecords` | Replaces the 2-bar comparison with a **full PR timeline** — line chart over `TrendsChartService.fullPRTimeline(for: exerciseName)`. Each PR event is a labeled point: date, weight (per `useLbs`), and delta from prior PR. Identifier `trendsChartDetail_personalRecords_timelinePoint_{index}`. The compact card stays unchanged. |
+| `workoutTypeBreakdown` | Donut occupies the upper half; lower half adds a **sortable legend table** with columns `Type · Count · % · Avg Duration`. Sort cycles count desc → count asc → alphabetical on tap of any header. Row identifier `trendsChartDetail_workoutTypeBreakdown_legendRow_{index}`; sort-header identifier `trendsChartDetail_workoutTypeBreakdown_legendSortHeader_{column}`. |
+| All others | Compact card's structure, larger sizing, full-numeric Y-axis, expanded range toggles. |
+
+### See Info
+
+Inline `info.circle` icon at top-trailing opens the standard See Info Modal (§ Standard Patterns) populated from INFO_COPY.md § Chart Info Modal Copy for the chart type. Same modal as the long-press path on the compact card.
+
+### Empty State
+
+Mirrors the compact card: when the chart's data threshold (§ Chart Data Thresholds) isn't met, the gradient, hairline, header summary, and plot marks all hide; the existing centered muted empty message renders. Range toggles, See Info, and back chevron remain available.
+
+### Accessibility
+
+Push focuses the chart title first (announces title + summary together as a single label). Selection callout announces as a separate label scoped to the selected mark. Range toggles announce as a `Tab` group. Swipe-paging respects VoiceOver's two-finger flick gestures.
+
 ---
 
 ## Goals
@@ -979,7 +1050,7 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 
 ### Layout
 
-← BACK · "Add Goal" heading · Goal Type selector: "STRENGTH PR" (default), "REPETITIONS PR", "SPEED AND DISTANCE", "NUMBER OF WEEKLY WORKOUTS".
+Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Add Goal" heading · Goal Type selector: "STRENGTH PR" (default), "REPETITIONS PR", "SPEED AND DISTANCE", "NUMBER OF WEEKLY WORKOUTS".
 
 | Type | Fields | Validation |
 |---|---|---|
@@ -1000,7 +1071,7 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 
 ### Layout
 
-← BACK · "Settings" heading.
+Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Settings" heading.
 
 **General** section: Weight Unit (KG/LBS toggle) · Distance Unit (KM/MILES toggle). Changes take effect immediately.
 

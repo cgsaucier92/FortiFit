@@ -22,6 +22,7 @@ struct FortiFitProgressView: View {
     @State private var showDeleteConfirm = false
     @State private var infoChartType: String?
     @State private var headerHeight: CGFloat = 0
+    @State private var detailChartIndex: Int?
     private var settings: UserSettings { UserSettings.shared }
     var selectedTab: Int = 3
 
@@ -129,6 +130,12 @@ struct FortiFitProgressView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+        .navigationDestination(item: $detailChartIndex) { index in
+            FortiFitChartDetailView(
+                charts: viewModel.charts,
+                initialChartIndex: index
+            )
+        }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
@@ -143,7 +150,11 @@ struct FortiFitProgressView: View {
             if viewModel.isReorderMode {
                 chartContent(for: chart)
             } else {
-                Button(action: {}) {
+                Button {
+                    if let index = viewModel.charts.firstIndex(where: { $0.chartType == chart.chartType }) {
+                        detailChartIndex = index
+                    }
+                } label: {
                     chartContent(for: chart)
                 }
                 .buttonStyle(PressableCardButtonStyle())
@@ -237,6 +248,7 @@ struct FortiFitProgressView: View {
             isEmpty: isEmpty,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: {
                 if !viewModel.availableExercises.isEmpty {
                     FortiFitSelect(
@@ -332,6 +344,7 @@ struct FortiFitProgressView: View {
             isEmpty: !viewModel.hasFrequencyData,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: { EmptyView() },
             chart: {
                 Chart {
@@ -382,6 +395,7 @@ struct FortiFitProgressView: View {
             isEmpty: !viewModel.hasPRData,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: {
                 if viewModel.hasPRData {
                     let prExercises = viewModel.exercisesWithPRs()
@@ -485,6 +499,7 @@ struct FortiFitProgressView: View {
             isEmpty: !viewModel.hasLoadTrendData,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: { EmptyView() },
             chart: {
                 let lastAvgDate = viewModel.rollingAverage.last.map { weekLabel($0.date) }
@@ -610,6 +625,7 @@ struct FortiFitProgressView: View {
             isEmpty: !viewModel.hasVolumeData,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: {
                 timeRangeToggle(
                     selected: Binding(
@@ -688,6 +704,7 @@ struct FortiFitProgressView: View {
             isEmpty: !viewModel.hasRPEData,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: { EmptyView() },
             chart: {
                 Chart {
@@ -737,6 +754,7 @@ struct FortiFitProgressView: View {
             isEmpty: !viewModel.hasTypeBreakdownData,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: {
                 breakdownTimeRangeToggle
             },
@@ -805,6 +823,7 @@ struct FortiFitProgressView: View {
             isEmpty: !viewModel.hasDurationData,
             emptyMessage: AppConstants.chartEmptyMessages[chartId] ?? "",
             isReorderMode: viewModel.isReorderMode,
+            onExpand: expandAction(for: chartId),
             controls: { EmptyView() },
             chart: {
                 Chart {
@@ -894,6 +913,17 @@ struct FortiFitProgressView: View {
                         )
                         .clipShape(RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadiusPill))
                 }
+            }
+        }
+    }
+
+    // MARK: - Expand Action
+
+    private func expandAction(for chartType: String) -> (() -> Void)? {
+        guard !viewModel.isReorderMode else { return nil }
+        return {
+            if let index = viewModel.charts.firstIndex(where: { $0.chartType == chartType }) {
+                detailChartIndex = index
             }
         }
     }

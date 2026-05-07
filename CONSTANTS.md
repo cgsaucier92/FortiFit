@@ -756,6 +756,114 @@ Renders inside the donut hole when the chart's data threshold is met. Replaces t
 
 ---
 
+## Trends Chart Detail View
+
+Visual + behavioral tokens for the per-chart expanded view (Phase 6.2). See SCREENS.md § Trends Chart Detail and § Standard Patterns → Back Navigation Chevron. The detail view inherits every visual token from § Trends Chart Visual Tokens — this section only adds what's specific to the larger surface.
+
+### Expand Button (on compact chart card)
+
+| Property | Value |
+|---|---|
+| SF Symbol | `chevron.right` |
+| Color | Muted Text `#737373` (matches Workout Detail stat-card chevrons) |
+| Size | 14pt |
+| Tap target | 44×44pt hit area, top-trailing of the card |
+| Identifier | `trendsChart_{chartId}_expandButton` |
+| VoiceOver label | `"Expand {chart title}, button"` |
+
+### Range Toggle by Chart Type
+
+Each chart's detail view exposes a wider set of time ranges than the compact card. Toggles render as a `FortiFitSegmentedToggle` row below the header summary. The eligible set is bounded by what the chart's underlying data supports — the table is per-chart canonical.
+
+| Chart (id) | Eligible Ranges | Default |
+|---|---|---|
+| `strengthTracker` | 30D · 90D · 6M · 1Y · All | 90D |
+| `trainingFrequency` | 8W · 6M · 1Y · All | 8W |
+| `personalRecords` | All (timeline is event-driven, not range-based) | All |
+| `trainingLoadTrend` | 14D · 30D · 90D · 6M | 30D |
+| `workoutVolume` | 30D · 90D · 6M · 1Y · All | 90D |
+| `rpeTrend` | 8W · 6M · 1Y · All | 8W |
+| `workoutTypeBreakdown` | 30D · 60D · 90D · 1Y · All | 90D |
+| `sessionDuration` | 8W · 6M · 1Y · All | 8W |
+
+`TimeRange` raw values (used for accessibility identifiers via `trendsChartDetail_{chartId}_rangeToggle_{rawValue}`): `14d`, `30d`, `60d`, `90d`, `8w`, `6m`, `1y`, `all`.
+
+### Header Summary (Detail Variant)
+
+Extends § Trends Chart Visual Tokens → Header Summary Block with a comparison-delta band. Suppressed on `workoutTypeBreakdown` (its hero stays in the donut center).
+
+| Property | Value |
+|---|---|
+| Hero value typography | 32px, 900 weight, anchor color (Primary Text `#e5e5e5` for `personalRecords`) |
+| Caption typography | 12px, 700 weight, Muted Text `#737373`, uppercase, 2px letter-spacing |
+| Delta band typography | 13px, 700 weight; color is Positive Green `#10b981` (up), Alert Red `#ef4444` (down), Muted Text `#737373` (flat or no prior period) |
+| Delta arrow icon | `arrow.up` (up), `arrow.down` (down), `minus` (flat) — 11pt, color matches delta band |
+| Delta string format | `{arrow} {magnitude} vs. prior {range}` — e.g., `↑ +15 lbs vs. prior 90D`, `↓ −0.4 vs. prior 8W`, `— same as prior 30D` |
+| No-prior-data fallback | Delta band hidden entirely; `direction == .flat` returns `nil` delta string |
+| Spacing | 6pt between hero and caption; 4pt between caption and delta band; 16pt below delta band before range toggles |
+
+**Helper function** in `TrendsChartService` — `func comparisonDelta(for: ChartType, exerciseName: String?, range: TimeRange) -> ChartDelta?`. Returns `nil` when below the chart's data threshold (CONSTANTS.md § Chart Data Thresholds).
+
+### Selection State
+
+Tap-to-select on bars + line dots; drag-to-scrub on line charts. Selection lives only on the detail view — the compact card stays read-only.
+
+| Property | Value |
+|---|---|
+| Selected mark | Full opacity, retains anchor color |
+| Non-selected marks | 35% opacity |
+| Floating annotation | Primary Text `#e5e5e5`, 13px, 700 weight; rendered above the selected mark with 6pt vertical offset; auto-flips below when within 24pt of the chart's top edge |
+| Annotation content (line 1) | Per-chart formatted value — e.g., `225 lbs`, `36 min`, `5.4 RPE` |
+| Annotation content (line 2) | Date or week label — e.g., `Apr 23, 2026`, `Week of Apr 19` |
+| Annotation content (line 3, optional) | Per-chart context where useful — e.g., on `strengthTracker`: exercise + top set (`Bench Press, 5 × 5`); on `trainingLoadTrend`: zone label (`Moderate`) |
+| Haptic | `UIImpactFeedbackGenerator(.light)` on initial selection AND on each scrub-snapped data point change. Not on deselection. |
+| Multi-select | Not supported — a new selection replaces the prior |
+| Persistence | View-state only — never written to SwiftData, never crosses navigation |
+| Deselection triggers | Range toggle change, swipe-paging to a different chart, back navigation |
+
+**Selection availability per chart type:**
+
+| Chart (id) | Tap | Scrub | Notes |
+|---|---|---|---|
+| `strengthTracker` | Yes | Yes | Line chart with discrete points |
+| `trainingFrequency` | Yes | Yes (snaps to weekly bars) | Bar chart |
+| `personalRecords` | Yes | No | Tap any timeline point; timeline is event-driven, not continuous |
+| `trainingLoadTrend` | Yes (per-day dots) | Yes (rolling-avg line scrubs continuously) | Both layers selectable |
+| `workoutVolume` | Yes | Yes | Line chart |
+| `rpeTrend` | Yes | Yes (snaps to weekly bars) | Bar chart |
+| `workoutTypeBreakdown` | No | No | Donut segments don't surface a useful per-segment timestamp; the legend table already discloses values |
+| `sessionDuration` | Yes | Yes (snaps to weekly bars) | Bar chart |
+
+### Scrubber Treatment
+
+Applies only on charts with scrub support per the table above.
+
+| Property | Value |
+|---|---|
+| Vertical line | `RuleMark`, 1px, anchor color at 60% opacity |
+| Touch follow | Real-time follow during drag; lifts the line on drag-release but keeps the last-snapped data point selected |
+| Snap behavior | On bar charts, snaps to the bar whose x-bucket contains the touch x. On line charts, snaps to the nearest data point's x within ±half-bucket-width. |
+| Out-of-bounds drag | Touch outside plot area → no scrubber line; selection retains the last in-bounds value |
+
+### Swipe Paging
+
+| Property | Value |
+|---|---|
+| Gesture | Horizontal swipe (≥ 50pt threshold), implemented via `TabView(.page)` page style |
+| Order | `TrendsChart.sortOrder` ascending; wraps at both ends |
+| Persistence | Detail view's active chart resets to the user's tap origin every time they return to the Trends screen and re-enter |
+| Disabled when | A chart is in a scrub-active state (drag in progress) — page gesture defers to the scrub gesture |
+
+### Y-Axis Label Formatting
+
+Compact card abbreviates large numbers (`5K`, `1.2M`). Detail view renders full numerics with grouping separators (`5,000`, `1,200,000`) since vertical space is no longer constrained. Unit suffix per chart unchanged.
+
+### Empty State
+
+Same suppression rules as the compact card (gradient + hairline + header summary + plot marks all hide; centered muted message renders). Range toggles, See Info, and back chevron remain available.
+
+---
+
 ## Training Load Zones
 
 | Score Range | Zone Label | Color |

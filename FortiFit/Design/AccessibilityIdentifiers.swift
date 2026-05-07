@@ -219,6 +219,52 @@ enum AccessibilityID {
         "trendsChart_\(chartId)_selectionAnnotation"
     }
 
+    static func trendsChartExpandButton(_ chartId: String) -> String {
+        "trendsChart_\(chartId)_expandButton"
+    }
+
+    // MARK: - Trends Chart Detail (Phase 6.2)
+
+    static func trendsChartDetailCard(_ chartId: String) -> String {
+        "trendsChartDetail_\(chartId)_card"
+    }
+
+    static func trendsChartDetailBackButton(_ chartId: String) -> String {
+        "trendsChartDetail_\(chartId)_backButton"
+    }
+
+    static func trendsChartDetailHeaderSummary(_ chartId: String) -> String {
+        "trendsChartDetail_\(chartId)_headerSummary"
+    }
+
+    static func trendsChartDetailSeeInfoButton(_ chartId: String) -> String {
+        "trendsChartDetail_\(chartId)_seeInfoButton"
+    }
+
+    static func trendsChartDetailRangeToggle(_ chartId: String, range: String) -> String {
+        "trendsChartDetail_\(chartId)_rangeToggle_\(range)"
+    }
+
+    static func trendsChartDetailDataPoint(_ chartId: String, index: Int) -> String {
+        "trendsChartDetail_\(chartId)_dataPoint_\(index)"
+    }
+
+    static func trendsChartDetailSelectionAnnotation(_ chartId: String) -> String {
+        "trendsChartDetail_\(chartId)_selectionAnnotation"
+    }
+
+    static func trendsChartDetailPRTimelinePoint(index: Int) -> String {
+        "trendsChartDetail_personalRecords_timelinePoint_\(index)"
+    }
+
+    static func trendsChartDetailBreakdownLegendRow(index: Int) -> String {
+        "trendsChartDetail_workoutTypeBreakdown_legendRow_\(index)"
+    }
+
+    static func trendsChartDetailBreakdownSortHeader(column: String) -> String {
+        "trendsChartDetail_workoutTypeBreakdown_legendSortHeader_\(column)"
+    }
+
     // MARK: - Helpers
 
     /// Sanitizes a display string for use in an identifier (removes spaces).

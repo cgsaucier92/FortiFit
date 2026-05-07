@@ -13,6 +13,113 @@ struct ChartSummary {
     let caption: String
 }
 
+enum DeltaDirection {
+    case up, down, flat
+}
+
+struct ChartDelta {
+    let hero: String
+    let caption: String
+    let delta: String?
+    let direction: DeltaDirection
+}
+
+struct ChartDataPoint: Identifiable {
+    let id = UUID()
+    let x: Date
+    let y: Double
+    let label: String
+}
+
+struct PRTimelineEvent: Identifiable {
+    let id = UUID()
+    let date: Date
+    let weightKg: Double
+    let deltaKg: Double
+}
+
+struct WorkoutTypeBreakdownRow: Identifiable {
+    let id = UUID()
+    let type: String
+    let count: Int
+    let percent: Double
+    let avgDurationMinutes: Int?
+}
+
+enum DetailTimeRange: String, CaseIterable {
+    case fourteenDays = "14d"
+    case thirtyDays = "30d"
+    case sixtyDays = "60d"
+    case ninetyDays = "90d"
+    case eightWeeks = "8w"
+    case sixMonths = "6m"
+    case oneYear = "1y"
+    case allTime = "all"
+
+    var displayLabel: String {
+        switch self {
+        case .fourteenDays: return "14D"
+        case .thirtyDays: return "30D"
+        case .sixtyDays: return "60D"
+        case .ninetyDays: return "90D"
+        case .eightWeeks: return "8W"
+        case .sixMonths: return "6M"
+        case .oneYear: return "1Y"
+        case .allTime: return "All"
+        }
+    }
+
+    var days: Int? {
+        switch self {
+        case .fourteenDays: return 14
+        case .thirtyDays: return 30
+        case .sixtyDays: return 60
+        case .ninetyDays: return 90
+        case .eightWeeks: return 56
+        case .sixMonths: return 182
+        case .oneYear: return 365
+        case .allTime: return nil
+        }
+    }
+
+    static func eligibleRanges(for chartType: String) -> [DetailTimeRange] {
+        switch chartType {
+        case "strengthTracker":
+            return [.thirtyDays, .ninetyDays, .sixMonths, .oneYear, .allTime]
+        case "trainingFrequency":
+            return [.eightWeeks, .sixMonths, .oneYear, .allTime]
+        case "personalRecords":
+            return [.allTime]
+        case "trainingLoadTrend":
+            return [.fourteenDays, .thirtyDays, .ninetyDays, .sixMonths]
+        case "workoutVolume":
+            return [.thirtyDays, .ninetyDays, .sixMonths, .oneYear, .allTime]
+        case "rpeTrend":
+            return [.eightWeeks, .sixMonths, .oneYear, .allTime]
+        case "workoutTypeBreakdown":
+            return [.thirtyDays, .sixtyDays, .ninetyDays, .oneYear, .allTime]
+        case "sessionDuration":
+            return [.eightWeeks, .sixMonths, .oneYear, .allTime]
+        default:
+            return [.allTime]
+        }
+    }
+
+    static func defaultRange(for chartType: String) -> DetailTimeRange {
+        switch chartType {
+        case "strengthTracker": return .ninetyDays
+        case "trainingFrequency": return .eightWeeks
+        case "personalRecords": return .allTime
+        case "trainingLoadTrend": return .thirtyDays
+        case "workoutVolume": return .ninetyDays
+        case "rpeTrend": return .eightWeeks
+        case "workoutTypeBreakdown": return .ninetyDays
+        case "sessionDuration": return .eightWeeks
+        default: return .allTime
+        }
+    }
+}
+
 enum AppConstants {
     static let workoutTypes = [
         "Strength Training",
@@ -243,6 +350,11 @@ enum AppConstants {
         static let captionToday = "TODAY'S LOAD"
         static let captionAvgPerSession = "AVG / SESSION"
         static let captionWorkouts = "WORKOUTS"
+
+        static func deltaString(magnitude: String, rangeLabel: String) -> String {
+            "\(magnitude) vs. prior \(rangeLabel)"
+        }
+        static let deltaSamePrefix = "same as prior"
     }
 
     static func chartGradientAnchor(for chartType: String) -> ChartGradientAnchor {

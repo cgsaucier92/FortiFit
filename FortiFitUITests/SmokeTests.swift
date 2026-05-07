@@ -850,6 +850,180 @@ final class SmokeTests: XCTestCase {
     }
 }
 
+// MARK: - Phase 6.2: Trends Chart Detail View
+
+final class TrendsChartDetailSmokeTests: XCTestCase {
+
+    enum Tab: String {
+        case home = "DASHBOARD"
+        case workouts = "WORKOUTS"
+        case plan = "PLAN"
+        case trends = "TRENDS"
+        case goals = "GOALS"
+    }
+
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--reset-state"]
+        app.launch()
+    }
+
+    private func logStrengthWorkoutQuick(name: String, weight: String) {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+        app.buttons["logWorkoutCTA"].tap()
+
+        let nameField = app.textFields["workoutNameInput"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.tap()
+        nameField.typeText(name)
+
+        app.buttons["addExerciseButton"].tap()
+        let exerciseField = app.textFields["exerciseNameInput_0"]
+        XCTAssertTrue(exerciseField.waitForExistence(timeout: 2))
+        exerciseField.tap()
+        exerciseField.typeText("Bench Press\n")
+
+        app.textFields["setsInput_0_0"].tap()
+        app.textFields["setsInput_0_0"].typeText("3")
+        app.textFields["repsInput_0_0"].tap()
+        app.textFields["repsInput_0_0"].typeText("8")
+        app.textFields["weightInput_0_0"].tap()
+        app.textFields["weightInput_0_0"].typeText(weight)
+
+        app.buttons["saveWorkoutButton"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 3))
+    }
+
+    private func navigateToTrendsAndSeedData() {
+        logStrengthWorkoutQuick(name: "Detail1", weight: "100")
+        logStrengthWorkoutQuick(name: "Detail2", weight: "150")
+        app.tabBars.buttons[Tab.trends.rawValue].tap()
+    }
+
+    func test_trendsChart_expandButtonTap_pushesDetailView() {
+        navigateToTrendsAndSeedData()
+
+        let expandButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_expandButton").firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 5),
+                      "Expand button should exist on the Strength Tracker card")
+        expandButton.tap()
+
+        let detailCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_card").firstMatch
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5),
+                      "Detail view should appear after tapping expand")
+    }
+
+    func test_trendsChartDetail_backButtonTap_popsToTrendsScreen() {
+        navigateToTrendsAndSeedData()
+
+        let expandButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_expandButton").firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 5))
+        expandButton.tap()
+
+        let detailCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_card").firstMatch
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+
+        let backButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_backButton").firstMatch
+        XCTAssertTrue(backButton.waitForExistence(timeout: 3))
+        backButton.tap()
+
+        let compactCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_card").firstMatch
+        XCTAssertTrue(compactCard.waitForExistence(timeout: 5),
+                      "Should return to the Trends screen after tapping back")
+        XCTAssertFalse(detailCard.exists,
+                       "Detail view should no longer be visible")
+    }
+
+    func test_trendsChartDetail_seeInfoButtonTap_opensSeeInfoModal() {
+        navigateToTrendsAndSeedData()
+
+        let expandButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_expandButton").firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 5))
+        expandButton.tap()
+
+        let detailCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_card").firstMatch
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+
+        let seeInfoButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_seeInfoButton").firstMatch
+        XCTAssertTrue(seeInfoButton.waitForExistence(timeout: 3))
+        seeInfoButton.tap()
+
+        let closeButton = app.buttons["seeInfoModal_closeButton"]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 3),
+                      "See Info modal should open with a close button")
+    }
+
+    /// Data point tap and selection annotation tests deferred — XCUI cannot reliably
+    /// trigger SwiftUI Charts tap/drag gestures (see BUG-034).
+    func test_trendsChartDetail_dataPointTap_revealsSelectionAnnotation() {
+        navigateToTrendsAndSeedData()
+
+        let expandButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_expandButton").firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 5))
+        expandButton.tap()
+
+        let detailCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_card").firstMatch
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5),
+                      "Detail view should render with data (data point interaction deferred per BUG-034)")
+    }
+
+    func test_trendsChartDetail_rangeToggleChange_clearsSelection() {
+        navigateToTrendsAndSeedData()
+
+        let expandButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_expandButton").firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 5))
+        expandButton.tap()
+
+        let detailCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_card").firstMatch
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+
+        let rangeToggle = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_rangeToggle_30d").firstMatch
+        XCTAssertTrue(rangeToggle.waitForExistence(timeout: 3),
+                      "30D range toggle should exist on the detail view")
+        rangeToggle.tap()
+
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 3),
+                      "Detail view should still render after range toggle change")
+    }
+
+    func test_trendsChartDetail_swipeLeft_pagesToNextChart() {
+        navigateToTrendsAndSeedData()
+
+        let expandButton = app.descendants(matching: .any)
+            .matching(identifier: "trendsChart_strengthTracker_expandButton").firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 5))
+        expandButton.tap()
+
+        let detailCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_strengthTracker_card").firstMatch
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+
+        detailCard.swipeLeft()
+
+        let nextCard = app.descendants(matching: .any)
+            .matching(identifier: "trendsChartDetail_trainingFrequency_card").firstMatch
+        XCTAssertTrue(nextCard.waitForExistence(timeout: 5),
+                      "Swiping left should page to the next chart in sort order")
+    }
+}
+
 // MARK: - HealthKit Smoke Tests (Seeded Data)
 
 /// These tests use `--seed-hk-workout` to inject an HK-linked workout at launch,

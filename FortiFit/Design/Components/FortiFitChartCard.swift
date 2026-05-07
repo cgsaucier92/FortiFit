@@ -8,14 +8,29 @@ struct FortiFitChartCard<ControlsView: View, ChartView: View, FooterView: View>:
     let isEmpty: Bool
     let emptyMessage: String
     var isReorderMode: Bool = false
+    var onExpand: (() -> Void)? = nil
     @ViewBuilder let controls: () -> ControlsView
     @ViewBuilder let chart: () -> ChartView
     @ViewBuilder let footer: () -> FooterView
 
     var body: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-            FortiFitWidgetHeader(title: title)
-                .accessibilityIdentifier(AccessibilityID.trendsChartCard(chartId))
+            HStack {
+                FortiFitWidgetHeader(title: title)
+                    .accessibilityIdentifier(AccessibilityID.trendsChartCard(chartId))
+                Spacer()
+                if let onExpand {
+                    Button(action: onExpand) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14))
+                            .foregroundStyle(FortiFitColors.mutedText)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityIdentifier(AccessibilityID.trendsChartExpandButton(chartId))
+                    .accessibilityLabel("Expand \(title), button")
+                }
+            }
 
             if isEmpty {
                 controls()

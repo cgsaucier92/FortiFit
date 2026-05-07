@@ -204,6 +204,7 @@ final class ProgressViewModel {
                 selectedPRExercise = saved
             } else {
                 selectedPRExercise = prExercises.first ?? ""
+                UserDefaults.standard.set(selectedPRExercise, forKey: "trendsSelectedPRExercise")
             }
         }
 
@@ -274,6 +275,7 @@ final class ProgressViewModel {
                 selectedExercise = saved
             } else {
                 selectedExercise = availableExercises.first ?? ""
+                UserDefaults.standard.set(selectedExercise, forKey: "trendsSelectedExercise")
             }
         }
     }

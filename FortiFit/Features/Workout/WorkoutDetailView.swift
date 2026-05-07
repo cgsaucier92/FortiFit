@@ -53,7 +53,7 @@ struct WorkoutDetailView: View {
 
                     FortiFitDivider()
 
-                    // Session Notes
+                    // Notes
                     notesSection
                 }
                 .padding(.horizontal, FortiFitSpacing.screenHorizontal)
@@ -538,7 +538,7 @@ struct WorkoutDetailView: View {
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
             HStack {
-                FortiFitWidgetHeader(title: "Session Notes")
+                FortiFitWidgetHeader(title: "Notes")
                 Spacer()
                 Button {
                     isEditingNote.toggle()

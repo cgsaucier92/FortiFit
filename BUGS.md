@@ -412,11 +412,11 @@
 
 | Field | Value |
 |-------|-------|
-| Date | 2026-05-06 |
+| Date | 2026-05-04 |
 | Phase | Phase 3 — Tab Navigation (navigation stack pop flash on tab switch) |
 | Description | When switching tabs, the previous tab's navigation stack visibly pops back to its root view for a split second before the new tab appears. For example, viewing a workout detail on the Workouts tab and tapping Goals briefly shows the Workouts tab's NavigationStack popping back to the workout list. |
 | Root Cause | Each tab view has an `onChange(of: selectedTab)` handler that synchronously resets all navigation state (setting `isPresented` booleans to `false`, nilling out `item` bindings) when leaving the tab. These resets trigger `.navigationDestination` pops immediately. Because SwiftUI's `TabView` keeps the outgoing tab's view hierarchy alive in memory, the pop animation is briefly visible during the tab transition before the old tab moves offscreen. |
-| Resolution | Two-layer fix in all five tab views' `onChange(of: selectedTab)` handlers: (1) `DispatchQueue.main.asyncAfter(deadline: .now() + 0.35)` defers the resets until after the tab transition animation completes (~350ms), ensuring the old tab is fully offscreen. (2) `withTransaction` with `disablesAnimations = true` suppresses any remaining pop animation so the state change is instant. |
+| Resolution | Wrapped the navigation state resets in each tab's `onChange(of: selectedTab)` handler inside `DispatchQueue.main.async`, deferring them by one run loop cycle. By the time the resets fire, the tab transition has moved the old tab offscreen, making the pops invisible. |
 | Status | Resolved |
 
 ---

@@ -856,6 +856,43 @@ Header summary values are computed on demand by the view (no persistent cache). 
 
 For `strengthTracker` and `personalRecords`, the view also rebuilds when the user changes the exercise dropdown selection. For charts with toggles (`workoutVolume`, `workoutTypeBreakdown`), the view rebuilds on toggle change.
 
+### Comparison Delta Computation
+
+Phase 6.2 adds a comparison-delta band to the chart detail view's header summary (see CONSTANTS.md § Trends Chart Detail View → Header Summary (Detail Variant) and SCREENS.md § Trends Chart Detail).
+
+- **`func comparisonDelta(for chartType: ChartType, exerciseName: String? = nil, range: TimeRange) -> ChartDelta?`** — entry point. Returns `nil` when below the chart's data threshold (CONSTANTS.md § Chart Data Thresholds). Otherwise returns a `ChartDelta` with `hero` + `caption` (matching what `headerSummary(for:exerciseName:)` would return for the *current* `range`), plus a `delta: String?` and `direction: DeltaDirection`.
+- **`ChartDelta`** — `hero: String`, `caption: String`, `delta: String?`, `direction: DeltaDirection`. `delta` is `nil` when no prior-period data exists; `direction` is `.flat` in that case. Caption strings live in `AppConstants.Trends`; never hardcoded.
+- **`enum DeltaDirection { case up, down, flat }`** — drives the arrow icon and color in the view (Positive Green up, Alert Red down, Muted Text flat).
+
+#### Per-Chart Comparison Window
+
+For each `range`, the prior period is the immediately preceding window of the same length. For event-driven charts (`personalRecords`), comparison is event-relative.
+
+| Chart (id) | Current Window | Prior Window | Delta Formula |
+|---|---|---|---|
+| `strengthTracker` | Trailing `range` ending today | Same length, ending the day before the current window starts | Latest `weightKg` in current − latest `weightKg` in prior, formatted per `useLbs` |
+| `trainingFrequency` | Trailing `range` of full Mon–Sun weeks | Same number of weeks immediately before | Mean workouts/week (current) − mean workouts/week (prior), 1 decimal |
+| `personalRecords` | Most recent PR event | Second-most-recent PR event | `(current PR weight − prior PR weight)` per `useLbs`. If only baseline + first PR, prior = baseline. |
+| `trainingLoadTrend` | Today's score | 7 days ago's score | Today − 7 days ago, integer |
+| `workoutVolume` | Trailing `range` ending today | Same length, ending the day before | Mean session volume (current) − mean session volume (prior), formatted with same K/M suffix logic as the hero |
+| `rpeTrend` | Trailing `range` of weeks | Same number of weeks immediately before | Mean RPE (current) − mean RPE (prior), 1 decimal |
+| `workoutTypeBreakdown` | Total workouts in trailing `range` | Total workouts in same prior length | Current count − prior count, integer (rendered alongside donut center label, not in the suppressed header summary) |
+| `sessionDuration` | Trailing `range` of weeks | Same number of weeks immediately before | Mean duration (current) − mean duration (prior), integer minutes |
+
+`direction` is `.up` when the delta is strictly positive, `.down` when strictly negative, `.flat` when zero or when the prior window has insufficient data to compute. Ties always read `.flat`.
+
+### Data Point Fetch (Detail View)
+
+- **`func dataPoints(for chartType: ChartType, exerciseName: String? = nil, range: TimeRange) -> [ChartDataPoint]`** — returns the chart's plot data at any supported `TimeRange`. `ChartDataPoint` carries `(x: Date, y: Double, label: String)`. Identical computation rules to the compact card but parameterized over `TimeRange` instead of fixed 30D / 60D / 90D / 8-week. Out-of-eligible-range pairs (e.g., `(.personalRecords, .d)`) return an empty array — the view gates eligible toggles up-front so this should never fire in production.
+
+### PR Timeline Fetch (Personal Records detail only)
+
+- **`func fullPRTimeline(for exerciseName: String) -> [PRTimelineEvent]`** — returns every PR event for the named exercise, chronologically. `PRTimelineEvent` carries `(date: Date, weightKg: Double, deltaKg: Double)`. Empty array → empty state on the detail view. Excludes baseline (per § PR Definition in SCREENS.md). Bodyweight exercises (nil `weightKg`) are excluded.
+
+### Type Breakdown Percentages (Workout Type Breakdown detail only)
+
+- **`func breakdownPercentages(range: TimeRange) -> [WorkoutTypeBreakdownRow]`** — returns one row per workout type with non-zero count in the active `range`. `WorkoutTypeBreakdownRow` carries `(type: String, count: Int, percent: Double, avgDurationMinutes: Int?)`. Percentages sum to 100.0 (rounding tie-broken toward the largest type). `avgDurationMinutes` is `nil` when no workouts of that type in the range have a recorded duration.
+
 ---
 
 ## ExerciseSuggestionService (ExerciseSuggestionService.swift)

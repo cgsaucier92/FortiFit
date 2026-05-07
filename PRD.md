@@ -37,7 +37,7 @@ A holistic health app that helps users track and understand the interaction betw
 
 ### Interaction Style
 - **Animations:** Subtle and functional. Progress bars: 0.4s width transitions. Toggles: 0.2s ease. Save buttons: 0.2s disabled↔enabled. Delete "x": 0.15s opacity fade-in. No playful bounces.
-- **Navigation:** Bottom tab bar (HOME, WORKOUTS, PLAN, TRENDS, GOALS). Settings via gear icon on Home. Drill-down screens use blue "← BACK" text button (uppercase, letter-spaced).
+- **Navigation:** Bottom tab bar (HOME, WORKOUTS, PLAN, TRENDS, GOALS). Settings via gear icon on Home. Drill-down screens use a blue left-pointing chevron button (`chevron.left` SF Symbol, Primary Accent Blue, 24×24pt circular tap target) at the top-leading edge — see SCREENS.md § Standard Patterns → Back Navigation Chevron.
 - **Feedback:** Color state changes. Completed goals: blue border, faint 3% blue card-surface wash, and "COMPLETED [date]" micro-label (Secondary Text, uppercase) at top center of goal card. Save buttons visually disabled until valid. Light haptic feedback (UIImpactFeedbackGenerator, .light) on primary action buttons: "+ Log Workout" (Home), "+" (Plan). Completion pulse: when user navigates to Goals with a goal whose `lastCelebratedDate` is today, the ring briefly glows/pulses once per visit.
 
 ### Accessibility

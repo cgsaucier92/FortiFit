@@ -156,6 +156,25 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Workout Cascade reference to header summary recompute | SERVICES § Workout Cascade |
 | Tests + new accessibility identifiers | TESTING |
 
+### Phase 6.2: Trends Chart Detail View
+*Per-chart expanded view pushed onto the navigation stack from the compact card. Larger chart with the same visual language; wider time-range toggles; comparison-delta header summary; tap-to-select + drag-to-scrub on data points; inline See Info; swipe-paging between charts; full PR timeline for Personal Records; sortable legend table for Workout Type Breakdown. Also formalizes a cross-app convention swap: `← BACK` text button → left-pointing chevron button on every drill-down screen.*
+
+| Feature | Spec |
+|---|---|
+| `FortiFitChartDetailView` component | PRD § Project Structure (Design/Components/); SCREENS § Trends Chart Detail |
+| Expand button on compact chart card | SCREENS § Trends (Expand Affordance); CONSTANTS § Trends Chart Detail View (Expand Button) |
+| Cross-app `chevron.left` back convention | PRD § Interaction Style; SCREENS § Standard Patterns (Back Navigation Chevron) |
+| Range toggles per chart (D / W / M / 6M / 1Y / All) | CONSTANTS § Trends Chart Detail View (Range Toggle by Chart Type); SERVICES § TrendsChartService → Data Point Fetch (Detail View) |
+| Comparison delta band in header summary | CONSTANTS § Trends Chart Detail View (Header Summary — Detail Variant); SERVICES § TrendsChartService → Comparison Delta Computation |
+| Tap-to-select on bars + dots | CONSTANTS § Trends Chart Detail View (Selection State); SCREENS § Trends Chart Detail |
+| Drag-to-scrub on line charts | CONSTANTS § Trends Chart Detail View (Scrubber Treatment); SCREENS § Trends Chart Detail |
+| Inline See Info entry on detail view | SCREENS § Trends Chart Detail (See Info) |
+| Swipe-paging between charts in `sortOrder` | CONSTANTS § Trends Chart Detail View (Swipe Paging); SCREENS § Trends Chart Detail |
+| Personal Records detail = full PR timeline | SCREENS § Trends Chart Detail (Per-Chart Detail Variants); SERVICES § TrendsChartService → PR Timeline Fetch |
+| Workout Type Breakdown detail = sortable legend table | SCREENS § Trends Chart Detail (Per-Chart Detail Variants); SERVICES § TrendsChartService → Type Breakdown Percentages |
+| Full-numeric Y-axis labels on detail | CONSTANTS § Trends Chart Detail View (Y-Axis Label Formatting) |
+| Tests + new accessibility identifiers | TESTING |
+
 ### Phase 7: Plan (Workout Scheduler)
 *Schedule workouts in advance and complete with minimal friction.*
 
