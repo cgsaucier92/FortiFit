@@ -80,19 +80,23 @@ struct PlanView: View {
             }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 2 else { return }
-                DispatchQueue.main.async {
-                    showSavedTemplates = false
-                    workoutVM.showLogWorkout = false
-                    viewModel.showWorkoutDetail = false
-                    viewModel.selectedWorkoutForDetail = nil
-                    viewModel.showScheduleSheet = false
-                    viewModel.showCompletionSheet = false
-                    viewModel.showDateResolutionPrompt = false
-                    viewModel.showRemoveConfirmation = false
-                    viewModel.showRecurringRemovePrompt = false
-                    viewModel.showCompletedToast = false
-                    viewModel.showRemovedFromPlanToast = false
-                    viewModel.itemToRemove = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        showSavedTemplates = false
+                        workoutVM.showLogWorkout = false
+                        viewModel.showWorkoutDetail = false
+                        viewModel.selectedWorkoutForDetail = nil
+                        viewModel.showScheduleSheet = false
+                        viewModel.showCompletionSheet = false
+                        viewModel.showDateResolutionPrompt = false
+                        viewModel.showRemoveConfirmation = false
+                        viewModel.showRecurringRemovePrompt = false
+                        viewModel.showCompletedToast = false
+                        viewModel.showRemovedFromPlanToast = false
+                        viewModel.itemToRemove = nil
+                    }
                 }
             }
             .onChange(of: viewModel.dayOffset) { _, _ in

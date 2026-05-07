@@ -240,7 +240,7 @@ enum AppConstants {
         static let captionLatest = "LATEST"
         static let captionAvgLast8Weeks = "AVG / LAST 8 WEEKS"
         static let captionLatestPR = "LATEST PR"
-        static let captionToday = "TODAY"
+        static let captionToday = "TODAY'S LOAD"
         static let captionAvgPerSession = "AVG / SESSION"
         static let captionWorkouts = "WORKOUTS"
     }

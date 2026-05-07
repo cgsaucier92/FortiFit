@@ -212,7 +212,12 @@ final class ProgressViewModel {
         // Task 5: PR exercises
         let prExercises = exercisesWithPRs()
         if !prExercises.contains(selectedPRExercise) {
-            selectedPRExercise = prExercises.first ?? ""
+            if let saved = UserDefaults.standard.string(forKey: "trendsSelectedPRExercise"),
+               prExercises.contains(saved) {
+                selectedPRExercise = saved
+            } else {
+                selectedPRExercise = prExercises.first ?? ""
+            }
         }
 
         // Task 6: New chart data
@@ -224,6 +229,7 @@ final class ProgressViewModel {
 
     func selectExercise(_ exercise: String) {
         selectedExercise = exercise
+        UserDefaults.standard.set(exercise, forKey: "trendsSelectedExercise")
         computeStrengthData()
     }
 
@@ -234,6 +240,7 @@ final class ProgressViewModel {
 
     func selectPRExercise(_ exercise: String) {
         selectedPRExercise = exercise
+        UserDefaults.standard.set(exercise, forKey: "trendsSelectedPRExercise")
     }
 
     func selectVolumeTimeRange(_ range: TimeRange) {
@@ -276,7 +283,12 @@ final class ProgressViewModel {
         }
         availableExercises = exercises.sorted()
         if !availableExercises.contains(selectedExercise) {
-            selectedExercise = availableExercises.first ?? ""
+            if let saved = UserDefaults.standard.string(forKey: "trendsSelectedExercise"),
+               availableExercises.contains(saved) {
+                selectedExercise = saved
+            } else {
+                selectedExercise = availableExercises.first ?? ""
+            }
         }
     }
 

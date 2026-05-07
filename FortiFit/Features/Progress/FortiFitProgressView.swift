@@ -93,12 +93,16 @@ struct FortiFitProgressView: View {
         .onDisappear { viewModel.isReorderMode = false }
         .onChange(of: selectedTab) { oldValue, _ in
             guard oldValue == 3 else { return }
-            DispatchQueue.main.async {
-                viewModel.showAddChartMenu = false
-                viewModel.isReorderMode = false
-                showDeleteConfirm = false
-                deleteTarget = nil
-                infoChartType = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    viewModel.showAddChartMenu = false
+                    viewModel.isReorderMode = false
+                    showDeleteConfirm = false
+                    deleteTarget = nil
+                    infoChartType = nil
+                }
             }
         }
         .alert("Delete \(deleteTarget.flatMap { AppConstants.trendsChartDisplayNames[$0.chartType] } ?? "Chart")?",

@@ -68,20 +68,24 @@ struct WorkoutListView: View {
             .toolbar(.hidden, for: .navigationBar)
             #endif
             .onAppear { viewModel.loadWorkouts(context: modelContext) }
-            .onChange(of: selectedTab) { oldValue, _ in
+            .onChange(of: selectedTab, initial: false) { oldValue, _ in
                 guard oldValue == 1 else { return }
-                DispatchQueue.main.async {
-                    viewModel.showLogWorkout = false
-                    viewModel.selectedWorkout = nil
-                    viewModel.showCreateTemplate = false
-                    viewModel.showSavedTemplates = false
-                    viewModel.showDeleteConfirmation = false
-                    viewModel.showDeleteTypeConfirmation = false
-                    viewModel.showCustomDateRangePicker = false
-                    viewModel.workoutToDelete = nil
-                    viewModel.workoutTypeToDelete = nil
-                    showRPEFilterSheet = false
-                    activeSwipeWorkoutID = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        viewModel.showLogWorkout = false
+                        viewModel.selectedWorkout = nil
+                        viewModel.showCreateTemplate = false
+                        viewModel.showSavedTemplates = false
+                        viewModel.showDeleteConfirmation = false
+                        viewModel.showDeleteTypeConfirmation = false
+                        viewModel.showCustomDateRangePicker = false
+                        viewModel.workoutToDelete = nil
+                        viewModel.workoutTypeToDelete = nil
+                        showRPEFilterSheet = false
+                        activeSwipeWorkoutID = nil
+                    }
                     if viewModel.isReorderMode {
                         viewModel.exitReorderMode()
                     }

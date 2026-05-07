@@ -156,15 +156,19 @@ struct GoalsView: View {
             }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 4 else { return }
-                DispatchQueue.main.async {
-                    viewModel.showAddGoal = false
-                    viewModel.isReorderMode = false
-                    viewModel.showDeleteConfirmation = false
-                    viewModel.showResetConfirmation = false
-                    viewModel.goalToDelete = nil
-                    viewModel.goalToReset = nil
-                    viewModel.dismissLegendTooltip()
-                    draggingGoalID = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        viewModel.showAddGoal = false
+                        viewModel.isReorderMode = false
+                        viewModel.showDeleteConfirmation = false
+                        viewModel.showResetConfirmation = false
+                        viewModel.goalToDelete = nil
+                        viewModel.goalToReset = nil
+                        viewModel.dismissLegendTooltip()
+                        draggingGoalID = nil
+                    }
                 }
             }
             .navigationDestination(isPresented: $viewModel.showAddGoal) {

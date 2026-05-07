@@ -84,15 +84,27 @@ struct ActivityRingsCanvas: View {
         // Over-100% overlay arc
         if overProgress > 0 && !muted {
             let cappedOver = min(overProgress, 1.0)
+
+            // Curved shadow behind trailing tip — drawn first so overlay covers it
+            Circle()
+                .trim(from: max(cappedOver - 0.05, 0), to: cappedOver)
+                .stroke(
+                    Color.black.opacity(0.5),
+                    style: StrokeStyle(lineWidth: ringThickness + 2, lineCap: .round)
+                )
+                .frame(width: radius * 2, height: radius * 2)
+                .rotationEffect(.degrees(-90))
+                .blur(radius: 2)
+
+            // Second-pass arc
             Circle()
                 .trim(from: 0, to: cappedOver)
                 .stroke(
-                    color.opacity(0.7),
+                    color,
                     style: StrokeStyle(lineWidth: ringThickness, lineCap: .round)
                 )
                 .frame(width: radius * 2, height: radius * 2)
                 .rotationEffect(.degrees(-90))
-                .shadow(color: color.opacity(0.5), radius: 3)
         }
     }
 }

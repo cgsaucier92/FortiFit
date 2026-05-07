@@ -182,17 +182,21 @@ struct HomeView: View {
             .onDisappear { viewModel.isEditMode = false }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 0 else { return }
-                DispatchQueue.main.async {
-                    showSettings = false
-                    workoutVM.showLogWorkout = false
-                    workoutVM.selectedWorkout = nil
-                    showPlanCompletion = false
-                    viewModel.showAddWidgetMenu = false
-                    viewModel.isEditMode = false
-                    showTrainingLoadSettings = false
-                    showStreakSettings = false
-                    showActivityRingsSettings = false
-                    showActivityDetailSheet = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        showSettings = false
+                        workoutVM.showLogWorkout = false
+                        workoutVM.selectedWorkout = nil
+                        showPlanCompletion = false
+                        viewModel.showAddWidgetMenu = false
+                        viewModel.isEditMode = false
+                        showTrainingLoadSettings = false
+                        showStreakSettings = false
+                        showActivityRingsSettings = false
+                        showActivityDetailSheet = false
+                    }
                 }
             }
             .navigationDestination(isPresented: $showSettings) {
