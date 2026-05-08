@@ -643,7 +643,7 @@ Source name resolution (`HealthKitClient.sourceName(for:)` per SERVICES § Healt
 |---|---|---|
 | Save as workout template (`square.and.arrow.down`) | Strength Training / HIIT only | Naming prompt pre-filled with workout name → saves template (name, type, duration, exercises; not Effort/date/time/notes) → "Template saved!" toast |
 | Show on Plan (`calendar.badge.plus`) | `workout.hiddenFromPlan == true` | Flips flag to `false`. No confirmation. Toast: "Showing on Plan." |
-| Unlink from Apple Health (`link.badge.minus`) | `workout.healthKitUUID != nil` | Confirmation alert ("Unlink this workout from Apple Health? Imported values will be retained as editable fields. Cancel / Unlink") → on Unlink applies SERVICES § HealthKit Unlink → toast "Unlinked from Apple Health." Renders below other items. |
+| Unlink from Apple Health (`link.badge.minus`) | `workout.healthKitUUID != nil` | Confirmation dialog (copy owned by `AppConstants.HealthKit.unlinkConfirm*` per CONSTANTS § HealthKit Strings — title "Unlink workout from Apple Health?", message warns the action deletes Apple Health–sourced summary data and is one-way) → on Unlink applies SERVICES § HealthKit Unlink (clears six HK-only summary fields + conditionally `rpe`, fires Workout Cascade, writes `WorkoutMatchRejection`) → toast "Unlinked from Apple Health." Renders below other items. |
 
 ✦ divider. **"Summary" header** (sentence case). 2-column grid of bordered stat cards (`FortiFitStatCard`); each card opens the Metric Detail Sheet (§ below).
 
@@ -683,7 +683,7 @@ Icons: CONSTANTS § Workout Detail Summary Icons (user-entered fields) and § Wo
 
 **After Summary** (Strength/HIIT only, conditional): "Exercises" header + exercise list (name, sets, weight). Header + list hidden entirely when `exerciseSets.isEmpty` (regardless of manual vs HK-imported origin). Reappears once an exercise is added.
 
-✦ divider. **"Notes"** header + edit icon. Note card, or textarea + SAVE button when editing.
+✦ divider. **"Session Notes"** header + edit icon. Note card, or textarea + SAVE button when editing.
 
 ### Source Indicator Info Sheet
 
@@ -696,10 +696,9 @@ Opens via tap on the Workout Detail Source Indicator row. iOS modal sheet, `.lar
 | 1. Header icon | Centered HealthKit-pink `heart.fill` (32pt) — system-level Apple Health brand mark, not the per-source glyph. |
 | 2. Title | "Imported from Apple Health" (Primary Text 18px semibold, centered). |
 | 3. Lead sentence | "This workout was imported from Apple Health." (Secondary Text 14px centered, `.fixedSize(horizontal: false, vertical: true)`). |
-| 4. Two-row callout | Stacked FortiFitCard rows (12px corner radius, 12px internal padding, 8px between rows). Each row: leading SF Symbol + multi-line body. **Row 1** — `pencil.slash` (Muted Text) + body "Date, Start Time, Effort, and Duration are read-only here. Edit in Apple Health, or unlink to edit in FitNavi." (first sentence Primary Text 14/600, second Muted Text 13/500). ID `sourceInfoSheet_readOnlyCallout`. **Row 2** — `arrow.uturn.backward.slash` (Alert Red) + body "Unlinking is permanent. Future Apple Health edits won't sync to this workout." (same dual-treatment). ID `sourceInfoSheet_permanentUnlinkCallout`. |
+| 4. Two-row callout | Stacked FortiFitCard rows (12px corner radius, 12px internal padding, 8px between rows). Each row: leading SF Symbol + multi-line body. **Row 1** — `pencil.slash` (Muted Text) + body "Date, Start Time, Effort, and Duration are read-only here. Edit in Apple Health, or unlink to edit in FitNavi." (first sentence Primary Text 14/600, second Muted Text 13/500). ID `sourceInfoSheet_readOnlyCallout`. **Row 2** — `arrow.uturn.backward.slash` (Alert Red) + body "Unlinking is permanent. Apple Health summary data will be deleted, and future Apple Health edits won't sync." (same dual-treatment). ID `sourceInfoSheet_permanentUnlinkCallout`. |
 | 5. Primary action | Full-width "Done" button (blue-outlined). Dismisses. ID `sourceInfoSheet_doneButton`. Largest visual element — safe path gets the prominence per iOS convention. |
-| 6. Destructive link | "Unlink from Apple Health" centered text-style link (Alert Red 14/600, 12px top spacing). Tap → confirmation dialog (next row). ID `workoutDetail_healthUnlinkButton` (preserves Phase 8 identifier per HEALTHKIT § 19). |
-| 7. Confirmation dialog | Title "Unlink this workout?" Message "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore." Actions: destructive "Unlink" + cancel "Cancel". On Unlink → `HealthKitSyncService.unlink(workout:)` (HEALTHKIT § 14; writes a `WorkoutMatchRejection`) → dismiss + "Unlinked from Apple Health." toast. IDs `sourceInfoSheet_unlinkConfirmButton`, `sourceInfoSheet_unlinkCancelButton`. |
+| 6. Destructive link | "Unlink from Apple Health" centered text-style link (Alert Red 14/600, 12px top spacing). Tap fires `WorkoutService.unlink(workout:context:)` immediately — no confirmation dialog (the two-row callout above already warns that unlinking is permanent and deletes summary data) → dismiss + "Unlinked from Apple Health." toast. ID `workoutDetail_healthUnlinkButton` (preserves Phase 8 identifier per HEALTHKIT § 19). |
 | 8. Footer metadata | 16px top spacer, then muted reference rows (12/600, Muted Text): `Activity Type · {workout.healthKitActivityType}` / `Source · {sourceName}` / `Imported · {formatted workout.dateCreated}` (omit if missing) / `Last synced · {relative}` (sourced from `HealthKitSyncService.lastSyncDate(for:)`; omit if never synced). ID `sourceInfoSheet_lastSyncedRow`. |
 
 **Why footer placement:** keeps the destructive-link warning adjacent to its control; metadata is reference, not decision-relevant.

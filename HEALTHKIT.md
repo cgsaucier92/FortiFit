@@ -124,9 +124,12 @@ Field-ownership invariant: applying a template never changes a HK-owned field's 
 All effort-score reads are gated `if #available(iOS 18, *)`. iOS 17 users don't receive this sub-feature.
 
 ### Rules (Option 2 — nil-fill only)
-- **On import:** if `rpe == nil` and HK has a `workoutEffortScore` for this workout, set `rpe = workoutEffortScore`. Otherwise leave `rpe` unchanged.
-- **Never overwrite:** if `rpe != nil` (user has set a value in FitNavi), HK `workoutEffortScore` is ignored regardless of whether it changes later.
+- **On import:** if `rpe == nil` and HK has a `workoutEffortScore` for this workout, set `rpe = workoutEffortScore` AND set `rpeFromHK = true` (provenance flag — see PRD.md § Data Model → Workout). Otherwise leave both `rpe` and `rpeFromHK` unchanged.
+- **Never overwrite:** if `rpe != nil` (user has set a value in FitNavi), HK `workoutEffortScore` is ignored regardless of whether it changes later. `rpeFromHK` stays `false`.
+- **User edits clear provenance:** any subsequent user mutation of `rpe` via Log Workout (Edit Mode) sets `rpeFromHK = false`. The flag is exclusively about whether the *current* `rpe` value originated from HK.
 - **Estimated scores ignored:** `estimatedWorkoutEffortScore` is never imported. Only user-entered `workoutEffortScore` contributes.
+
+`rpeFromHK` is consumed by the unlink flow (§ 14) to decide whether to clear `rpe` alongside the six HK-only summary fields. No other algorithm reads it.
 
 ### API Mechanics
 `workoutEffortScore` is NOT a property on `HKWorkout`. It is a separate `HKQuantitySample` queried via `HKSampleQuery` and related to the workout via `relateWorkoutEffortSample(_:with:activity:)`. Permission is requested separately as `HKQuantityType(.workoutEffortScore)`.
@@ -274,24 +277,34 @@ Add `SCREENS.md § Match Prompt Sheet` section with layout spec.
 
 ### Two Entry Points
 1. Workout Detail ellipsis menu → "Unlink from Apple Health" (visible only when `healthKitUUID != nil`)
-2. Source indicator info sheet → "Unlink from Apple Health" link (gated by confirmation dialog)
+2. Source indicator info sheet → "Unlink from Apple Health" link (no confirmation dialog — the sheet itself already warns that unlinking is permanent and deletes summary data)
 
 ### Confirmation
-Unlink is **always** gated behind a SwiftUI `.confirmationDialog` regardless of entry point. Title "Unlink this workout?" Message "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore." Actions: destructive "Unlink" + cancel "Cancel". Copy is owned by `AppConstants.HealthKit.unlinkConfirm*` (see CONSTANTS.md § HealthKit Strings).
+The **ellipsis menu** entry point is gated behind a SwiftUI `.confirmationDialog`. Title "Unlink workout from Apple Health?" Message "This will delete all Apple Health–sourced summary data for this workout, and you won't be able to link it back. This can't be undone." Actions: destructive "Unlink" + cancel "Cancel". Copy is owned by `AppConstants.HealthKit.unlinkConfirm*` (see CONSTANTS.md § HealthKit Strings).
 
-### On Unlink (one-way, post-Phase-8.5)
-1. Capture `healthKitUUID` into a local before clearing — needed for step 5.
+The **info sheet** entry point fires the unlink immediately on tap — the two-row callout ("Unlinking is permanent. Apple Health summary data will be deleted…") serves as the warning, making a second confirmation redundant.
+
+### On Unlink (one-way, destructive on summary data)
+1. Capture `healthKitUUID` into a local before clearing — needed for step 7.
 2. Clear `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType` (set to nil).
-3. Retain all HK-sourced numeric values (duration, distance, HR, calories, elevation, etc.) as-is — they become regular editable fields on a now-manual workout.
-4. Bump `lastModifiedDate` to `.now`.
-5. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. This guarantees:
+3. **Clear the six HK-only summary fields** (set each to nil): `avgHeartRate`, `maxHeartRate`, `activeEnergyKcal`, `totalEnergyBurnedKcal`, `elevationAscendedMeters`, `exerciseMinutes`. These have no manual-entry path in FitNavi, so retaining them on a now-manual workout would surface data the user can't trace, edit, or reproduce.
+4. **Conditionally clear `rpe`:** if `workout.rpeFromHK == true`, set `rpe = nil`. Set `rpeFromHK = false` regardless. This isolates the destructive clear to RPE values that originated from `workoutEffortScore` (see § 8) without erasing user-entered effort ratings.
+5. **Retain** `durationMinutes`, `distanceKm`, `date`, `time`, `name`, `note`, `ExerciseSets`, and `indoor` — these either have a manual-entry path or are user-owned per § 7. They become regular editable fields on a now-manual workout.
+6. Bump `lastModifiedDate` to `.now`.
+7. **Fire the full Workout Cascade** (SERVICES.md § Workout Cascade). Training Load, Effort Trend chart points, Power Level inputs, header summary recompute, and GoalSnapshot recompute against the cleared values. This is a behavior change from the prior spec — see § Why cascade now.
+8. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. This guarantees:
    - The matcher (`WorkoutMatcher.findCandidates(for:)`) skips the (UUID, workoutId) pair forever.
    - If the same HK UUID re-imports (e.g., the user removes and re-installs the Health source), auto-create proceeds normally as a new workout, but auto-link to this specific FitNavi workout is short-circuited. Other FitNavi workouts can still match it via the normal flow.
    - Re-linking via the Match Prompt Sheet for this same pairing is impossible — the matcher never queues it.
-6. Do NOT fire the deletion cascade.
 
 ### Why one-way
 Reversible unlink caused confused re-prompts and weaker warning copy. One-way unlink → "Unlinking is permanent" reads crisply and the matcher never re-proposes a rejected pair. Same-outcome workaround: delete the FitNavi workout and let auto-create rebuild from HK.
+
+### Why cascade now
+Earlier spec did NOT fire the cascade because unlink retained all measurement values — no aggregate input changed. Now that step 3 clears six HK-only fields and step 4 may clear `rpe`, downstream aggregates (Effort Trend chart points, Training Load when `rpe` is cleared, header summaries) need to recompute against the new values. Cascade after the field mutations and `lastModifiedDate` bump (so cascade reads the freshest state) and before the rejection write (so the rejection is purely a side effect with no cascade dependency).
+
+### Contrast with HK Upstream Delete
+HK upstream delete (§ 11) is non-destructive on measurements — it retains all HK-sourced values and does not fire the cascade. Rationale: upstream delete may be incidental (the user cleaning up Health), and FitNavi protects training history. User-initiated unlink is the destructive path because the user explicitly opted in (via the ellipsis-menu confirmation dialog or the info-sheet unlink link, which is preceded by a permanent-warning callout).
 
 ---
 
@@ -309,9 +322,9 @@ Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator.
 
 ### Source Indicator Info Sheet (post-Phase-8.5 redesign)
 - **Lead sentence:** "This workout was imported from Apple Health." (no inline source-name interpolation — moved to the footer).
-- **Two-row callout** explaining (a) which fields are read-only here and (b) that unlinking is permanent — see SCREENS.md § Workout Detail → Source Indicator Info Sheet for exact copy and SF symbols.
+- **Two-row callout** explaining (a) which fields are read-only here and (b) that unlinking is permanent and deletes Apple Health–sourced summary data — see SCREENS.md § Workout Detail → Source Indicator Info Sheet for exact copy and SF symbols.
 - **Primary safe action:** full-width "Done" button (Primary Accent blue outline). This is the visually largest action, matching the iOS convention of giving the safe path the prominence.
-- **Demoted destructive link:** "Unlink from Apple Health" rendered as a small Alert Red text-style link below Done. Tap → confirmation dialog (see § 14 Confirmation) → on confirm runs `HealthKitSyncService.unlink(workout:)` per § 14.
+- **Demoted destructive link:** "Unlink from Apple Health" rendered as a small Alert Red text-style link below Done. Tap fires `WorkoutService.unlink(workout:context:)` immediately (no confirmation dialog — the two-row callout above already warns that unlinking is permanent and deletes summary data) → dismiss + toast.
 - **Footer metadata** (muted, below destructive link): Activity Type, Source (uses `sourceName` resolver), Imported date, Last synced (relative time from `HealthKitSyncService.lastSyncDate(for:)`). Source name resolution: Apple Watch → `Apple Workout`, recognized sources → `HKSource.name`, unresolvable → `another app`. Never renders a raw bundle ID.
 
 Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator Info Sheet.

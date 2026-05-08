@@ -216,6 +216,7 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | date | Date | Yes | Defaults to today. User can backdate. No future dates. |
 | workoutType | String | Yes | One of the 6 types in AppConstants |
 | rpe | Int? | No | 1–10. Nil if not rated. |
+| rpeFromHK | Bool | Yes | Default: `false`. Provenance flag for `rpe` — `true` only when `rpe` was populated by the iOS 18+ `workoutEffortScore` nil-fill path (HEALTHKIT.md § 8). Set to `false` whenever the user mutates `rpe` via Log Workout, on HK upstream delete, and on unlink. Used exclusively by `HealthKitSyncService.unlink(workout:)` to decide whether to clear `rpe` (HEALTHKIT.md § 14). Never persisted as `true` for manual workouts. |
 | note | String | No | Free-text session notes |
 | durationMinutes | Int? | No | Available for all types. Nil if not entered. Read-only in Log Workout edit view when `healthKitUUID != nil` (HK-owned field — see HEALTHKIT.md § 7). |
 | distanceKm | Double? | No | Cardio only. Always nil for other types. Read-only in Log Workout edit view when `healthKitUUID != nil` (HK-owned field). |

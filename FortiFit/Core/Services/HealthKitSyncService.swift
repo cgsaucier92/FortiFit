@@ -210,6 +210,7 @@ final class HealthKitSyncService {
         guard workout.rpe == nil else { return }
         guard let score = try? await client.fetchEffortScore(for: snapshot.uuid) else { return }
         workout.rpe = score
+        workout.rpeFromHK = true
     }
 
     private func applyEffortScoreIfNeeded(snapshot: HealthKitWorkoutSnapshot, context: ModelContext) async {
@@ -231,6 +232,7 @@ final class HealthKitSyncService {
             guard let hkUUID = workout.healthKitUUID else { continue }
             guard let score = try? await client.fetchEffortScore(for: hkUUID) else { continue }
             workout.rpe = score
+            workout.rpeFromHK = true
             changed = true
         }
         if changed {

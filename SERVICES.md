@@ -358,17 +358,21 @@ HK-linked workout's HK-owned fields changed upstream (e.g., duration edited in t
 
 See HEALTHKIT.md § 11 for rationale. Non-destructive: user keeps training history even if they clean up HK upstream.
 
-### HealthKit Unlink (user-initiated, one-way)
+### HealthKit Unlink (user-initiated, one-way, destructive on summary data)
 Triggered from Workout Detail's ellipsis menu or the source indicator info sheet. Always gated by `.confirmationDialog` (HEALTHKIT.md § 14).
 
 1. Capture `healthKitUUID` into a local.
-2. Clear the three HK pointer fields to nil.
-3. Retain HK-sourced numeric values as-is.
-4. Bump `lastModifiedDate = .now`.
-5. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. Makes unlink one-way — matcher will skip this `(uuid, workoutId)` pair forever. Re-import of the same HK UUID auto-creates a new workout; auto-link to *this* FitNavi workout is short-circuited.
-6. Do NOT fire the deletion cascade.
+2. Clear the three HK pointer fields to nil (`healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType`).
+3. **Clear the six HK-only summary fields** to nil: `avgHeartRate`, `maxHeartRate`, `activeEnergyKcal`, `totalEnergyBurnedKcal`, `elevationAscendedMeters`, `exerciseMinutes`.
+4. **Conditionally clear `rpe`:** if `workout.rpeFromHK == true`, set `rpe = nil`. Set `rpeFromHK = false` regardless.
+5. Retain `durationMinutes`, `distanceKm`, `date`, `time`, `indoor`, `name`, `note`, and `ExerciseSets` as-is — they have manual-entry paths or are user-owned.
+6. Bump `lastModifiedDate = .now`.
+7. **Fire the full Workout Cascade** (see § Workout Cascade). Effort Trend points, Training Load (if `rpe` was cleared), Power Level, header summary, and GoalSnapshot recompute. Behavior change from prior spec.
+8. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. Makes unlink one-way — matcher will skip this `(uuid, workoutId)` pair forever. Re-import of the same HK UUID auto-creates a new workout; auto-link to *this* FitNavi workout is short-circuited.
 
-See HEALTHKIT.md § 14 for rationale.
+Contrast with § HealthKit Upstream Delete: upstream delete retains measurements and does NOT fire the cascade because it's non-destructive (the workout promotes to manual without losing data). Unlink is the destructive path — the user explicitly confirmed via the dialog.
+
+See HEALTHKIT.md § 14 for full rationale and copy.
 
 ---
 
@@ -381,7 +385,7 @@ CRUD wrapper for workouts via SwiftData:
 - **Update notes:** Inline note edit. Sets `workout.lastModifiedDate = .now` (cosmetic edit per § Reset Scoping).
 - **Delete:** Cascade-delete all ExerciseSets. Trigger all cascading recalculations (see Deletion Behavior above). If the deleted workout is linked to a `ScheduledWorkout` (via `completedWorkoutId`), notify PlanService to revert that slot to "planned". **HK-linked workouts delete normally** — deletion removes the FitNavi record but does not propagate to HealthKit (no write-back in MVP). Orphan `WorkoutMatchRejection` records pointing at the deleted workout are retained; harmless.
 - **Delete all for type:** Accept a workoutType string, fetch all workouts matching that type, cascade-delete each with ExerciseSets, then trigger all cascading recalculations once (see Workout Type Deletion above). Remove the corresponding WorkoutTypeOrder record. Revert any linked ScheduledWorkout slots to "planned".
-- **Unlink (HK-linked workouts):** Invoked via Workout Detail's ellipsis menu or the source indicator info sheet. See § HealthKit Unlink for data behavior.
+- **Unlink (HK-linked workouts):** Invoked via Workout Detail's ellipsis menu or the source indicator info sheet. Clears the three HK pointer fields and the six HK-only summary fields, conditionally clears `rpe` based on `rpeFromHK`, fires the Workout Cascade, and writes a `WorkoutMatchRejection`. See § HealthKit Unlink for the full ordered sequence.
 
 ---
 

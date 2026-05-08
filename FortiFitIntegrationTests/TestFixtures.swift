@@ -461,21 +461,57 @@ enum TestFixtures {
         name: String = "HK Workout",
         date: Date = .now,
         workoutType: String = "Strength Training",
+        rpe: Int? = nil,
+        rpeFromHK: Bool = false,
         healthKitUUID: UUID = UUID(),
         durationMinutes: Int? = 45,
+        distanceKm: Double? = nil,
+        time: Date? = nil,
+        note: String? = nil,
         avgHeartRate: Int? = 142,
+        maxHeartRate: Int? = nil,
+        activeEnergyKcal: Double? = nil,
+        totalEnergyBurnedKcal: Double? = nil,
+        elevationAscendedMeters: Double? = nil,
+        exerciseMinutes: Int? = nil,
+        indoor: Bool? = nil,
+        exercises: [SetSpec] = [],
         in context: ModelContext
     ) -> Workout {
         let workout = Workout(
             name: name,
             date: date,
             workoutType: workoutType,
+            rpe: rpe,
+            note: note,
             durationMinutes: durationMinutes,
+            distanceKm: distanceKm,
+            time: time,
             healthKitUUID: healthKitUUID,
             healthKitSourceBundleID: "com.apple.health.workout-builder",
             healthKitActivityType: "Traditional Strength Training",
-            avgHeartRate: avgHeartRate
+            avgHeartRate: avgHeartRate,
+            maxHeartRate: maxHeartRate,
+            activeEnergyKcal: activeEnergyKcal,
+            totalEnergyBurnedKcal: totalEnergyBurnedKcal,
+            elevationAscendedMeters: elevationAscendedMeters,
+            exerciseMinutes: exerciseMinutes,
+            indoor: indoor
         )
+        workout.rpeFromHK = rpeFromHK
+
+        for (index, spec) in exercises.enumerated() {
+            let set = ExerciseSet(
+                exerciseName: spec.exerciseName,
+                sets: spec.sets,
+                reps: spec.reps,
+                weightKg: spec.weightKg,
+                sortOrder: index,
+                workout: workout
+            )
+            context.insert(set)
+        }
+
         context.insert(workout)
         try? context.save()
         return workout

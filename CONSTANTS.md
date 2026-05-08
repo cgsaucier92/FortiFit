@@ -226,7 +226,7 @@ Lives under `AppConstants.HealthKit.*`. Strings must be read from `AppConstants`
 | `infoSheetReadOnlyHeadline` | "Date, Start Time, Effort, and Duration are read-only here." |
 | `infoSheetReadOnlySubline` | "Edit in Apple Health, or unlink to edit in FitNavi." |
 | `infoSheetPermanentHeadline` | "Unlinking is permanent." |
-| `infoSheetPermanentSubline` | "Future Apple Health edits won't sync to this workout." |
+| `infoSheetPermanentSubline` | "Apple Health summary data will be deleted, and future Apple Health edits won't sync." |
 | `infoSheetDoneButton` | "Done" |
 | `infoSheetUnlinkLink` | "Unlink from Apple Health" |
 | `infoSheetActivityTypeLabel` | "Activity Type" |
@@ -246,8 +246,8 @@ Lives under `AppConstants.HealthKit.*`. Strings must be read from `AppConstants`
 
 | Constant | Value |
 |---|---|
-| `unlinkConfirmTitle` | "Unlink this workout?" |
-| `unlinkConfirmMessage` | "You won't be able to link it back to Apple Health, and changes you make to it in Apple Health won't appear here anymore." |
+| `unlinkConfirmTitle` | "Unlink workout from Apple Health?" |
+| `unlinkConfirmMessage` | "This will delete all Apple Health–sourced summary data for this workout, and you won't be able to link it back. This can't be undone." |
 | `unlinkConfirmDestructive` | "Unlink" |
 | `unlinkConfirmCancel` | "Cancel" |
 | `unlinkSuccessToast` | "Unlinked from Apple Health." |

@@ -6,7 +6,6 @@ struct FortiFitHealthSourceInfoSheet: View {
     let lastSyncDate: Date?
     let onUnlink: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var showUnlinkConfirmation = false
 
     private var displaySourceName: String {
         sourceName ?? AppConstants.HealthKit.unknownSourceName
@@ -57,31 +56,16 @@ struct FortiFitHealthSourceInfoSheet: View {
                 }
                 .accessibilityIdentifier(AccessibilityID.sourceInfoSheetDoneButton)
 
-                // 6. Demoted destructive link — Unlink
+                // 6. Demoted destructive link — Unlink (no confirmation; the sheet itself warns)
                 Button {
-                    showUnlinkConfirmation = true
+                    onUnlink()
+                    dismiss()
                 } label: {
                     Text(AppConstants.HealthKit.infoSheetUnlinkLink)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(FortiFitColors.alert)
                 }
                 .accessibilityIdentifier(AccessibilityID.workoutDetailHealthUnlinkButton)
-                .confirmationDialog(
-                    AppConstants.HealthKit.unlinkConfirmTitle,
-                    isPresented: $showUnlinkConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button(AppConstants.HealthKit.unlinkConfirmDestructive, role: .destructive) {
-                        onUnlink()
-                        dismiss()
-                    }
-                    .accessibilityIdentifier(AccessibilityID.sourceInfoSheetUnlinkConfirmButton)
-
-                    Button(AppConstants.HealthKit.unlinkConfirmCancel, role: .cancel) {}
-                        .accessibilityIdentifier(AccessibilityID.sourceInfoSheetUnlinkCancelButton)
-                } message: {
-                    Text(AppConstants.HealthKit.unlinkConfirmMessage)
-                }
 
                 // 8. Footer metadata
                 footerMetadata

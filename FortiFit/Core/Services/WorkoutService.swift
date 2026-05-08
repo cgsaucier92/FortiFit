@@ -97,6 +97,7 @@ struct WorkoutService {
         workout.date = date
         workout.time = time
         workout.rpe = rpe
+        workout.rpeFromHK = false
         workout.durationMinutes = durationMinutes
         workout.distanceKm = distanceKm
         workout.lastModifiedDate = .now
@@ -169,10 +170,32 @@ struct WorkoutService {
 
     static func unlink(_ workout: Workout, context: ModelContext) {
         let capturedUUID = workout.healthKitUUID
+
         workout.healthKitUUID = nil
         workout.healthKitSourceBundleID = nil
         workout.healthKitActivityType = nil
+
+        workout.avgHeartRate = nil
+        workout.maxHeartRate = nil
+        workout.activeEnergyKcal = nil
+        workout.totalEnergyBurnedKcal = nil
+        workout.elevationAscendedMeters = nil
+        workout.exerciseMinutes = nil
+
+        if workout.rpeFromHK {
+            workout.rpe = nil
+        }
+        workout.rpeFromHK = false
+
         workout.lastModifiedDate = .now
+
+        GoalService.recalculateGoals(
+            affectedExerciseNames: workout.exerciseSets.map { $0.exerciseName },
+            affectedWorkoutTypes: [workout.workoutType],
+            workout: workout,
+            context: context
+        )
+
         if let capturedUUID {
             let rejection = WorkoutMatchRejection(
                 healthKitUUID: capturedUUID,

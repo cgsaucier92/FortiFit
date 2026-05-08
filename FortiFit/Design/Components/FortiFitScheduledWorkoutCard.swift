@@ -63,7 +63,9 @@ struct FortiFitScheduledWorkoutCard: View {
                         Text("·")
                             .font(FortiFitTypography.bodySmall)
                             .foregroundStyle(FortiFitColors.mutedText)
-                        FortiFitHealthGlyph()
+                        Text("Apple Workout")
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
                     }
                 }
 
@@ -207,7 +209,9 @@ struct FortiFitLoggedWorkoutCard: View {
                             Text("·")
                                 .font(FortiFitTypography.bodySmall)
                                 .foregroundStyle(FortiFitColors.mutedText)
-                            FortiFitHealthGlyph()
+                            Text("Apple Workout")
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.mutedText)
                         }
                     }
                 }

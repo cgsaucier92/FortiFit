@@ -8,6 +8,7 @@ final class Workout {
     var date: Date
     var workoutType: String
     var rpe: Int?
+    var rpeFromHK: Bool = false
     var note: String?
     var durationMinutes: Int?
     var distanceKm: Double?

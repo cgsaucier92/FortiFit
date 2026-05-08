@@ -562,6 +562,7 @@ struct WorkoutDetailView: View {
                     .tint(FortiFitColors.primaryAccent)
 
                 FortiFitButton("Save Notes", style: .primary) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     viewModel.updateNote(workout, note: noteText.isEmpty ? nil : noteText, context: modelContext)
                     isEditingNote = false
                 }
