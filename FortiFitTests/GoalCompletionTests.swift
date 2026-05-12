@@ -276,8 +276,6 @@ struct GoalCompletionTests {
     @Test func weeklyWorkoutsCrossing100SetsFlag() throws {
         let context = try makeGoalContext()
 
-        UserSettings.shared.targetWorkoutsPerWeek = 3
-
         let goal = Goal(title: "Workouts Per Week", goalType: "weeklyWorkouts", sortOrder: 0)
         context.insert(goal)
 
@@ -293,7 +291,7 @@ struct GoalCompletionTests {
         }
         try context.save()
 
-        let progress = GoalService.weeklyWorkoutsProgress(context: context)
+        let progress = GoalService.weeklyWorkoutsProgress(context: context, target: 3)
         #expect(progress.current >= 3)
         #expect(progress.isComplete == true)
     }

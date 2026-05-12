@@ -96,7 +96,6 @@ struct FortiFitAddWidgetMenu: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     #endif
                     onAdd(widgetType)
-                    isPresented = false
                 } label: {
                     Text("Add")
                         .font(FortiFitTypography.label)

@@ -43,9 +43,9 @@ Before closing a session: all three test targets passing (intentionally failing 
 
 ## Out of Scope (Do Not Build)
 
-- Social features, multi-user (single-workout image export and template QR sharing are in scope — see SCREENS.md § Workout Detail, SCREENS.md § Saved Templates List)
+- Social features, multi-user (single-workout image export and template QR sharing are in scope — see SCREENS.md § Workout Detail, SCREENS.md § Workout Templates List)
 - Subscriptions or IAP
-- Apple Watch app
+- Native watchOS companion app. WorkoutKit-based outbound scheduling is in scope as of Phase 8.7 — see WORKOUTKIT.md.
 - Third-party device integration (Garmin, Whoop, Fitbit)
 - Cloud sync or user accounts
 - HealthKit write-back (FitNavi → HealthKit). HealthKit **read** integration is in scope as of Phase 8 — see HEALTHKIT.md. Write-back remains deferred indefinitely; see HEALTHKIT.md § 2 Scope and § 20 Future Phases.
@@ -100,9 +100,9 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Log Workout (form, type-adaptive, templates, autocomplete) | SCREENS § Log Workout; SERVICES § ExerciseSuggestionService |
 | Workout Detail | SCREENS § Workout Detail |
 | Edit Workout (HK-aware) | SCREENS § Log Workout (Edit Mode); SERVICES § WorkoutTemplateService; HEALTHKIT § 7 |
-| Goals + Add Goal | SCREENS § Goals, § Add Goal |
+| Goals + Create Goal | SCREENS § Goals, § Create Goal |
 | Progress | SCREENS § Progress |
-| Templates (Create, Saved List) | SCREENS § Create Template, § Saved Templates |
+| Templates (Create, Saved List) | SCREENS § Create Workout Template, § Workout Templates |
 
 ### Phase 4: Home Customization & Power Level
 *Home fully user-customizable with Power Level widget.*
@@ -125,7 +125,7 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Goal drag-and-drop, PR auto-detection | SCREENS § Goals; SERVICES § Goal Auto-Update |
 | Edit/delete cascading edge cases | SERVICES § Deletion Cascading Behavior |
 | Workout share image export | SCREENS § Workout Detail (Share Image Card); SERVICES § WorkoutShareService |
-| Template QR sharing | SCREENS § Saved Templates List, § Template Import Prompt; SERVICES § TemplateShareService |
+| Template QR sharing | SCREENS § Workout Templates List, § Template Import Prompt; SERVICES § TemplateShareService |
 
 ### Phase 6: Trends Screen v2
 *Trends fully customizable; PR redesign.*
@@ -247,6 +247,44 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Tests + new accessibility identifiers | TESTING |
 
 *Post-MVP (parked):* Trends-screen integration via three new chart types (`moveHistory`, `exerciseHistory`, `standHistory`) consuming `AppleActivityService.fetchActivitySummaries`. Out of scope for this phase.
+
+### Phase 8.7: Apple Watch Workout Scheduling
+*Sync `ScheduledWorkout`s from the Plan tab to the user's Apple Watch via WorkoutKit. Completed sessions auto-link back via `HKWorkout.workoutPlan?.id` round-trip. No native watchOS companion app.*
+
+| Feature | Spec |
+|---|---|
+| `WatchScheduleService` (schedule, removePlan, reconcile, error handling) | SERVICES § WatchScheduleService; WORKOUTKIT § 7, § 11, § 15 |
+| New ScheduledWorkout fields (`syncToAppleWatch`, `appleWorkoutPlanId`) + rename `templateSnapshot` → `scheduledWorkoutSnapshot` | PRD § Data Model; WORKOUTKIT § 5 |
+| New TemplateExerciseSet + ExerciseSet fields (`restSeconds`, `displayAsTime`) | PRD § Data Model; WORKOUTKIT § 5 |
+| `UserSettings.syncPlanToAppleWatchEnabled` master kill switch | PRD § Data Model; SCREENS § Settings → Apple Watch Section |
+| Plan-ID fast-path in HealthKitSyncService (bypass WorkoutMatcher) | SERVICES § HealthKitSyncService; HEALTHKIT § 12.0; WORKOUTKIT § 8 |
+| `PlanService.completeFromWatch(...)` + `editScheduledWorkout(...)` | SERVICES § PlanService; WORKOUTKIT § 8, § 13 |
+| `CustomWorkout` plan composition (one block per exercise, exercise prescriptions, rest intervals between sets) | WORKOUTKIT § 6 |
+| Outbound HK type mapping (FortiFit `workoutType` → `HKWorkoutActivityType`) | HK_MAPPING § Outbound Mapping; WORKOUTKIT § 6 |
+| Isometric exercise dictionary additions + `displayAsTime` toggle | CONSTANTS § Exercise Dictionary, § Isometric Exercise Names; WORKOUTKIT § 6 |
+| REST PER SET field + REPS/TIME segmented control on exercise cards (Create/Edit Template, Log Workout, Edit Planned Workout) | SCREENS § Create Workout Template, § Log Workout, § Edit Planned Workout |
+| Card glyph (`FortiFitWatchSyncGlyph`: `applewatch.watchface` / `applewatch.slash`) | SCREENS § Plan, § Standard Patterns; CONSTANTS § Watch Sync Glyph |
+| Edit Planned Workout screen + recurrence prompt | SCREENS § Edit Planned Workout; WORKOUTKIT § 13 |
+| Settings → Apple Watch section + just-in-time auth | SCREENS § Settings; WORKOUTKIT § 9, § 10 |
+| Master Sync Off popover + field-specific gate popovers | SCREENS § Standard Patterns; CONSTANTS § Apple Watch Strings |
+| Cleanup lifecycle (skip, complete, remove, day-passed, sync-off, master-off, auth-revoked) | WORKOUTKIT § 12; SERVICES § PlanService |
+| Recurrence sync intent inheritance + 12-week regen hook | WORKOUTKIT § 13; SERVICES § PlanService |
+| Optimistic UI + error toast with retry | WORKOUTKIT § 11; CONSTANTS § Toast Style |
+| watchOS 11+ static caveat (no dynamic detection) | WORKOUTKIT § 14; SCREENS § Settings |
+| Tests + new accessibility identifiers | TESTING § WorkoutKit Test Strategy; WORKOUTKIT § 16, § 17 |
+
+### Phase 8.7.1: Apple Watch Push — Entry-Point Refinement
+*Refinement on top of Phase 8.7. Moves the primary configuration moment from the Plan card glyph to the Schedule Workout sheet, auto-defaults Push when master is on. Time is decoupled from Push — setting a scheduled time is optional regardless of push state; when no time is set, `WatchScheduleService` falls back to noon for the WorkoutKit API call. Full rename "Sync" → "Push" everywhere user-facing; "Set Specific Time" → "Scheduled Time", "Date" → "Scheduled Date" on Plan/Edit screens. Internal Swift identifiers unchanged.*
+
+| Feature | Spec |
+|---|---|
+| Schedule Workout "Push to Apple Watch" toggle (new primary entry point) | SCREENS § Plan → Push to Apple Watch Toggle; CONSTANTS § Apple Watch Strings → Schedule Workout Sheet |
+| Auto-default to true when master on / greyed off when master off | SERVICES § PlanService → Scheduling; WORKOUTKIT § 7 |
+| Time decoupled from Push; noon fallback when `scheduledTime` is nil | WORKOUTKIT § 7; SERVICES § WatchScheduleService → Schedule Date Resolution |
+| Rename "Sync" → "Push" across Settings master toggle, Edit Planned Workout toggle, Master Sync Off Popover | CONSTANTS § Apple Watch Strings; SCREENS § Settings, § Edit Planned Workout, § Standard Patterns |
+| Plan card glyph behavior unchanged (status indicator + quick-toggle) | SCREENS § Standard Patterns → Watch Sync Card Glyph |
+| Tests + new accessibility identifiers (`scheduleWorkout_*`) | TESTING § Accessibility Identifiers (Apple Watch push) |
+| Implementation plan | IMPLEMENTATION_PLAN_PHASE_8_7_1.md |
 
 ### Phase 9: Launch Prep
 *Ready for TestFlight or App Store.*

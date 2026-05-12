@@ -33,7 +33,7 @@ Each screen specifies only seed defaults, card definitions, and deviations.
 - Structure: `ZStack(alignment: .top)` with `ScrollView` (`.scrollClipDisabled()`) + fixed header `VStack` on top. Scroll content uses `.padding(.top, headerHeight)` measured via `GeometryReader`.
 - Header bg: `FortiFitColors.background.opacity(0.90)`. Below the header, a 30pt `LinearGradient` fades to `.clear` (`.allowsHitTesting(false)`).
 - Header holds only top-level action buttons (back, ellipsis, plus, share/edit/delete); screen headings (`FortiFitScreenHeading`) live in scroll content.
-- FortiFitDivider in header: kept on form/detail screens (Log Workout, Create Template, Schedule Workout); removed on list/tab screens (Home, Workouts, Plan, Trends, Goals, Saved Templates, Add Goal, Workout Detail).
+- FortiFitDivider in header: kept on form/detail screens (Log Workout, Create Workout Template); removed on list/tab screens (Home, Workouts, Plan, Plan Workout, Trends, Goals, Workout Templates, Create Goal, Workout Detail).
 - Empty states use `.padding(.top, headerHeight)`.
 
 **Peripheral Apple Workout Label:** Inline "Apple Workout" text alongside workout metadata on compact surfaces. `bodySmall` / muted to match surroundings.
@@ -61,7 +61,7 @@ Each screen specifies only seed defaults, card definitions, and deviations.
 
 **Accessibility:** title announced first; section headings traverse as headers (`accessibilityAddTraits(.isHeader)`); close button reads "Close, button".
 
-**Back Navigation Chevron:** Every drill-down screen (Workout Detail, Edit Workout, Create Template, Saved Templates, Add Goal, Schedule Workout, Settings, Trends Chart Detail, etc.) uses a single shared back control — a blue left-pointing chevron at the top-leading edge of the screen.
+**Back Navigation Chevron:** Every drill-down screen (Workout Detail, Edit Workout, Create Workout Template, Workout Templates, Create Goal, Plan Workout, Settings, Trends Chart Detail, etc.) uses a single shared back control — a blue left-pointing chevron at the top-leading edge of the screen.
 
 | Property | Value |
 |---|---|
@@ -74,6 +74,30 @@ Each screen specifies only seed defaults, card definitions, and deviations.
 | VoiceOver label | "Back, button" |
 
 Replaces the previously documented "← BACK" text button. Any earlier reference to `← BACK` in this doc points to this pattern.
+
+**Watch Sync Card Glyph:** Shared component (`FortiFitWatchSyncGlyph` in `Design/Components/`) used to indicate and toggle a `ScheduledWorkout`'s Apple Watch push state on Plan cards (Plan screen) and the Edit Planned Workout screen. SF Symbols + color treatment per CONSTANTS.md § Watch Sync Glyph. (Component name retains "Sync" for code-level continuity; user-facing copy uses "Push" — see CONSTANTS.md § Apple Watch Strings.)
+
+| State | SF Symbol | Color | Opacity | Tap behavior |
+|---|---|---|---|---|
+| Active (synced) | `applewatch.watchface` | Watch Sync Green | 1.0 | Toggle off — optimistic UI flips immediately, `WatchScheduleService.removePlan(_:)` fires async, error toast on failure (glyph stays inactive — intent matches visible state). |
+| Inactive (not synced, gates pass) | `applewatch.slash` | Muted Text | 1.0 | Toggle on — optimistic UI flips immediately, `WatchScheduleService.schedule(_:)` fires async, glyph reverts on error with toast (intent retained). |
+| Disabled (gates fail or master off or auth denied) | `applewatch.slash` | Muted Text | 0.4 | Show contextual popover explaining the gate failure (see CONSTANTS.md § Apple Watch Strings). Does not flip the underlying flag. |
+
+**Gating conditions** (all must hold for the glyph to be in active or inactive state, not disabled): `UserSettings.syncPlanToAppleWatchEnabled == true` (master on), WorkoutKit auth granted, `scheduledWorkout.scheduledDate >= today`, snapshot decodes to ≥1 exercise. See WORKOUTKIT.md § 7 for full gate semantics. Note: `scheduledTime` is not a gate — when nil, the service falls back to noon for the WorkoutKit API call.
+
+The glyph is positioned in the upper-right corner of any card hosting it (44×44pt minimum tap target, glyph 24×24pt centered). Identifier convention: `{screenContext}_watchSyncGlyph` — e.g., `scheduledWorkoutCard_{index}_watchSyncGlyph`, `editScheduledWorkout_watchSyncToggle`.
+
+**Master Sync Off Popover:** Shared popover affordance triggered when the user taps any Watch Sync surface (card glyph, Edit Planned Workout toggle) while `UserSettings.syncPlanToAppleWatchEnabled == false`. Single SwiftUI `.popover` with the copy below, anchored to the tapped element. ID `masterSyncOff_popover`.
+
+> **Push to Apple Watch is off**
+>
+> Turn it on in Settings to push this workout to your Apple Watch.
+>
+> [Open Settings]
+
+The "Open Settings" button (ID `masterSyncOff_openSettingsButton`) navigates **in-app** to Settings → Apple Watch section via `NavigationPath` push (not iOS Settings). This is distinct from the auth-denied "Open iOS Settings" button which deep-links via `UIApplication.openSettingsURLString`. When the user is on the master-on but auth-denied path, the popover instead surfaces auth-denial copy and the iOS Settings deep-link.
+
+Tap-outside dismisses. Does not flip the underlying per-card `syncToAppleWatch` flag (the user's intent is preserved; only the gate is the obstacle).
 
 **Trends Chart Card Visual Treatment:** Shared visual styling for every chart card on the Trends screen. Implemented via `FortiFitChartCard` (Design/Components/), which wraps `FortiFitCard` and composes a gradient backdrop, inner plot hairline, header summary block, latest-point highlight, rounded bar tops, smoothed line interpolation, donut center label, and tap-to-select state. Per-chart values (gradient anchor, header summary formula, selection availability) live in CONSTANTS.md § Trends Chart Visual Tokens — never hardcoded in views.
 
@@ -262,10 +286,13 @@ Standard See Info Modal (§ Standard Patterns). Content from INFO_COPY § Activi
 **Purpose:** Training log organized by workout type with expandable cards.
 
 ### Layout
-Left: blue ellipsis icon. Right: "+" button. ✦ divider. One Workout Type card per type with ≥ 1 logged workout. Cards sorted by WorkoutTypeOrder.sortOrder.
+Left: blue ellipsis icon. Right: "+" menu button. ✦ divider. One Workout Type card per type with ≥ 1 logged workout. Cards sorted by WorkoutTypeOrder.sortOrder.
 
 ### Workouts Ellipsis Menu
-Two options: **"CREATE WORKOUT TEMPLATE"** with SF Symbol `square.and.pencil` to the left → Create Template screen. **"VIEW SAVED TEMPLATES"** with SF Symbol `doc.on.doc` to the left → Saved Templates List.
+One option: **"View Workout Templates"** with SF Symbol `doc.on.doc` to the left → Workout Templates List.
+
+### Workouts "+" Menu
+Two options: **"Log Workout"** with SF Symbol `plus.circle` to the left → Log Workout screen. **"Create Workout Template"** with SF Symbol `square.and.pencil` to the left → Create Workout Template screen.
 
 ### Workout Type Card (FortiFitWorkoutTypeCard)
 
@@ -339,9 +366,43 @@ Back chevron (§ Standard Patterns → Back Navigation Chevron) · Heading "Log 
 
 | Type | Additional fields |
 |---|---|
-| Strength Training / HIIT | Exercise cards: name input with autocomplete, sets/reps/weight table, + ADD ROW, remove. "+ Add Exercise" button. Each row = one ExerciseSet. |
+| Strength Training / HIIT | Exercise cards: name input with autocomplete, per-card metadata row (REST PER SET + REPS/TIME toggle — see § Exercise Card Additions below), sets/reps/weight table, + ADD ROW, remove. "+ Add Exercise" button. Each row = one ExerciseSet. |
 | Cardio | Distance (km or mi per `useMiles`, optional). No exercises. |
 | Yoga / Pilates | No additional fields. |
+
+### Exercise Card Additions (Phase 8.7)
+
+Two per-card controls share a single horizontal row positioned directly above the column header (between the exercise-name input and the data rows). Layout:
+
+```
+[Exercise Name input]
+[REST PER SET: 90s ⓘ]                          [REPS | TIME]
+[SETS  REPS  LBS]
+... rows ...
+[+ ADD ROW]
+```
+
+**REST PER SET field (left):**
+
+- Single rest value per exercise card (not per row). Stored as `restSeconds: Int?` on each `TemplateExerciseSet` / `ExerciseSet` row of this exercise — UI keeps all rows of the same `exerciseName` in lockstep.
+- Label: `REST PER SET` (uppercase, 11px / 700 weight / 2px letter spacing — matches existing micro-label treatment).
+- Value display: `90s` for sub-minute, `1:30` for ≥1 minute. `—` when nil.
+- Tap opens a SwiftUI duration picker. Range 5–600 seconds in 5-second increments (see CONSTANTS.md § Apple Watch Strings → Rest Picker Range).
+- Trailing `info.circle` icon (14pt, Muted Text). Tap → SwiftUI `.popover` with copy from INFO_COPY.md § Inline Popover Copy → Rest Per Set. ID `exerciseCard_{index}_restPerSetInfoPopover`.
+- Field ID: `exerciseCard_{index}_restPerSetField`.
+
+**REPS/TIME segmented control (right):**
+
+- Two-segment SwiftUI segmented control: `REPS` | `TIME`. Initial position resolves from the exercise dictionary: `displayAsTime ?? exerciseDictionary.isIsometric(exerciseName)` (see WORKOUTKIT.md § 6 and CONSTANTS.md § Isometric Exercise Names).
+- User tap on the opposite segment overrides the dictionary default — sets `displayAsTime = true` (for TIME) or `displayAsTime = false` (for REPS) on every row of this exercise card.
+- When TIME is active: column header reads `TIME` (replacing `REPS`); each row's input becomes the same duration picker as REST PER SET (same range, same increments). The integer is stored in the `reps` field — interpretation is purely at display and Watch-composition time.
+- When REPS is active: column header reads `REPS`; numeric text field input (current behavior).
+- **Flip preserves integer values.** A `10` in REPS becomes `10s` in TIME after flip — user adjusts if needed. Toggling back restores the integer interpretation. No data clearing on toggle.
+- Field ID: `exerciseCard_{index}_repsTimeToggle`.
+
+**Default selection by exercise name (from CONSTANTS.md § Isometric Exercise Names + § Ambiguous Exercise Default Modes):** Planks, Wall Sit, Dead Hang, Hollow Hold, Side Planks, L-Sit, Bear Hold, etc. → TIME. Battle Ropes, Farmers Walks, Sled Push/Pull, Rowing Machine, Assault Bike → TIME. Bench Press, Squats, Burpees, Box Jumps, etc. → REPS. Unknown / custom exercises → REPS (safe default).
+
+**Effect on Watch sync (Strength Training / HIIT):** these per-row settings are written into the `scheduledWorkoutSnapshot` at scheduling time and into the `ExerciseSet` records on completion. They drive the `IntervalStep` goal type (`.time` vs `.open`) and step display name in the `CustomWorkout` plan composition (see WORKOUTKIT.md § 6).
 
 ### Log Workout Ellipsis Menu (New Mode Only)
 
@@ -402,30 +463,30 @@ When `healthKitUUID != nil`, three fields are read-only with inline `info.circle
 
 ---
 
-## Create Template
+## Create Workout Template
 
 **Purpose:** Build a reusable workout template from scratch, or edit an existing one.
 
 ### Layout
 
-Back chevron (§ Standard Patterns → Back Navigation Chevron) · Heading "Create Template" (new) / "Edit Template" (edit). Form fields: Template Name (required), Workout Type dropdown (Strength Training / HIIT only), Duration (optional), exercise cards (identical to Log Workout Strength/HIIT), "+ Add Exercise". No Effort, no DatePicker, no distance.
+Back chevron (§ Standard Patterns → Back Navigation Chevron) · Heading "Create Workout Template" (new) / "Edit Template" (edit). Form fields: Template Name (required), Workout Type dropdown (Strength Training / HIIT only), Duration (optional), exercise cards (identical to Log Workout Strength/HIIT, including the per-card REST PER SET field and REPS/TIME segmented control — see § Log Workout → Exercise Card Additions), "+ Add Exercise". No Effort, no DatePicker, no distance. Per-row `restSeconds` and `displayAsTime` values flow through into `ScheduledWorkout.scheduledWorkoutSnapshot` when the template is later scheduled (see WORKOUTKIT.md § 5, § 6).
 
 "SAVE TEMPLATE" / "Save Changes" button. Disabled until name + ≥1 exercise with sets/reps. Saves to SwiftData, navigates back.
 
-**Edit mode:** Pre-populated from Saved Templates List. Type locked. Top-right: muted trash · blue ellipsis. Trash → standard delete confirmation → cascade-deletes template + TemplateExerciseSets → navigate to Saved Templates List. Back button → Saved Templates.
+**Edit mode:** Pre-populated from Workout Templates List. Type locked. Top-right: muted trash · blue ellipsis. Trash → standard delete confirmation → cascade-deletes template + TemplateExerciseSets → navigate to Workout Templates List. Back button → Workout Templates.
 
-**Edit Mode Ellipsis Menu:** **"Share Template"** (`qrcode`) → opens the same Share Template QR Modal as Saved Templates List (§ below).
+**Edit Mode Ellipsis Menu:** **"Share Template"** (`qrcode`) → opens the same Share Template QR Modal as Workout Templates List (§ below).
 
 ---
 
-## Saved Templates List
+## Workout Templates List
 
 **Purpose:** View, edit, delete, and share saved templates.
 
 ### Layout
-Back chevron (§ Standard Patterns → Back Navigation Chevron). "Saved Templates" heading. Right: "+" button (→ Create Template in new-template mode). Scrollable list sorted by dateCreated (newest first). Each row: template name (16px semibold), workout type (muted), date created (muted), trailing chevron.
+Back chevron (§ Standard Patterns → Back Navigation Chevron). "Workout Templates" heading. Right: "+" button (→ Create Workout Template in new-template mode). Scrollable list sorted by dateCreated (newest first). Each row: template name (16px semibold), workout type (muted), date created (muted), trailing chevron.
 
-Tap row → Create Template in edit mode. Template deletion has no effect on workouts, goals, PRs, streaks, or Training Load.
+Tap row → Create Workout Template in edit mode. Template deletion has no effect on workouts, goals, PRs, streaks, or Training Load.
 
 ### Long-Press Context Menu
 
@@ -518,7 +579,7 @@ Selected day uses the same blue filled circle. Tap → selects + updates Day Det
 
 ### Plan Ellipsis Menu
 
-One option: **"Saved Templates"** (`doc.on.doc`) → SavedTemplatesListView (same view as Workouts ellipsis).
+One option: **"View Workout Templates"** (`doc.on.doc`) → SavedTemplatesListView (same view as Workouts ellipsis).
 
 ### Day Detail Area
 
@@ -535,6 +596,8 @@ Below the calendar. One card per scheduled or logged workout on the selected day
 | Skipped scheduled | Dimmed, strikethrough name, muted border | — | Muted "SKIPPED" label replaces the button |
 
 **Card fields (common):** workout name (Primary Text 16/semibold), workout type pill (muted uppercase, 11px), metadata row with duration, scheduled time (planned only, when set), and "Apple Workout" peripheral label trailing on the metadata row when source is Apple Watch (§ Standard Patterns). Metadata row hidden if all components absent.
+
+**Push to Apple Watch glyph (planned cards only):** `FortiFitWatchSyncGlyph` (§ Standard Patterns → Watch Sync Card Glyph) in the upper-right corner of every `FortiFitScheduledWorkoutCard` whose `status == "planned"` and `scheduledDate >= today`. Renders as active green `applewatch.watchface` when `syncToAppleWatch == true` and gates pass; inactive `applewatch.slash` when push is off; disabled (0.4 opacity) when any gate fails. Skipped, completed, overdue, and logged-only cards do NOT render the glyph — push is only meaningful for future planned sessions. Tap behavior per § Standard Patterns. Identifier: `scheduledWorkoutCard_{index}_watchSyncGlyph` (kept for code-level continuity).
 
 **Tap behavior:**
 - Planned / Skipped: no tap navigation (button is the primary action).
@@ -555,16 +618,42 @@ Plan empty state fires only when **no** `ScheduledWorkout` records exist AND no 
 
 ### Scheduling Flow
 
-**Entry points:** (1) "+" button in Plan header. (2) Long-press a template in Saved Templates List → "Schedule This Template."
+**Entry points:** (1) "+" button in Plan header. (2) Long-press a template in Workout Templates List → "Schedule This Template."
 
 **Flow:**
-1. **Template Selection** — sheet up showing saved templates (reuses SavedTemplatesListView as a picker). Each row: template name, workout type, exercise count. Tap to select.
+1. **Workout Template Selection** — label "Workout Template". Sheet up showing saved templates (reuses SavedTemplatesListView as a picker). Each row: template name, workout type, exercise count. Tap to select.
 2. **Date Selection** — pre-filled if entered from a specific day. Otherwise date picker. Today or later only — past dates not schedulable.
-3. **Time (optional)** — time-of-day picker. Defaults to no specific time.
+3. **Scheduled Time toggle** — when on, exposes a time-of-day picker. When off, no scheduled time. Default off. Independent of the Push to Apple Watch toggle — time is optional regardless of push state.
 4. **Recurrence (optional)** — None (default) / Weekly / Biweekly. Selecting auto-generates `ScheduledWorkout`s for the next 12 weeks, all sharing the same `recurrenceGroupId`.
-5. **Confirmation** — summary card (template name, date, time, recurrence) under a "Summary" header. "Schedule Workout" saves and dismisses.
+5. **Push to Apple Watch toggle (Phase 8.7.1+)** — see § Push to Apple Watch Toggle below for full behavior. Position: directly under the Recurrence segmented control, above the "Plan Workout" CTA.
+6. **"Plan Workout" button** — full-width primary action at bottom. Saves the `ScheduledWorkout` (and its recurrence siblings, if any), and if Push is on, registers the plan with the Watch via `WatchScheduleService.schedule(_:)`.
 
 Validation: template required; date today or future. Multiple workouts per day allowed.
+
+### Push to Apple Watch Toggle (Phase 8.7.1)
+
+The primary entry point for pushing workouts to Apple Watch. SwiftUI `Toggle` row with a trailing `info.circle` icon. ID `scheduleWorkout_pushToAppleWatchToggle`; popover ID `scheduleWorkout_pushToAppleWatchInfoPopover`.
+
+**Default value at sheet open** (resolves once, when the sheet appears):
+
+| Master state | WorkoutKit auth | Toggle default | Toggle interactive? |
+|---|---|---|---|
+| `syncPlanToAppleWatchEnabled == true` | Granted | On | Yes |
+| `syncPlanToAppleWatchEnabled == false` | Any | Off | No (greyed, 0.4 opacity) |
+| `syncPlanToAppleWatchEnabled == true` | Denied | Off | No (greyed, 0.4 opacity) |
+
+**When greyed (master off or auth denied):** Caption directly beneath the toggle row, muted text per `bodySmall` treatment. Master-off case: *"Push to Apple Watch is off in Settings"* (`AppConstants.AppleWatch.scheduleWorkout_masterOffCaption`). Auth-denied case: *"Apple Health permission required — open iOS Settings"* (`AppConstants.AppleWatch.scheduleWorkout_authDeniedCaption`). Tap on the disabled toggle surfaces the existing Master Sync Off Popover (§ Standard Patterns). Master-off path deep-links to in-app Settings; auth-denied path deep-links to iOS Settings via `UIApplication.openSettingsURLString`.
+
+**When the user toggles Push ON or OFF:** No side effects on the Scheduled Time toggle. Time and Push are independent controls. When Push is on and no `scheduledTime` is set, `WatchScheduleService` falls back to noon (12:00 PM) for the WorkoutKit API call — Apple Watch does not surface the time to users.
+
+**`info.circle` popover copy:** see INFO_COPY.md § Inline Popover Copy → Watch Sync Toggle. Reused across Plan Workout and Edit Planned Workout.
+
+**On Save:**
+
+- `ScheduledWorkout.syncToAppleWatch` is set from the toggle's final value.
+- Defensive server-side gate validation (master on, auth granted, ≥1 exercise, scheduledDate >= today). Validation failure should be impossible given the UI gating; if it occurs (race / form bypass), force `syncToAppleWatch = false` and surface a soft error toast: *"Couldn't push to Apple Watch — check Settings."* (`AppConstants.AppleWatch.scheduleWorkout_validationFailedToast`).
+- After SwiftData save, if `syncToAppleWatch == true`, call `WatchScheduleService.schedule(_:)` per existing Phase 8.7 logic. New `appleWorkoutPlanId` UUID stamped on first sync.
+- For recurring schedules, the inheritance logic is unchanged — every instance in the new `recurrenceGroupId` gets the same `syncToAppleWatch` value and `scheduledTime`, applied to each instance's own date.
 
 ### Complete Planned Workout Flow
 
@@ -595,8 +684,8 @@ Long-press a Day Detail card (uses Standard Long-Press Tease). Menu varies by ca
 
 | Card type | Menu items |
 |---|---|
-| Planned scheduled | **Skip Workout** (sets status "skipped", dims card, no `Workout` created — reversible via "Restore Workout"). **Remove from Plan** (standard delete confirmation; deletes `ScheduledWorkout`. Recurring instances trigger the "This workout only / This and future" prompt first). |
-| Skipped scheduled | **Restore Workout** (status back to "planned"). **Remove from Plan** (same as planned). |
+| Planned scheduled | **Edit Workout** (`pencil`) — opens § Edit Planned Workout pre-populated from this `ScheduledWorkout`. **Skip Workout** (sets status "skipped", dims card, no `Workout` created — reversible via "Restore Workout"). **Remove from Plan** (standard delete confirmation; deletes `ScheduledWorkout`. Recurring instances trigger the "This workout only / This and future" prompt first). |
+| Skipped scheduled | **Edit Workout** (same as planned). **Restore Workout** (status back to "planned"). **Remove from Plan** (same as planned). |
 | Completed scheduled | **Remove from Plan** — dual-action (see below). Underlying `Workout` preserved. |
 | Logged-only | **Remove from Plan** — non-destructive ("Remove [Workout Name] from Plan? The workout will remain in your log." — Cancel / Remove, no destructive-red styling). Sets `workout.hiddenFromPlan = true`. Card + dot disappear; workout intact in Workouts and algorithms. Toast "Removed from Plan. [Undo]" (~4s) flips back on Undo. |
 
@@ -620,6 +709,71 @@ Edit/delete on a recurring instance prompts **"This workout only"** or **"This a
 | Completed | Green checkmark + muted "COMPLETED" label (both completed scheduled and logged-only cards) |
 | Skipped | Dimmed card, strikethrough name, muted "SKIPPED" label |
 | Overdue | Planned card + muted "OVERDUE" badge |
+
+---
+
+## Edit Planned Workout
+
+**Purpose:** Modify a scheduled workout's exercises, name, date, time, duration, and Apple Watch push intent. The `ScheduledWorkout` is the source of truth for everything Watch-relevant — edits here freely deviate from the originating template, and pushed cards re-sync to Watch on save (see WORKOUTKIT.md § 7, § 13).
+
+### Trigger
+
+Long-press a planned or skipped `FortiFitScheduledWorkoutCard` on the Plan screen → context menu → **Edit Workout** (`pencil`). Opens this screen pre-populated from the `ScheduledWorkout`'s decoded `scheduledWorkoutSnapshot` plus the record's name, date, time, and duration fields.
+
+### Layout
+
+Back chevron (§ Standard Patterns → Back Navigation Chevron) · Heading "Edit Planned Workout" (top-leading, Primary Text per heading typography). Top-trailing: blue `FortiFitWatchSyncGlyph` (§ Standard Patterns → Watch Sync Card Glyph) — same component as on the Plan card, mirroring the per-card `syncToAppleWatch` flag. ID `editScheduledWorkout_watchSyncToggle`.
+
+Form fields, top-to-bottom:
+
+- Workout Name input — pre-filled from `ScheduledWorkout.workoutName`. Editable.
+- DatePicker `.date` — pre-filled from `ScheduledWorkout.scheduledDate`. Constrained to today-or-future (past dates not allowed; would invalidate Watch sync). ID `editScheduledWorkout_dateField`.
+- Scheduled Time toggle — pre-filled from `ScheduledWorkout.scheduledTime` (toggle on with picker if set, off if nil). Optional. Not required for Watch push (service falls back to noon). ID `editScheduledWorkout_timeField`.
+- Workout Type — read-only display of `ScheduledWorkout.workoutType`. Locked (changing type would orphan the snapshot).
+- Duration (minutes) — pre-filled from `ScheduledWorkout.durationMinutes`. Editable. Optional.
+- Exercise cards — pre-populated from the decoded snapshot. Identical to Log Workout's exercise card UI (including the new REST PER SET field and REPS/TIME segmented control — see § Log Workout → Exercise Card Additions). User can add, modify, remove rows; reorder; rename exercises. All edits flow through decode-edit-re-encode of `scheduledWorkoutSnapshot`.
+- "+ Add Exercise" button — same as Log Workout / Create Workout Template.
+
+**"Push to Apple Watch" toggle behavior** (renamed from "Sync to Apple Watch" in Phase 8.7.1): mirrors the card glyph (§ Standard Patterns) and the Plan Workout Push toggle (§ Plan → Push to Apple Watch Toggle). When master is off, tap shows the Master Sync Off Popover. `info.circle` next to the toggle (ID `editScheduledWorkout_watchSyncInfoPopover`) shows a SwiftUI `.popover` with copy from INFO_COPY.md § Inline Popover Copy → Watch Sync Toggle. Time and Push are independent controls — toggling Push on/off has no side effect on the Scheduled Time toggle.
+
+### Save Button
+
+"Save Changes" (full-width, bottom). Disabled until name is filled and ≥1 exercise has sets and reps. ID `editScheduledWorkout_saveButton`. Tap fires the save flow below.
+
+### Save Flow
+
+1. Re-encode the edited exercises into `scheduledWorkoutSnapshot`.
+2. Update `workoutName`, `scheduledDate`, `scheduledTime`, `durationMinutes` on the `ScheduledWorkout` record.
+3. **Recurrence prompt** (if `recurrenceGroupId != nil`):
+   - Confirmation dialog: title "Apply changes to all future workouts?" / message "This is part of a recurring schedule. You can apply your changes to this workout only or to this workout and all future ones in the series." / "This Workout Only" (default) / "This and Future Workouts".
+   - **Date changes always force "This Workout Only"** — applying a date change to a series doesn't have a coherent meaning. If the user changed the date, the prompt's secondary action is suppressed and only "This Workout Only" appears, with a small footnote: "Date changes apply to this workout only."
+   - "This and Future Workouts" applies the snapshot, name, time, and duration changes to this instance plus all future instances in the same `recurrenceGroupId` (`scheduledDate >= this instance's date`). Past completed/skipped instances untouched.
+   - IDs `editScheduledWorkout_recurrencePrompt_thisOnly`, `editScheduledWorkout_recurrencePrompt_thisAndFuture`.
+4. **Watch sync re-sync** (after SwiftData save): if the saved `ScheduledWorkout` has `syncToAppleWatch == true` and gates pass, `WatchScheduleService.resync(_:)` is called — `removePlan(uuid)` followed by `schedule(plan, at:)` with the same `appleWorkoutPlanId`. For "this and future," each affected synced instance is re-synced individually with its own UUID. See WORKOUTKIT.md § 7, § 13.
+5. Dismiss the screen and pop back to Plan.
+
+### Field Editability Table
+
+| Field | Editable? | Notes |
+|---|---|---|
+| Name | Yes | User-controlled |
+| Workout type | No | Locked. Changing would orphan the snapshot. |
+| `scheduledDate` | Yes | Per-instance only for recurring (forces "This Workout Only"). Today or future. |
+| `scheduledTime` | Yes | Optional. Required for Watch sync. |
+| `durationMinutes` | Yes | Optional |
+| Exercises (snapshot) | Yes | Add, modify, remove, reorder; per-row rest seconds and reps/time toggle |
+| `recurrenceRule` | No | Recurrence rule changes via Remove + Re-schedule, not via Edit |
+| `syncToAppleWatch` | Yes | Mirrors card glyph |
+
+### States
+
+| State | What the User Sees |
+|-------|-------------------|
+| Initial load | Form pre-populated from snapshot + ScheduledWorkout fields. Glyph reflects current push state. |
+| Recurring instance | On Save, prompt asks "This Workout Only / This and Future." |
+| Master push off | Glyph rendered disabled (0.4 opacity); tap shows Master Sync Off Popover. |
+| Empty exercises (after user removed all rows) | Save button disabled. Glyph would render disabled (gate fails) on save attempt. |
+| Save error (Watch push failure) | Save still completes (SwiftData write succeeds); error toast appears for the Watch portion only. Per-card flag retained per WORKOUTKIT.md § 11. |
 
 ---
 
@@ -698,7 +852,8 @@ Opens via tap on the Workout Detail Source Indicator row. iOS modal sheet, `.lar
 | 3. Lead sentence | "This workout was imported from Apple Health." (Secondary Text 14px centered, `.fixedSize(horizontal: false, vertical: true)`). |
 | 4. Two-row callout | Stacked FortiFitCard rows (12px corner radius, 12px internal padding, 8px between rows). Each row: leading SF Symbol + multi-line body. **Row 1** — `pencil.slash` (Muted Text) + body "Date, Start Time, Effort, and Duration are read-only here. Edit in Apple Health, or unlink to edit in FitNavi." (first sentence Primary Text 14/600, second Muted Text 13/500). ID `sourceInfoSheet_readOnlyCallout`. **Row 2** — `arrow.uturn.backward.slash` (Alert Red) + body "Unlinking is permanent. Apple Health summary data will be deleted, and future Apple Health edits won't sync." (same dual-treatment). ID `sourceInfoSheet_permanentUnlinkCallout`. |
 | 5. Primary action | Full-width "Done" button (blue-outlined). Dismisses. ID `sourceInfoSheet_doneButton`. Largest visual element — safe path gets the prominence per iOS convention. |
-| 6. Destructive link | "Unlink from Apple Health" centered text-style link (Alert Red 14/600, 12px top spacing). Tap fires `WorkoutService.unlink(workout:context:)` immediately — no confirmation dialog (the two-row callout above already warns that unlinking is permanent and deletes summary data) → dismiss + "Unlinked from Apple Health." toast. ID `workoutDetail_healthUnlinkButton` (preserves Phase 8 identifier per HEALTHKIT § 19). |
+| 6. Destructive link | "Unlink from Apple Health" centered text-style link (Alert Red 14/600, 12px top spacing). Tap → confirmation dialog (next row). ID `workoutDetail_healthUnlinkButton` (preserves Phase 8 identifier per HEALTHKIT § 19). |
+| 7. Confirmation dialog | Title "Unlink workout from Apple Health?" Message "This will delete all Apple Health–sourced summary data for this workout, and you won't be able to link it back. This can't be undone." Actions: destructive "Unlink" + cancel "Cancel". On Unlink → `HealthKitSyncService.unlink(workout:)` (HEALTHKIT § 14; clears six HK-only summary fields + conditionally `rpe`, fires Workout Cascade, writes a `WorkoutMatchRejection`) → dismiss + "Unlinked from Apple Health." toast. IDs `sourceInfoSheet_unlinkConfirmButton`, `sourceInfoSheet_unlinkCancelButton`. |
 | 8. Footer metadata | 16px top spacer, then muted reference rows (12/600, Muted Text): `Activity Type · {workout.healthKitActivityType}` / `Source · {sourceName}` / `Imported · {formatted workout.dateCreated}` (omit if missing) / `Last synced · {relative}` (sourced from `HealthKitSyncService.lastSyncDate(for:)`; omit if never synced). ID `sourceInfoSheet_lastSyncedRow`. |
 
 **Why footer placement:** keeps the destructive-link warning adjacent to its control; metadata is reference, not decision-relevant.
@@ -1043,13 +1198,13 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 
 ---
 
-## Add Goal
+## Create Goal
 
 **Purpose:** Create a new goal.
 
 ### Layout
 
-Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Add Goal" heading · Goal Type selector: "STRENGTH PR" (default), "REPETITIONS PR", "SPEED AND DISTANCE", "NUMBER OF WEEKLY WORKOUTS".
+Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Create Goal" heading · Goal Type selector: "STRENGTH PR" (default), "REPETITIONS PR", "SPEED AND DISTANCE", "NUMBER OF WEEKLY WORKOUTS".
 
 | Type | Fields | Validation |
 |---|---|---|
@@ -1076,9 +1231,9 @@ Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Settings" he
 
 ✦ divider.
 
-**Apple Health** section: HealthKit integration controls. See HEALTHKIT § 16 (settings architecture) and § 17 (authorization).
+**Apple Health & Devices** section: HealthKit integration controls and Apple Watch scheduling. See HEALTHKIT § 16 (settings architecture), § 17 (authorization), WORKOUTKIT.md § 9 (authorization), and § 10 (UI surfaces). Both cards live under a single heading — **no separate "Apple Watch" header**.
 
-### Apple Health Section
+### Apple Health & Devices — Apple Health Card
 
 Toggle: "Connect to Apple Health" — FortiFitSegmentedToggle styled like the General toggles but functionally on/off, not a unit selector. ID `settings_appleHealthToggle`.
 
@@ -1086,7 +1241,7 @@ Description below toggle (muted, 13/700): *"Import workouts from Apple Watch and
 
 Status line below description (muted, 11/700, uppercase, 2px spacing) and conditional buttons — content per the state table below.
 
-### Apple Health Section — State Table
+### Apple Health Card — State Table
 
 Four possible states driven by (toggle on/off) × (iOS authorization status):
 
@@ -1118,6 +1273,37 @@ Source: `UserSettings.healthKitLastSyncDate`. Updated after every successful syn
 
 Turn-off confirmation: Title "Turn off Apple Health sync?" / Message "Imported workouts will remain in FitNavi but new workouts from Apple Health won't appear automatically." / "Cancel" + destructive-red "Turn Off".
 
+### Apple Health & Devices — Apple Watch Card
+
+Sibling card to Apple Health within the same section — **no separate section header, no FortiFitDivider between them**. See WORKOUTKIT.md § 9 (authorization) and § 10 (UI surfaces) for full context.
+
+Toggle: "Push planned workouts to Apple Watch" — FortiFitSegmentedToggle styled like the General toggles but functionally on/off, not a unit selector. ID `settings_appleWatchToggle`. First flip-on triggers `WorkoutScheduler.shared.requestAuthorization()` (just-in-time pattern — see WORKOUTKIT.md § 9).
+
+Description below toggle (muted, 13/700): *"Push planned workouts from your Plan tab to your Apple Watch. Pushed workouts appear in the Workout app's Scheduled section and complete automatically when finished. Requires watchOS 11 or later."*
+
+**No status line, no "Sync Now" button, no "Last sync" timestamp** — WorkoutKit operations are imperative one-shots tied to per-card toggles and reconciliation, with no useful "manual sync" or "connected" semantics to surface. Conditional button (e.g., "Open iOS Settings" on denied) per the state table below.
+
+### Apple Watch Card — State Table
+
+Four possible states driven by (toggle on/off) × (WorkoutKit authorization status):
+
+| Toggle | WK Auth | Status Line | Visible Buttons | Behavior on Toggle Tap |
+|---|---|---|---|---|
+| Off | Any (including not-yet-requested) | *(hidden — no status shown)* | None | Flipping on triggers `WorkoutScheduler.shared.requestAuthorization()` if not yet determined; otherwise re-enables sync using the cached authorization state. On grant, reconciliation runs (WORKOUTKIT.md § 7). |
+| On | Granted | *(none)* | None | Flipping off → confirmation alert (see below). On confirm: every `ScheduledWorkout` with `syncToAppleWatch == true` has its plan removed from any paired Watch via `WatchScheduleService.removePlan(_:)`. Per-card flags retained for restoration. |
+| On | Denied | `PERMISSION DENIED IN IOS SETTINGS` | **"Open iOS Settings"** (blue outlined, full-width) — ID `settings_appleWatchOpenSettingsButton`. Tap → `UIApplication.openSettingsURLString` deep-link. | Same as granted — confirmation alert, then flip off. |
+| On | Not yet requested | *(transient — typically <1s)* | None during transient state | Authorization prompt fires immediately; resolves to granted or denied. UI shows previous state until the prompt resolves. |
+
+### Apple Watch Card — Toggle-On Flows
+
+**First-time toggle-on:** FitNavi calls `WorkoutScheduler.shared.requestAuthorization()` → iOS presents the native dialog → user grants or denies → control returns to FitNavi. On grant: status updates to "CONNECTED", reconciliation runs (re-schedules every `ScheduledWorkout` with `syncToAppleWatch == true` and gates passing). On deny: status shows "PERMISSION DENIED IN IOS SETTINGS"; toggle stays on (user's expressed intent), no plans are scheduled, "Open iOS Settings" button appears.
+
+**Subsequent toggle-off → toggle-on:** No re-authorization prompt (iOS caches the decision). Reconciliation runs immediately; previously-synced cards re-register their plans on the Watch.
+
+### Apple Watch Card — Confirmation Alert Copy
+
+Turn-off confirmation: Title "Turn off Push to Apple Watch?" / Message "All scheduled workouts currently pushed to your Apple Watch will be removed. You can turn it back on anytime — your push preferences will be remembered." / "Cancel" + destructive-red "Turn Off".
+
 ### States
 
 | State | What the User Sees |
@@ -1126,7 +1312,10 @@ Turn-off confirmation: Title "Turn off Apple Health sync?" / Message "Imported w
 | Apple Health off | Toggle off, description visible, no status line, no buttons |
 | Apple Health on — connected | Toggle on, description, "CONNECTED · …" status, "Sync Now" button |
 | Apple Health on — denied | Toggle on, description, "PERMISSION DENIED IN IOS SETTINGS" status, "Open iOS Settings" button |
-| Sync in progress | Same as connected state, but "Sync Now" button shows transient "Syncing…" label and is disabled until complete |
+| Sync in progress (Apple Health) | Same as Apple Health connected state, but "Sync Now" button shows transient "Syncing…" label and is disabled until complete |
+| Apple Watch push off | Toggle off, description visible, no status line, no buttons |
+| Apple Watch push on — connected | Toggle on, description, "CONNECTED" status, no buttons |
+| Apple Watch push on — denied | Toggle on, description, "PERMISSION DENIED IN IOS SETTINGS" status, "Open iOS Settings" button |
 
 ---
 

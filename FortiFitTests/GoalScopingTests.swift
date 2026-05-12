@@ -296,8 +296,6 @@ struct GoalScopingTests {
         goal.resetDate = Date() // set a resetDate; should be ignored for weekly workouts
         context.insert(goal)
 
-        UserSettings.shared.targetWorkoutsPerWeek = 3
-
         // Log 2 workouts this week
         let monday = Date().startOfWeek
         for i in 0..<2 {
@@ -308,7 +306,7 @@ struct GoalScopingTests {
         try context.save()
 
         // Weekly workouts count is runtime-derived, not affected by resetDate
-        let progress = GoalService.weeklyWorkoutsProgress(context: context)
+        let progress = GoalService.weeklyWorkoutsProgress(context: context, target: 3)
         #expect(progress.current >= 2)
     }
 

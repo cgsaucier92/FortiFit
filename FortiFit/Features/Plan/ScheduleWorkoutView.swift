@@ -4,11 +4,13 @@ import SwiftData
 struct ScheduleWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(WatchScheduleService.self) private var watchScheduleService
     @Query(sort: \WorkoutTemplate.dateCreated, order: .reverse) private var templates: [WorkoutTemplate]
 
     var preSelectedDate: Date
     var preSelectedTemplate: WorkoutTemplate?
-    var onSchedule: (WorkoutTemplate, Date, Date?, String?) -> Void
+    var onSchedule: (WorkoutTemplate, Date, Date?, String?, Bool) -> Void
+    var onOpenSettings: (() -> Void)?
 
     @State private var selectedTemplate: WorkoutTemplate?
     @State private var scheduledDate: Date
@@ -16,17 +18,22 @@ struct ScheduleWorkoutView: View {
     @State private var scheduledTime: Date = Date()
     @State private var recurrence = "None"
     @State private var headerHeight: CGFloat = 0
+    @State private var pushToAppleWatch = false
+    @State private var showPushInfoPopover = false
+    @State private var showMasterOffPopover = false
 
     private let recurrenceOptions = ["None", "Weekly", "Biweekly"]
 
     init(
         preSelectedDate: Date,
         preSelectedTemplate: WorkoutTemplate?,
-        onSchedule: @escaping (WorkoutTemplate, Date, Date?, String?) -> Void
+        onSchedule: @escaping (WorkoutTemplate, Date, Date?, String?, Bool) -> Void,
+        onOpenSettings: (() -> Void)? = nil
     ) {
         self.preSelectedDate = preSelectedDate
         self.preSelectedTemplate = preSelectedTemplate
         self.onSchedule = onSchedule
+        self.onOpenSettings = onOpenSettings
 
         let today = Calendar.current.startOfDay(for: Date())
         let date = Calendar.current.startOfDay(for: preSelectedDate)
@@ -46,13 +53,25 @@ struct ScheduleWorkoutView: View {
         }
     }
 
+    private var masterOn: Bool {
+        UserSettings.shared.syncPlanToAppleWatchEnabled
+    }
+
+    private var authGranted: Bool {
+        watchScheduleService.authState == .granted
+    }
+
+    private var pushEnabled: Bool {
+        masterOn && authGranted
+    }
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
             if templates.isEmpty {
                 VStack {
                     Spacer()
-                    Text("You'll need to create a template before scheduling a workout. You can create a template from the Workouts or Saved Templates screens.")
+                    Text("You'll need to create a template before scheduling a workout. You can create a template from the Workouts or Workout Templates screens.")
                         .font(FortiFitTypography.body)
                         .foregroundStyle(FortiFitColors.mutedText)
                         .multilineTextAlignment(.center)
@@ -63,12 +82,14 @@ struct ScheduleWorkoutView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
+                        FortiFitScreenHeading("Plan Workout")
+
                         // Template selection
-                        FortiFitLabel("Template", color: FortiFitColors.primaryText)
+                        FortiFitLabel("Workout Template", color: FortiFitColors.primaryText)
                         templateSelectionSection
 
                         // Date picker
-                        FortiFitLabel("Date", color: FortiFitColors.primaryText)
+                        FortiFitLabel("Scheduled Date", color: FortiFitColors.primaryText)
                         DatePicker(
                             "",
                             selection: $scheduledDate,
@@ -81,22 +102,7 @@ struct ScheduleWorkoutView: View {
                         .colorScheme(.dark)
 
                         // Optional time
-                        Toggle(isOn: $showTimePicker) {
-                            FortiFitLabel("Set Specific Time", color: FortiFitColors.primaryText)
-                        }
-                        .tint(FortiFitColors.primaryAccent)
-
-                        if showTimePicker {
-                            DatePicker(
-                                "",
-                                selection: $scheduledTime,
-                                displayedComponents: .hourAndMinute
-                            )
-                            .datePickerStyle(.compact)
-                            .labelsHidden()
-                            .tint(FortiFitColors.primaryAccent)
-                            .colorScheme(.dark)
-                        }
+                        setSpecificTimeSection
 
                         // Recurrence
                         FortiFitLabel("Recurrence", color: FortiFitColors.primaryText)
@@ -104,6 +110,9 @@ struct ScheduleWorkoutView: View {
                             options: recurrenceOptions,
                             selected: $recurrence
                         )
+
+                        // Push to Apple Watch
+                        pushToAppleWatchSection
 
                         // Summary card
                         if let template = selectedTemplate {
@@ -132,13 +141,14 @@ struct ScheduleWorkoutView: View {
                         }
 
                         // Schedule button
-                        FortiFitButton("Schedule Workout", style: .primary, isEnabled: canSchedule) {
+                        FortiFitButton("Plan Workout", style: .primary, isEnabled: canSchedule) {
                             guard let template = selectedTemplate else { return }
                             onSchedule(
                                 template,
                                 scheduledDate,
                                 showTimePicker ? scheduledTime : nil,
-                                recurrenceRule
+                                recurrenceRule,
+                                pushToAppleWatch
                             )
                             dismiss()
                         }
@@ -155,22 +165,9 @@ struct ScheduleWorkoutView: View {
             FortiFitFixedHeader(headerHeight: $headerHeight) {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
                     HStack {
-                        Text("Schedule Workout")
-                            .font(FortiFitTypography.screenHeading)
-                            .kerning(FortiFitTypography.screenHeadingKerning)
-                            .foregroundStyle(FortiFitColors.primaryAccent)
+                        FortiFitBackButton { dismiss() }
                         Spacer()
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(FortiFitColors.mutedText)
-                                .frame(width: FortiFitSpacing.minTouchTarget, height: FortiFitSpacing.minTouchTarget)
-                        }
                     }
-
-                    FortiFitDivider()
                 }
             }
             }
@@ -178,7 +175,138 @@ struct ScheduleWorkoutView: View {
             #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
             #endif
+            .onAppear {
+                if pushEnabled {
+                    pushToAppleWatch = true
+                }
+            }
         }
+    }
+
+    // MARK: - Scheduled Time Section
+
+    @ViewBuilder
+    private var setSpecificTimeSection: some View {
+        Toggle(isOn: $showTimePicker) {
+            FortiFitLabel("Scheduled Time", color: FortiFitColors.primaryText)
+        }
+        .tint(FortiFitColors.primaryAccent)
+
+        if showTimePicker {
+            DatePicker(
+                "",
+                selection: $scheduledTime,
+                displayedComponents: .hourAndMinute
+            )
+            .datePickerStyle(.compact)
+            .labelsHidden()
+            .tint(FortiFitColors.primaryAccent)
+            .colorScheme(.dark)
+        }
+    }
+
+    // MARK: - Push to Apple Watch Section
+
+    @ViewBuilder
+    private var pushToAppleWatchSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if pushEnabled {
+                Toggle(isOn: $pushToAppleWatch) {
+                    HStack(spacing: 6) {
+                        Text(AppConstants.AppleWatch.scheduleWorkoutToggleLabel)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                        Button { showPushInfoPopover.toggle() } label: {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 14))
+                                .foregroundStyle(FortiFitColors.mutedText)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showPushInfoPopover) {
+                            Text(AppConstants.AppleWatch.watchSyncInfoPopover)
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(FortiFitColors.primaryText)
+                                .padding()
+                                .frame(width: 280)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .presentationCompactAdaptation(.popover)
+                        }
+                        .accessibilityIdentifier(AccessibilityID.scheduleWorkout_pushToAppleWatchInfoPopover)
+                    }
+                }
+                .tint(FortiFitColors.primaryAccent)
+                .accessibilityIdentifier(AccessibilityID.scheduleWorkout_pushToAppleWatchToggle)
+            } else {
+                // Disabled state — master off or auth denied
+                ZStack {
+                    Toggle(isOn: .constant(false)) {
+                        Text(AppConstants.AppleWatch.scheduleWorkoutToggleLabel)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                    }
+                    .tint(FortiFitColors.primaryAccent)
+                    .disabled(true)
+                    .opacity(0.4)
+                    .accessibilityIdentifier(AccessibilityID.scheduleWorkout_pushToAppleWatchToggle)
+
+                    // Tap overlay for showing popover
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showMasterOffPopover = true
+                        }
+                }
+                .popover(isPresented: $showMasterOffPopover) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(AppConstants.AppleWatch.masterOffTitle)
+                            .font(FortiFitTypography.label)
+                            .foregroundStyle(FortiFitColors.primaryText)
+
+                        Text(disabledCaption)
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.primaryText)
+
+                        Button(disabledButtonLabel) {
+                            showMasterOffPopover = false
+                            if !masterOn {
+                                dismiss()
+                                onOpenSettings?()
+                            } else {
+                                #if os(iOS)
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                                #endif
+                            }
+                        }
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(FortiFitColors.primaryAccent)
+                        .accessibilityIdentifier(AccessibilityID.masterSyncOff_openSettingsButton)
+                    }
+                    .padding()
+                    .frame(width: 280)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .presentationCompactAdaptation(.popover)
+                    .accessibilityIdentifier(AccessibilityID.masterSyncOff_popover)
+                }
+
+                Text(disabledCaption)
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(FortiFitColors.mutedText)
+            }
+        }
+    }
+
+    private var disabledCaption: String {
+        if !masterOn {
+            return AppConstants.AppleWatch.scheduleWorkoutMasterOffCaption
+        }
+        return AppConstants.AppleWatch.scheduleWorkoutAuthDeniedCaption
+    }
+
+    private var disabledButtonLabel: String {
+        if !masterOn {
+            return AppConstants.AppleWatch.masterOffOpenSettings
+        }
+        return AppConstants.AppleWatch.authDeniedOpenSettings
     }
 
     // MARK: - Template Selection
@@ -199,7 +327,7 @@ struct ScheduleWorkoutView: View {
                                 Text(template.workoutType)
                                     .font(FortiFitTypography.bodySmall)
                                     .foregroundStyle(FortiFitColors.mutedText)
-                                Text("\(template.exerciseSets.count) exercises")
+                                Text("\(Set(template.exerciseSets.map(\.exerciseName)).count) exercises")
                                     .font(FortiFitTypography.bodySmall)
                                     .foregroundStyle(FortiFitColors.mutedText)
                             }

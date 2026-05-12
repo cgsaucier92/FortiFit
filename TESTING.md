@@ -126,6 +126,7 @@ TextField("Workout name", text: $name)
 - Trends chart cards (Phase 6.1 — see SCREENS.md § Standard Patterns → Trends Chart Card Visual Treatment): `trendsChart_{chartId}_card`, `trendsChart_{chartId}_headerSummary`, `trendsChart_workoutTypeBreakdown_centerLabel`
 - Trends chart detail view (Phase 6.2 — see SCREENS.md § Trends Chart Detail and CONSTANTS.md § Trends Chart Detail View): `trendsChart_{chartId}_expandButton`, `trendsChartDetail_{chartId}_card`, `trendsChartDetail_{chartId}_backButton`, `trendsChartDetail_{chartId}_headerSummary`, `trendsChartDetail_{chartId}_seeInfoButton`, `trendsChartDetail_{chartId}_rangeToggle_{rangeRawValue}` (e.g. `..._rangeToggle_30d`, `..._rangeToggle_1y`), `trendsChartDetail_{chartId}_dataPoint_{index}` (selection target — only on charts where selection is enabled per CONSTANTS.md § Trends Chart Detail View → Selection State), `trendsChartDetail_{chartId}_selectionAnnotation`, `trendsChartDetail_personalRecords_timelinePoint_{index}` (PR timeline only), `trendsChartDetail_workoutTypeBreakdown_legendRow_{index}` (donut legend only), `trendsChartDetail_workoutTypeBreakdown_legendSortHeader_{column}` (column ∈ `count`, `percent`, `type`, `avgDuration`)
 - Cross-app back navigation chevron (Phase 6.2 — see SCREENS.md § Standard Patterns → Back Navigation Chevron): `{screenId}_backButton` — e.g., `workoutDetail_backButton`, `addGoal_backButton`, `settings_backButton`, `trendsChartDetail_strengthTracker_backButton`
+- Apple Watch push (Phase 8.7 + 8.7.1 — see SCREENS.md § Standard Patterns → Watch Sync Card Glyph, § Plan → Push to Apple Watch Toggle, § Settings → Apple Watch Section, § Edit Planned Workout, and WORKOUTKIT.md § 17): `settings_appleWatchToggle`, `settings_appleWatchOpenSettingsButton`, `scheduledWorkoutCard_{index}_watchSyncGlyph`, `scheduleWorkout_pushToAppleWatchToggle`, `scheduleWorkout_pushToAppleWatchInfoPopover`, `editScheduledWorkout_backButton`, `editScheduledWorkout_dateField`, `editScheduledWorkout_timeField`, `editScheduledWorkout_watchSyncToggle`, `editScheduledWorkout_watchSyncInfoPopover`, `editScheduledWorkout_recurrencePrompt_thisOnly`, `editScheduledWorkout_recurrencePrompt_thisAndFuture`, `editScheduledWorkout_saveButton`, `exerciseCard_{index}_restPerSetField`, `exerciseCard_{index}_restPerSetInfoPopover`, `exerciseCard_{index}_repsTimeToggle`, `masterSyncOff_popover`, `masterSyncOff_openSettingsButton`, `watchSyncErrorToast`, `watchSyncErrorToast_retryButton`. (Identifier names retain "Sync"/"watchSync" tokens for code-level continuity; user-facing copy uses "Push" per CONSTANTS.md § Apple Watch Strings.)
 
 **Indexed-row pattern for dynamic rows.** When a screen has a list of rows a test needs to target individually (exercises in a workout form, templates in a selection sheet, etc.), suffix the identifier with the row index — and set/column index if the row itself contains multiple inputs:
 
@@ -258,6 +259,41 @@ These scenarios require a real device and cannot be covered by automated tests. 
 ### Identifier Constants
 
 All HealthKit-related accessibility identifiers are listed in the "HealthKit:" row of the § Accessibility Identifiers representative examples above. As with all identifiers, they live as string constants in `AccessibilityIdentifiers.swift` and are referenced from both views and tests — never hardcoded.
+
+---
+
+## WorkoutKit Test Strategy (Phase 8.7)
+
+WorkoutKit integration (Phase 8.7 — see WORKOUTKIT.md) is tested via protocol stubbing, mirroring the HealthKit pattern. Real WorkoutKit calls never happen in automated tests; the simulator's WorkoutKit support is limited and the Watch's Scheduled section can't be observed from iOS tests.
+
+### Protocol Stubbing
+
+All WorkoutKit access goes through the `WorkoutSchedulerProtocol` protocol (see SERVICES.md § WorkoutSchedulerProtocol). Tests inject `StubWorkoutScheduler` from `TestFixtures.swift` instead of the concrete `DefaultWorkoutScheduler`. The stub records every `schedule` and `removePlan` call and exposes assertion helpers (e.g., `assertScheduled(uuid:atDate:)`, `assertRemoved(uuid:)`, `enumerateScheduled()`).
+
+**Rule:** no test file outside `StubWorkoutScheduler` itself imports `WorkoutKit`. If you find yourself needing to, stop — the coverage belongs in manual QA, not an automated test.
+
+### Test Distribution by Target
+
+| Target | Scenarios |
+|--------|-----------|
+| `FortiFitTests` (unit) | **Outbound HK type mapping** correctness (Strength Training → `.traditionalStrengthTraining`; HIIT → `.highIntensityIntervalTraining`; per HK_MAPPING.md § Outbound Mapping). **Plan composition rules** (per WORKOUTKIT.md § 6): one block per exercise; one `IntervalStep(.work)` per set; recovery step inserted between sets when `restSeconds != nil`; no recovery after final set in each block; correct goal-type resolution (`.time` for time, `.open` for reps); step display name format across all four `(displayAsTime, weightKg)` permutations. **REST PER SET range validation** (5–600 in 5s increments). **`displayAsTime` resolution** against `isometricExerciseNames` Set and `ambiguousExerciseDefaultModes` map (CONSTANTS.md). **`ExerciseSuggestionService.isIsometric(_:)`** alias resolution + dictionary fallback + ambiguous-default fallback. **Sync gate logic** (5 conditions per WORKOUTKIT.md § 7). **`ScheduledWorkout.appleWorkoutPlanId` lifecycle** — stamped on first sync, retained across off/on cycles, cleared on record deletion. |
+| `FortiFitIntegrationTests` | **Plan-ID fast-path:** synthetic HK snapshot with `workoutPlanId` matching an existing `ScheduledWorkout` → `PlanService.completeFromWatch(...)` fires, `Workout` created with HK-owned fields, `ExerciseSet`s preserve `restSeconds` and `displayAsTime`, `ScheduledWorkout.status = "completed"`, `WatchScheduleService.removePlan(_:)` called, full Workout Cascade fires. **Plan-ID with deleted ScheduledWorkout** → falls through to matcher path. **Plan-ID with already-completed ScheduledWorkout** → falls through to matcher path. **Edit Planned Workout flow:** edit a synced `ScheduledWorkout` → `WatchScheduleService.resync(_:)` is called with same UUID. **Recurrence edit "this and future":** each affected synced instance gets re-sync individually. **Master toggle off:** all plans removed via `removePlan` loop; per-card flags retained. **Master toggle on:** reconciliation re-schedules previously-synced cards. **Auth revoked mid-session:** next operation gracefully degrades; status line updates; per-card flags retained. **Past-dated sweep on foreground:** stale plans removed. **12-week recurrence regen:** new instances inherit `syncToAppleWatch` from most recent sibling; if true, `schedule(_:)` is called. **`ScheduledWorkout` deletion:** `removePlan` is called before SwiftData delete if `appleWorkoutPlanId != nil`. |
+| `FortiFitUITests` | **Settings master toggle states** (off; on-granted; on-denied via Stub denial) — toggle visibility, status line copy, "Open iOS Settings" button visibility. **Plan card glyph states** (active/green, inactive/muted, disabled/0.4-opacity) and tap behavior (active → off, inactive → on, disabled → popover). **Master Sync Off popover** — taps card glyph or Edit Planned Workout toggle while master off, popover appears, "Open Settings" navigates in-app. **Edit Planned Workout flow** — long-press planned card → Edit Workout context menu item → screen opens → fields pre-populated → edit → save → recurrence prompt for recurring instance. **REST PER SET picker** opens duration picker, range/increments correct, info.circle popover visible. **REPS/TIME segmented control** flips column header and input type; flip preserves integer values. **Date-change forces "this only"** in recurrence prompt. **Past-dated card glyph** is muted and non-tappable (or tap is no-op). |
+
+### Requires Manual QA (Not Automatable)
+
+These scenarios require a real device and cannot be covered by automated tests. Log them in a manual QA checklist before every TestFlight build:
+
+- Real-Watch round-trip: schedule on phone → workout appears in Watch's Scheduled section → user starts → completes → resulting `HKWorkout.workoutPlan?.id` carries the plan UUID → FitNavi marks the slot completed via plan-ID fast-path on next foreground.
+- WorkoutKit's actual upsert behavior (`schedule` with existing UUID): does it replace or error?
+- Authorization prompt UX on first toggle-on (copy, dialog flow).
+- Denial path: deny in iOS Settings → FitNavi Settings status line shows "Permission denied" with working deep link.
+- watchOS 10 paired Watch behavior — the iOS API succeeds, but plans don't appear on Watch (silently). Static caveat copy makes this honest.
+- Background reconciliation when Watch session completes while FitNavi is closed — verify the workout shows up correctly when FitNavi is next foregrounded.
+
+### Identifier Constants
+
+All Apple Watch push–related accessibility identifiers are listed in the "Apple Watch push (Phase 8.7 + 8.7.1 …)" row of the § Accessibility Identifiers representative examples above.
 
 ---
 

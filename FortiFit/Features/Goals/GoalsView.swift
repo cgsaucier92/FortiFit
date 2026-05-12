@@ -19,7 +19,7 @@ struct GoalsView: View {
                     VStack {
                         Spacer()
                         VStack(spacing: FortiFitSpacing.gapMedium) {
-                            Text("Set your first goal to start tracking")
+                            Text("Set your first goal to start tracking.")
                                 .font(FortiFitTypography.body)
                                 .foregroundStyle(FortiFitColors.mutedText)
                                 .frame(maxWidth: .infinity)
@@ -144,6 +144,11 @@ struct GoalsView: View {
                     }
                 }
             }
+            // Catch-all: drops landing outside any goal clear the stale drag state
+            .onDrop(of: [.text], isTargeted: nil) { _, _ in
+                draggingGoalID = nil
+                return false
+            }
             .onAppear {
                 viewModel.loadGoals(context: modelContext)
                 // Trigger pulse for goals completed today
@@ -153,6 +158,9 @@ struct GoalsView: View {
             .onDisappear {
                 viewModel.isReorderMode = false
                 viewModel.clearPulsedGoalIds()
+            }
+            .onChange(of: viewModel.isReorderMode) { _, isOn in
+                if !isOn { draggingGoalID = nil }
             }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 4 else { return }
@@ -404,18 +412,23 @@ struct GoalsView: View {
                 // Dual-target: conversational phrasing
                 let distDisplay: String = {
                     if settings.useMiles {
-                        return String(format: "%.1f miles", targetDist * UnitConversion.kmToMilesFactor)
+                        let miles = targetDist * UnitConversion.kmToMilesFactor
+                        let unit = miles == 1.0 ? "mile" : "miles"
+                        return String(format: "%.1f \(unit)", miles)
                     } else {
                         return String(format: "%.1f km", targetDist)
                     }
                 }()
-                Text("\(distDisplay) in \(Int(targetDur)) minutes")
+                let minUnit = Int(targetDur) == 1 ? "minute" : "minutes"
+                Text("\(distDisplay) in \(Int(targetDur)) \(minUnit)")
                     .font(FortiFitTypography.body)
                     .foregroundStyle(FortiFitColors.primaryText)
             } else if let targetDist = goal.targetDistanceKm {
                 let distDisplay: String = {
                     if settings.useMiles {
-                        return String(format: "%.1f miles", targetDist * UnitConversion.kmToMilesFactor)
+                        let miles = targetDist * UnitConversion.kmToMilesFactor
+                        let unit = miles == 1.0 ? "mile" : "miles"
+                        return String(format: "%.1f \(unit)", miles)
                     } else {
                         return String(format: "%.1f km", targetDist)
                     }
@@ -424,7 +437,8 @@ struct GoalsView: View {
                     .font(FortiFitTypography.body)
                     .foregroundStyle(FortiFitColors.primaryText)
             } else if let targetDur = goal.targetDurationMinutes {
-                Text("\(Int(targetDur)) minutes")
+                let minUnit = Int(targetDur) == 1 ? "minute" : "minutes"
+                Text("\(Int(targetDur)) \(minUnit)")
                     .font(FortiFitTypography.body)
                     .foregroundStyle(FortiFitColors.primaryText)
             }
@@ -629,7 +643,6 @@ private struct GoalDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         draggingGoalID = nil
-        viewModel.isReorderMode = false
         return true
     }
 

@@ -21,6 +21,25 @@ struct HealthKitWorkoutSnapshot {
     let elevationAscendedMeters: Double?
     let exerciseMinutes: Int?
     let indoor: Bool?
+    let workoutPlanId: UUID?
+
+    init(uuid: UUID, activityTypeRawValue: UInt, sourceBundleID: String, startDate: Date, endDate: Date, durationMinutes: Int, distanceKm: Double? = nil, avgHeartRate: Int? = nil, maxHeartRate: Int? = nil, activeEnergyKcal: Double? = nil, totalEnergyBurnedKcal: Double? = nil, elevationAscendedMeters: Double? = nil, exerciseMinutes: Int? = nil, indoor: Bool? = nil, workoutPlanId: UUID? = nil) {
+        self.uuid = uuid
+        self.activityTypeRawValue = activityTypeRawValue
+        self.sourceBundleID = sourceBundleID
+        self.startDate = startDate
+        self.endDate = endDate
+        self.durationMinutes = durationMinutes
+        self.distanceKm = distanceKm
+        self.avgHeartRate = avgHeartRate
+        self.maxHeartRate = maxHeartRate
+        self.activeEnergyKcal = activeEnergyKcal
+        self.totalEnergyBurnedKcal = totalEnergyBurnedKcal
+        self.elevationAscendedMeters = elevationAscendedMeters
+        self.exerciseMinutes = exerciseMinutes
+        self.indoor = indoor
+        self.workoutPlanId = workoutPlanId
+    }
 
     var mapping: HealthKitTypeMapping {
         HealthKitTypeMapping.map(activityTypeRawValue: activityTypeRawValue)

@@ -85,13 +85,14 @@ struct TrendsChartService {
         for chartType: String,
         exerciseName: String? = nil,
         timeRangeDays: Int? = nil,
+        useLbs: Bool? = nil,
         context: ModelContext
     ) -> ChartSummary? {
         let allWorkouts = WorkoutService.fetchAll(context: context)
 
         switch chartType {
         case "strengthTracker":
-            return strengthTrackerSummary(exerciseName: exerciseName, workouts: allWorkouts)
+            return strengthTrackerSummary(exerciseName: exerciseName, workouts: allWorkouts, useLbs: useLbs)
         case "trainingFrequency":
             return trainingFrequencySummary(workouts: allWorkouts)
         case "personalRecords":
@@ -113,10 +114,10 @@ struct TrendsChartService {
 
     // MARK: - Per-Chart Summary Computation
 
-    private static func strengthTrackerSummary(exerciseName: String?, workouts: [Workout]) -> ChartSummary? {
+    private static func strengthTrackerSummary(exerciseName: String?, workouts: [Workout], useLbs: Bool? = nil) -> ChartSummary? {
         guard let name = exerciseName, !name.isEmpty else { return nil }
         let nameLower = name.lowercased()
-        let useLbs = UserSettings.shared.useLbs
+        let useLbs = useLbs ?? UserSettings.shared.useLbs
 
         var workoutsWithExercise = 0
         var latestWeight: Double?
@@ -408,6 +409,21 @@ struct TrendsChartService {
             }
         }
         return result.sorted()
+    }
+
+    // MARK: - Strength Tracker Exercise List
+
+    static func exercisesWithStrengthData(context: ModelContext) -> [String] {
+        let allWorkouts = WorkoutService.fetchAll(context: context)
+        var exercises = Set<String>()
+        for workout in allWorkouts {
+            for set in workout.exerciseSets {
+                if set.weightKg != nil {
+                    exercises.insert(set.exerciseName)
+                }
+            }
+        }
+        return exercises.sorted()
     }
 
     // MARK: - PR Timeline Fetch

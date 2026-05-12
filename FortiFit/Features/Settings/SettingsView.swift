@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var headerHeight: CGFloat = 0
     @State private var viewModel: SettingsViewModel?
     @State private var showDisableAlert = false
+    @State private var showAppleWatchDisableAlert = false
+    @Environment(WatchScheduleService.self) private var watchScheduleService
 
     private var unitSelection: String {
         settings.useLbs ? "LBS" : "KG"
@@ -62,6 +64,8 @@ struct SettingsView: View {
                 FortiFitDivider()
 
                 appleHealthSection
+
+                appleWatchSection
             }
             .padding(.horizontal, FortiFitSpacing.screenHorizontal)
             .padding(.top, headerHeight)
@@ -97,12 +101,83 @@ struct SettingsView: View {
         #endif
     }
 
+    // MARK: - Apple Watch Section
+
+    @ViewBuilder
+    private var appleWatchSection: some View {
+        VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
+            FortiFitCard(borderColor: FortiFitColors.border) {
+                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                    Toggle(isOn: Binding(
+                        get: { settings.syncPlanToAppleWatchEnabled },
+                        set: { newValue in
+                            if newValue {
+                                settings.syncPlanToAppleWatchEnabled = true
+                                Task {
+                                    await watchScheduleService.handleMasterToggleOn(context: modelContext)
+                                }
+                            } else {
+                                showAppleWatchDisableAlert = true
+                            }
+                        }
+                    )) {
+                        Text(AppConstants.AppleWatch.settingsToggleLabel)
+                            .font(FortiFitTypography.body)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                    }
+                    .tint(FortiFitColors.primaryAccent)
+                    .accessibilityIdentifier(AccessibilityID.settingsAppleWatchToggle)
+
+                    Text(AppConstants.AppleWatch.settingsDescription)
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(FortiFitColors.mutedText)
+                }
+            }
+        }
+        .alert(AppConstants.AppleWatch.settingsTurnOffConfirmTitle, isPresented: $showAppleWatchDisableAlert) {
+            Button("Turn Off", role: .destructive) {
+                settings.syncPlanToAppleWatchEnabled = false
+                Task {
+                    await watchScheduleService.handleMasterToggleOff(context: modelContext)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(AppConstants.AppleWatch.settingsTurnOffConfirmMessage)
+        }
+    }
+
+    @ViewBuilder
+    private var appleWatchStatusLine: some View {
+        switch watchScheduleService.authState {
+        case .granted:
+            Text(AppConstants.AppleWatch.settingsStatusConnected)
+                .font(FortiFitTypography.bodySmall)
+                .foregroundStyle(FortiFitColors.positive)
+        case .denied:
+            VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
+                Text(AppConstants.AppleWatch.settingsStatusDenied)
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(FortiFitColors.alert)
+                Button(AppConstants.AppleWatch.settingsOpenSettings) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .tint(FortiFitColors.primaryAccent)
+                .accessibilityIdentifier(AccessibilityID.settingsAppleWatchOpenSettingsButton)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
     // MARK: - Apple Health Section
 
     @ViewBuilder
     private var appleHealthSection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
-            FortiFitScreenHeading("Apple Health", color: FortiFitColors.primaryAccent)
+            FortiFitScreenHeading("Apple Health & Devices", color: FortiFitColors.primaryAccent)
 
             FortiFitCard(borderColor: FortiFitColors.border) {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
@@ -130,7 +205,7 @@ struct SettingsView: View {
                     if let statusText = viewModel?.lastSyncDescription {
                         Text(statusText)
                             .font(FortiFitTypography.bodySmall)
-                            .foregroundStyle(FortiFitColors.mutedText)
+                            .foregroundStyle(viewModel?.authStatus == .granted ? FortiFitColors.positive : FortiFitColors.mutedText)
                     }
 
                     if viewModel?.healthKitEnabled == true {
@@ -169,5 +244,6 @@ struct SettingsView: View {
     NavigationStack {
         SettingsView()
             .environment(HealthKitSyncService(client: DefaultHealthKitClient(), matcher: WorkoutMatcher()))
+            .environment(WatchScheduleService(scheduler: NoOpWorkoutScheduler()))
     }
 }

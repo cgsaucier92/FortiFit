@@ -10,6 +10,8 @@ final class ExerciseSet {
     var weightKg: Double?
     var sortOrder: Int
     var workout: Workout?
+    var restSeconds: Int?
+    var displayAsTime: Bool?
 
     init(
         id: UUID = UUID(),
@@ -18,7 +20,9 @@ final class ExerciseSet {
         reps: Int,
         weightKg: Double? = nil,
         sortOrder: Int = 0,
-        workout: Workout? = nil
+        workout: Workout? = nil,
+        restSeconds: Int? = nil,
+        displayAsTime: Bool? = nil
     ) {
         self.id = id
         self.exerciseName = exerciseName
@@ -27,5 +31,7 @@ final class ExerciseSet {
         self.weightKg = weightKg
         self.sortOrder = sortOrder
         self.workout = workout
+        self.restSeconds = restSeconds
+        self.displayAsTime = displayAsTime
     }
 }

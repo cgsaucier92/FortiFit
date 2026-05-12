@@ -436,7 +436,8 @@ enum TestFixtures {
         avgHeartRate: Int? = 142,
         maxHeartRate: Int? = 168,
         activeEnergyKcal: Double? = 487,
-        indoor: Bool? = false
+        indoor: Bool? = false,
+        workoutPlanId: UUID? = nil
     ) -> HealthKitWorkoutSnapshot {
         HealthKitWorkoutSnapshot(
             uuid: uuid,
@@ -452,7 +453,8 @@ enum TestFixtures {
             totalEnergyBurnedKcal: nil,
             elevationAscendedMeters: nil,
             exerciseMinutes: nil,
-            indoor: indoor
+            indoor: indoor,
+            workoutPlanId: workoutPlanId
         )
     }
 

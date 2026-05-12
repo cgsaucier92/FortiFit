@@ -63,8 +63,9 @@ final class PlanViewModel {
 
         switch calendarMode {
         case .week:
-            guard let weekStart = calendar.date(byAdding: .day, value: dayOffset, to: Date().startOfWeek),
-                  let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart)
+            let buffer = 7
+            guard let weekStart = calendar.date(byAdding: .day, value: dayOffset - buffer, to: Date().startOfWeek),
+                  let weekEnd = calendar.date(byAdding: .day, value: 6 + buffer * 2, to: weekStart)
             else { return }
             planItemsForView = PlanService.fetchPlanSurface(start: weekStart, end: weekEnd, context: context)
 
@@ -289,23 +290,27 @@ final class PlanViewModel {
         showScheduleSheet = true
     }
 
+    @discardableResult
     func scheduleWorkout(
         template: WorkoutTemplate,
         date: Date,
         time: Date?,
         recurrenceRule: String?,
+        syncToAppleWatch: Bool = false,
         context: ModelContext
-    ) {
-        PlanService.scheduleWorkout(
+    ) -> [ScheduledWorkout] {
+        let created = PlanService.scheduleWorkout(
             template: template,
             date: date,
             time: time,
             recurrenceRule: recurrenceRule,
+            syncToAppleWatch: syncToAppleWatch,
             context: context
         )
         showScheduleSheet = false
         preSelectedTemplate = nil
         loadWorkoutsForCurrentView(context: context)
+        return created
     }
 
     // MARK: - Helpers

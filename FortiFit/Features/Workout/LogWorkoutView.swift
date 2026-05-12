@@ -463,6 +463,9 @@ struct ExerciseCardView: View {
     var onExerciseNameChanged: ((String) -> Void)?
     let onRemove: () -> Void
 
+    @State private var showRestPicker = false
+    @State private var showRestInfoPopover = false
+
     var body: some View {
         FortiFitCard(borderColor: FortiFitColors.border) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
@@ -489,11 +492,13 @@ struct ExerciseCardView: View {
                 }
                 .zIndex(1)
 
+                restAndToggleRow
+
                 // Column headers
                 HStack(spacing: FortiFitSpacing.elementSpacing) {
                     Text("SETS")
                         .frame(maxWidth: .infinity)
-                    Text("REPS")
+                    Text(exercise.resolvedDisplayAsTime ? "TIME" : "REPS")
                         .frame(maxWidth: .infinity)
                     Text(weightUnit.uppercased())
                         .frame(maxWidth: .infinity)
@@ -509,6 +514,7 @@ struct ExerciseCardView: View {
                         exerciseIndex: exerciseIndex,
                         rowIndex: rowIndex,
                         canRemove: exercise.rows.count > 1,
+                        isTimeMode: exercise.resolvedDisplayAsTime,
                         onRemove: { exercise.removeRow(row) }
                     )
                 }
@@ -526,6 +532,84 @@ struct ExerciseCardView: View {
             }
         }
     }
+
+    private var restAndToggleRow: some View {
+        HStack {
+            // REST PER SET
+            HStack(spacing: 4) {
+                Text("REST PER SET")
+                    .font(.system(size: 14, weight: .bold))
+                    .kerning(2)
+                    .foregroundStyle(FortiFitColors.mutedText)
+
+                Button {
+                    showRestInfoPopover.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(FortiFitColors.mutedText)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showRestInfoPopover) {
+                    Text(AppConstants.AppleWatch.restPerSetPopover)
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(FortiFitColors.primaryText)
+                        .padding()
+                        .frame(width: 280)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .presentationCompactAdaptation(.popover)
+                }
+                .accessibilityIdentifier(AccessibilityID.exerciseCardRestPerSetInfoPopover(exerciseIndex))
+
+                Spacer().frame(width: 4)
+
+                Button {
+                    showRestPicker.toggle()
+                } label: {
+                    Text(DurationFormat.display(seconds: exercise.restSeconds))
+                        .font(FortiFitTypography.body)
+                        .foregroundStyle(exercise.restSeconds != nil ? FortiFitColors.primaryText : FortiFitColors.mutedText)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadiusSmall)
+                                .fill(FortiFitColors.elevatedSurface)
+                        )
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showRestPicker) {
+                    DurationPickerView(
+                        seconds: Binding(
+                            get: { exercise.restSeconds },
+                            set: { exercise.restSeconds = $0 }
+                        ),
+                        isPresented: $showRestPicker
+                    )
+                    .presentationCompactAdaptation(.popover)
+                }
+                .accessibilityIdentifier(AccessibilityID.exerciseCardRestPerSetField(exerciseIndex))
+            }
+
+            Spacer()
+
+            // REPS / TIME toggle
+            Picker("", selection: Binding(
+                get: { exercise.resolvedDisplayAsTime },
+                set: { newValue in exercise.displayAsTime = newValue }
+            )) {
+                Text("REPS").tag(false)
+                Text("TIME").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 120)
+            .onAppear {
+                UISegmentedControl.appearance().setTitleTextAttributes(
+                    [.font: UIFont.boldSystemFont(ofSize: 14)], for: .normal
+                )
+            }
+            .accessibilityIdentifier(AccessibilityID.exerciseCardRepsTimeToggle(exerciseIndex))
+        }
+    }
 }
 
 // MARK: - SetRowView (isolated observation scope)
@@ -535,7 +619,10 @@ struct SetRowView: View {
     let exerciseIndex: Int
     let rowIndex: Int
     let canRemove: Bool
+    var isTimeMode: Bool = false
     let onRemove: () -> Void
+
+    @State private var showTimePicker = false
 
     var body: some View {
         HStack(spacing: FortiFitSpacing.elementSpacing) {
@@ -544,11 +631,42 @@ struct SetRowView: View {
                 placeholder: "0"
             )
             .accessibilityIdentifier(AccessibilityID.setsInput(exerciseIndex, rowIndex))
-            NumberFieldView(
-                text: Binding(get: { row.reps }, set: { row.reps = $0 }),
-                placeholder: "0"
-            )
-            .accessibilityIdentifier(AccessibilityID.repsInput(exerciseIndex, rowIndex))
+
+            if isTimeMode {
+                Button {
+                    showTimePicker.toggle()
+                } label: {
+                    Text(DurationFormat.display(seconds: Int(row.reps)))
+                        .font(FortiFitTypography.body)
+                        .foregroundStyle(row.reps.isEmpty ? FortiFitColors.mutedText : FortiFitColors.primaryText)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .background(
+                            RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadiusSmall)
+                                .fill(FortiFitColors.elevatedSurface)
+                        )
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showTimePicker) {
+                    DurationPickerView(
+                        seconds: Binding(
+                            get: { Int(row.reps) },
+                            set: { row.reps = $0.map { String($0) } ?? "" }
+                        ),
+                        isPresented: $showTimePicker
+                    )
+                    .presentationCompactAdaptation(.popover)
+                }
+                .accessibilityIdentifier(AccessibilityID.repsInput(exerciseIndex, rowIndex))
+            } else {
+                NumberFieldView(
+                    text: Binding(get: { row.reps }, set: { row.reps = $0 }),
+                    placeholder: "0"
+                )
+                .accessibilityIdentifier(AccessibilityID.repsInput(exerciseIndex, rowIndex))
+            }
+
             NumberFieldView(
                 text: Binding(get: { row.weight }, set: { row.weight = $0 }),
                 placeholder: "BW"
@@ -588,6 +706,72 @@ struct NumberFieldView: View {
             .keyboardType(.decimalPad)
             #endif
             .tint(FortiFitColors.primaryAccent)
+    }
+}
+
+// MARK: - Duration Formatting
+
+enum DurationFormat {
+    static func display(seconds: Int?) -> String {
+        guard let s = seconds, s > 0 else { return "—" }
+        if s < 60 {
+            return "\(s)s"
+        }
+        let min = s / 60
+        let rem = s % 60
+        return String(format: "%d:%02d", min, rem)
+    }
+}
+
+// MARK: - DurationPickerView
+
+struct DurationPickerView: View {
+    @Binding var seconds: Int?
+    var isPresented: Binding<Bool>?
+
+    private let values: [Int] = {
+        let min = AppConstants.AppleWatch.durationPickerMinSeconds
+        let max = AppConstants.AppleWatch.durationPickerMaxSeconds
+        let inc = AppConstants.AppleWatch.durationPickerIncrementSeconds
+        return stride(from: min, through: max, by: inc).map { $0 }
+    }()
+
+    @State private var selected: Int = 30
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Picker("Duration", selection: $selected) {
+                ForEach(values, id: \.self) { value in
+                    Text(DurationFormat.display(seconds: value)).tag(value)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 150)
+
+            HStack(spacing: 16) {
+                if seconds != nil {
+                    Button("Clear") {
+                        seconds = nil
+                        isPresented?.wrappedValue = false
+                    }
+                    .foregroundStyle(FortiFitColors.alert)
+                }
+                Button("Done") {
+                    seconds = selected
+                    isPresented?.wrappedValue = false
+                }
+                .foregroundStyle(FortiFitColors.primaryAccent)
+                .fontWeight(.semibold)
+            }
+            .padding(.bottom, 8)
+        }
+        .padding()
+        .onAppear {
+            if let s = seconds {
+                let snapped = values.min(by: { abs($0 - s) < abs($1 - s) }) ?? 30
+                selected = snapped
+            }
+        }
     }
 }
 

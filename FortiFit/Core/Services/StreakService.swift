@@ -18,12 +18,12 @@ struct StreakService {
 
     /// Calculates the consecutive-week workout streak per the PRD algorithm.
     /// Called on app launch, after each workout save/edit/delete, and after Settings changes.
-    static func calculateStreak(context: ModelContext, referenceDate: Date = Date(), target: Int? = nil) -> StreakResult {
+    static func calculateStreak(context: ModelContext, referenceDate: Date = Date(), target: Int? = nil, writeToSettings: Bool = true) -> StreakResult {
         let target = target ?? UserSettings.shared.targetWorkoutsPerWeek
 
         // Target of 0 = no streak
         guard target > 0 else {
-            updateSettings(streak: 0)
+            if writeToSettings { updateSettings(streak: 0) }
             return StreakResult(streak: 0, tier: .dormant, message: message(for: 0))
         }
 
@@ -58,7 +58,7 @@ struct StreakService {
             streak += 1
         }
 
-        updateSettings(streak: streak)
+        if writeToSettings { updateSettings(streak: streak) }
         return StreakResult(streak: streak, tier: tier(for: streak), message: message(for: streak))
     }
 

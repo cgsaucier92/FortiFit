@@ -477,8 +477,12 @@ enum AppConstants {
         "Power Cleans", "Clean and Press", "Kettlebell Swings",
         "Farmers Walks", "Turkish Get-Ups",
         // Core
-        "Planks", "Hanging Leg Raises", "Cable Crunches",
+        "Planks", "Side Planks", "Hanging Leg Raises", "Cable Crunches",
         "Ab Wheel Rollouts", "Russian Twists", "Woodchoppers",
+        "Hollow Hold", "L-Sit",
+        // Isometric / Holds
+        "Dead Hang", "Wall Sit", "Bear Hold", "Bear Crawl",
+        "Glute Bridge Hold",
         // HIIT / Cardio Exercises
         "Box Jumps", "Burpees", "Battle Ropes",
         "Sled Push", "Sled Pull", "Rowing Machine", "Assault Bike"
@@ -511,7 +515,38 @@ enum AppConstants {
         "Face Pull": "Face Pulls",
         "Hip Thrust": "Hip Thrusts",
         "Calf Raise": "Calf Raises",
-        "KB Swings": "Kettlebell Swings"
+        "KB Swings": "Kettlebell Swings",
+        "Plank": "Planks",
+        "Side Plank": "Side Planks",
+        "Hollow Body Hold": "Hollow Hold",
+        "L Sit": "L-Sit",
+        "Dead Hangs": "Dead Hang",
+        "Wall Sits": "Wall Sit",
+        "Bear Holds": "Bear Hold",
+        "Bear Crawls": "Bear Crawl",
+        "Glute Bridge Holds": "Glute Bridge Hold"
+    ]
+
+    // MARK: - Isometric Exercise Names
+
+    static let isometricExerciseNames: Set<String> = [
+        "Planks", "Side Planks", "Hollow Hold", "L-Sit",
+        "Dead Hang", "Wall Sit", "Bear Hold", "Glute Bridge Hold"
+    ]
+
+    // MARK: - Ambiguous Exercise Default Modes
+    // true = display as time, false = display as reps
+
+    static let ambiguousExerciseDefaultModes: [String: Bool] = [
+        "Burpees": false,
+        "Box Jumps": false,
+        "Battle Ropes": true,
+        "Farmers Walks": true,
+        "Sled Push": true,
+        "Sled Pull": true,
+        "Rowing Machine": true,
+        "Assault Bike": true,
+        "Bear Crawl": true
     ]
 
     // MARK: - HealthKit Strings
@@ -542,14 +577,14 @@ enum AppConstants {
 
         // Unlink Confirmation Dialog (Info Sheet)
         static let unlinkConfirmTitle = "Unlink workout from Apple Health?"
-        static let unlinkConfirmMessage = "This will delete all Apple Health\u{2013}sourced summary data for this workout, and you won't be able to link it back. This can't be undone."
+        static let unlinkConfirmMessage = "This will delete all Apple Health\u{2013}sourced summary data for this workout, and you won't be able to link it back."
         static let unlinkConfirmDestructive = "Unlink"
         static let unlinkConfirmCancel = "Cancel"
         static let unlinkSuccessToast = "Unlinked from Apple Health."
 
         // Unlink Confirmation Alert (Ellipsis Menu)
         static let ellipsisUnlinkConfirmTitle = "Unlink workout from Apple Health?"
-        static let ellipsisUnlinkConfirmMessage = "This will delete all Apple Health\u{2013}sourced summary data for this workout, and you won't be able to link it back.G"
+        static let ellipsisUnlinkConfirmMessage = "This will delete all Apple Health\u{2013}sourced summary data for this workout, and you won't be able to link it back."
         static let ellipsisUnlinkConfirmDestructive = "Unlink"
 
         // Source Name Display
@@ -569,6 +604,54 @@ enum AppConstants {
                 return "Distance is sourced from Apple Health and can't be edited here. Unlink the workout to edit it in FitNavi."
             }
         }
+    }
+
+    // MARK: - Apple Watch Strings (Phase 8.7 + 8.7.1)
+
+    enum AppleWatch {
+        // Settings Section
+        static let settingsToggleLabel = "Push Planned Workouts to Apple Watch"
+        static let settingsDescription = "Permit FitNavi to snyc planned workouts to the Workout app on Apple Watch. Requires watchOS 11 or later."
+        static let settingsStatusConnected = "Connected"
+        static let settingsStatusDenied = "Permission denied in iOS Settings"
+        static let settingsStatusOff = "Off"
+        static let settingsOpenSettings = "Open iOS Settings"
+        static let settingsTurnOffConfirmTitle = "Turn off Push to Apple Watch?"
+        static let settingsTurnOffConfirmMessage = "All scheduled workouts currently pushed to your Apple Watch will be removed. You can turn it back on anytime — your push preferences will be remembered."
+
+        // Master Sync Off Popover
+        static let masterOffTitle = "Push to Apple Watch is off"
+        static let masterOffBody = "Turn it on in Settings to push this workout to your Apple Watch."
+        static let masterOffOpenSettings = "Open Settings"
+
+        // Auth Denied Popover (variant of Master Sync Off)
+        static let authDeniedBody = "Permission denied. Open iOS Settings to grant access."
+        static let authDeniedOpenSettings = "Open iOS Settings"
+
+        // Field-Specific Gate Popovers
+        static let gateNoExercises = "Add at least one exercise to push to Apple Watch."
+
+        // Error Toast
+        static let errorToast = "Couldn't push to Apple Watch. Try again later."
+        static let errorToastRetry = "Retry"
+
+        // Edit Scheduled Workout
+        static let watchSyncToggleLabel = "Push to Apple Watch"
+        static let watchSyncInfoPopover = "Pushes this workout to your Apple Watch's Workout app. Appears in the Scheduled section on the workout's day."
+
+        // Schedule Workout
+        static let scheduleWorkoutToggleLabel = "Push to Apple Watch"
+        static let scheduleWorkoutMasterOffCaption = "Turn it on in Settings"
+        static let scheduleWorkoutAuthDeniedCaption = "Apple Health permission required — open iOS Settings"
+        static let scheduleWorkoutValidationFailedToast = "Couldn't push to Apple Watch — check Settings."
+
+        // Inline Popover Copy
+        static let restPerSetPopover = "Rest period between each set of this exercise. On Apple Watch, the rest period appears as a countdown timer."
+
+        // Duration Picker Range (REST PER SET + TIME column)
+        static let durationPickerMinSeconds = 5
+        static let durationPickerMaxSeconds = 600
+        static let durationPickerIncrementSeconds = 5
     }
 
     // MARK: - Scheduled Workout

@@ -15,7 +15,7 @@ struct AddGoalView: View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                    FortiFitScreenHeading(viewModel.isEditMode ? "Edit Goal" : "Add Goal")
+                    FortiFitScreenHeading(viewModel.isEditMode ? "Edit Goal" : "Create Goal")
 
                     // Goal Type Selector — hidden in edit mode (type is locked)
                     if !viewModel.isEditMode {

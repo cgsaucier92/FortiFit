@@ -116,6 +116,16 @@ final class HealthKitSyncService {
     }
 
     private func processSnapshot(_ snapshot: HealthKitWorkoutSnapshot, context: ModelContext) async {
+        // Step 0: Plan-ID Fast-Path (Phase 8.7)
+        if let planId = snapshot.workoutPlanId {
+            if let scheduledWorkout = PlanService.findByPlanId(planId, context: context),
+               scheduledWorkout.status == "planned",
+               fetchWorkoutByHKUUID(snapshot.uuid, context: context) == nil {
+                PlanService.completeFromWatch(scheduledWorkout: scheduledWorkout, hkSnapshot: snapshot, context: context)
+                return
+            }
+        }
+
         if let existing = fetchWorkoutByHKUUID(snapshot.uuid, context: context) {
             await handleUpstreamUpdate(existing: existing, snapshot: snapshot, context: context)
             return

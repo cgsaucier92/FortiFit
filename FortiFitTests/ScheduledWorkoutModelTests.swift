@@ -23,7 +23,7 @@ struct ScheduledWorkoutModelTests {
         #expect(sw.id != UUID())
         #expect(sw.status == "planned")
         #expect(sw.templateId == nil)
-        #expect(sw.templateSnapshot == nil)
+        #expect(sw.scheduledWorkoutSnapshot == nil)
         #expect(sw.scheduledTime == nil)
         #expect(sw.durationMinutes == nil)
         #expect(sw.completedWorkoutId == nil)
@@ -41,7 +41,7 @@ struct ScheduledWorkoutModelTests {
 
         let sw = ScheduledWorkout(
             templateId: templateId,
-            templateSnapshot: snapshot,
+            scheduledWorkoutSnapshot: snapshot,
             scheduledDate: PlanTestFactory.tomorrow,
             scheduledTime: Date(),
             workoutType: "HIIT",
@@ -54,7 +54,7 @@ struct ScheduledWorkoutModelTests {
         context.insert(sw)
 
         #expect(sw.templateId == templateId)
-        #expect(sw.templateSnapshot == snapshot)
+        #expect(sw.scheduledWorkoutSnapshot == snapshot)
         #expect(sw.workoutType == "HIIT")
         #expect(sw.workoutName == "Tabata Blast")
         #expect(sw.durationMinutes == 30)
@@ -111,7 +111,7 @@ struct ScheduledWorkoutModelTests {
         let template = PlanTestFactory.makeTemplate(context: context)
         let sw = ScheduledWorkout(
             templateId: template.id,
-            templateSnapshot: "[]".data(using: .utf8),
+            scheduledWorkoutSnapshot: "[]".data(using: .utf8),
             scheduledDate: PlanTestFactory.tomorrow,
             workoutType: template.workoutType,
             workoutName: template.name

@@ -19,7 +19,7 @@ struct CreateTemplateView: View {
         ZStack(alignment: .top) {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                FortiFitScreenHeading(viewModel.isEditMode ? "Edit Template" : "Create Template")
+                FortiFitScreenHeading(viewModel.isEditMode ? "Edit Template" : "Create Workout Template")
 
                 // Template Name
                 FortiFitLabel("Template Name", color: FortiFitColors.primaryText)
@@ -32,6 +32,8 @@ struct CreateTemplateView: View {
                     selected: $viewModel.workoutType,
                     placeholder: "Select Type"
                 )
+                .frame(width: 220, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .disabled(viewModel.isEditMode)
 
                 // Duration (optional)
@@ -40,6 +42,8 @@ struct CreateTemplateView: View {
                     #if os(iOS)
                     .keyboardType(.numberPad)
                     #endif
+                    .frame(width: 120, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 FortiFitDivider()
 

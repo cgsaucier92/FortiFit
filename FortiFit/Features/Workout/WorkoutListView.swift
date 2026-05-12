@@ -25,29 +25,25 @@ struct WorkoutListView: View {
 
                 FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
+                        FortiFitEllipsisButton(menuItems: [
+                            (label: "View Workout Templates", systemImage: "doc.on.doc", identifier: AccessibilityID.viewSavedTemplatesMenuItem, action: {
+                                viewModel.showSavedTemplates = true
+                            })
+                        ])
+                        .accessibilityIdentifier(AccessibilityID.workoutsEllipsisMenu)
+                        Spacer()
                         Menu {
+                            Button {
+                                viewModel.resetForm()
+                                viewModel.showLogWorkout = true
+                            } label: {
+                                Label("Log Workout", systemImage: "pencil.circle")
+                            }
                             Button {
                                 viewModel.showCreateTemplate = true
                             } label: {
-                                Label("Create Template", systemImage: "square.and.pencil")
+                                Label("Create Workout Template", systemImage: "square.and.pencil")
                             }
-                            Button {
-                                viewModel.showSavedTemplates = true
-                            } label: {
-                                Label("View Templates", systemImage: "doc.on.doc")
-                            }
-                            .accessibilityIdentifier(AccessibilityID.viewSavedTemplatesMenuItem)
-                        } label: {
-                            FortiFitEllipsisButton()
-                        }
-                        .accessibilityIdentifier(AccessibilityID.workoutsEllipsisMenu)
-                        Spacer()
-                        Button {
-                            #if os(iOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            #endif
-                            viewModel.resetForm()
-                            viewModel.showLogWorkout = true
                         } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 16))
@@ -60,6 +56,11 @@ struct WorkoutListView: View {
                                         .stroke(FortiFitColors.primaryAccent, lineWidth: 1)
                                 )
                         }
+                        .simultaneousGesture(LongPressGesture(minimumDuration: 0.01).onEnded { _ in
+                            #if os(iOS)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
+                        })
                     }
                 }
             }
@@ -68,6 +69,10 @@ struct WorkoutListView: View {
             .toolbar(.hidden, for: .navigationBar)
             #endif
             .onAppear { viewModel.loadWorkouts(context: modelContext) }
+            .onDisappear { viewModel.exitReorderMode() }
+            .onChange(of: viewModel.isReorderMode) { _, isOn in
+                if !isOn { draggedType = nil }
+            }
             .onChange(of: selectedTab, initial: false) { oldValue, _ in
                 guard oldValue == 1 else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -157,7 +162,7 @@ struct WorkoutListView: View {
         VStack {
             Spacer()
             VStack(spacing: FortiFitSpacing.gapMedium) {
-                Text("Log your first workout to see it here")
+                Text("Log your first workout to see it here.")
                     .font(FortiFitTypography.body)
                     .foregroundStyle(FortiFitColors.mutedText)
                     .frame(maxWidth: .infinity)
@@ -227,21 +232,26 @@ struct WorkoutListView: View {
                     ))
                 }
 
-                // Tappable area at the bottom to exit reorder mode
+                // Bottom area extends the tappable region beyond the last card
                 Color.clear
                     .frame(maxWidth: .infinity, minHeight: 300)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        draggedType = nil
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewModel.exitReorderMode()
-                        }
-                    }
             }
             .padding(.horizontal, FortiFitSpacing.screenHorizontal)
             .padding(.top, headerHeight)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                draggedType = nil
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.exitReorderMode()
+                }
+            }
         }
         .scrollClipDisabled()
+        // Catch-all: drops landing outside any card clear the stale drag state
+        .onDrop(of: [UTType.text], isTargeted: nil) { _, _ in
+            draggedType = nil
+            return false
+        }
     }
 
     // MARK: - Workout Type Section (Normal Mode)
@@ -834,9 +844,6 @@ struct WorkoutTypeReorderDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         draggedType = nil
-        withAnimation(.easeInOut(duration: 0.2)) {
-            viewModel.exitReorderMode()
-        }
         return true
     }
 

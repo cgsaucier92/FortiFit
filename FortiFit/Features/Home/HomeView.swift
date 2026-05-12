@@ -65,7 +65,7 @@ struct HomeView: View {
                                 FortiFitWidgetHeader(title: "Recent Workouts")
 
                                 if viewModel.recentWorkouts.isEmpty {
-                                    Text("Log your first workout to see it here")
+                                    Text("Log your first workout to see it here.")
                                         .font(FortiFitTypography.bodySmall)
                                         .foregroundStyle(FortiFitColors.mutedText)
                                 } else {
@@ -96,6 +96,11 @@ struct HomeView: View {
                                 viewModel.isEditMode = false
                             }
                         }
+                    }
+                    // Catch-all: drops landing outside any widget clear the stale drag state
+                    .onDrop(of: [.text], isTargeted: nil) { _, _ in
+                        draggingWidgetType = nil
+                        return false
                     }
 
                     // Header (floats on top of scroll content)
@@ -180,6 +185,9 @@ struct HomeView: View {
                 activityService.refreshWorkoutContributions(context: modelContext)
             }
             .onDisappear { viewModel.isEditMode = false }
+            .onChange(of: viewModel.isEditMode) { _, isOn in
+                if !isOn { draggingWidgetType = nil }
+            }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 0 else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -689,7 +697,7 @@ struct HomeView: View {
         workoutVM.selectedRPE = nil
         workoutVM.scheduledWorkoutId = scheduled.id
 
-        if let snapshotData = scheduled.templateSnapshot {
+        if let snapshotData = scheduled.scheduledWorkoutSnapshot {
             let exercises = PlanService.decodeSnapshot(data: snapshotData)
             let settings = UserSettings.shared
             var seen = Set<String>()
@@ -798,7 +806,6 @@ private struct WidgetDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         draggingWidgetType = nil
-        viewModel.isEditMode = false
         return true
     }
 

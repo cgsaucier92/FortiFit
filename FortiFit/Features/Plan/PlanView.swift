@@ -3,11 +3,16 @@ import SwiftData
 
 struct PlanView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(WatchScheduleService.self) private var watchScheduleService
     @State private var viewModel = PlanViewModel()
     @State private var workoutVM = WorkoutViewModel()
     @State private var calendarModeString = "Week"
     @State private var showSavedTemplates = false
     @State private var headerHeight: CGFloat = 0
+    @State private var showEditScheduledWorkout = false
+    @State private var scheduledWorkoutToEdit: ScheduledWorkout?
+    @State private var showWatchSyncErrorToast = false
+    @State private var showSettingsFromGatePopover = false
     var selectedTab: Int = 2
 
     var body: some View {
@@ -31,7 +36,16 @@ struct PlanView: View {
             ) {
                 Button("Cancel", role: .cancel) { viewModel.itemToRemove = nil }
                 Button("Remove", role: removeButtonRole) {
+                    let planId: UUID? = {
+                        if case .scheduled(let sw) = viewModel.itemToRemove {
+                            return sw.appleWorkoutPlanId
+                        }
+                        return nil
+                    }()
                     viewModel.executeRemoveFromPlan(context: modelContext)
+                    if let planId {
+                        Task { await watchScheduleService.removePlan(uuid: planId) }
+                    }
                 }
             } message: {
                 Text(removeConfirmationBody)
@@ -67,6 +81,17 @@ struct PlanView: View {
                         }
                 }
             }
+            .navigationDestination(isPresented: $showEditScheduledWorkout) {
+                if let sw = scheduledWorkoutToEdit {
+                    EditScheduledWorkoutView(watchScheduleService: watchScheduleService, scheduledWorkout: sw)
+                        .onDisappear {
+                            viewModel.loadWorkoutsForCurrentView(context: modelContext)
+                        }
+                }
+            }
+            .navigationDestination(isPresented: $showSettingsFromGatePopover) {
+                SettingsView()
+            }
     }
 
     private var planContentWithSheets: some View {
@@ -77,6 +102,12 @@ struct PlanView: View {
             .onAppear {
                 viewModel.resetToToday()
                 viewModel.loadWorkoutsForCurrentView(context: modelContext)
+                watchScheduleService.onError = { _ in
+                    showWatchSyncErrorToast = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        showWatchSyncErrorToast = false
+                    }
+                }
             }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 2 else { return }
@@ -95,6 +126,8 @@ struct PlanView: View {
                         viewModel.showRecurringRemovePrompt = false
                         viewModel.showCompletedToast = false
                         viewModel.showRemovedFromPlanToast = false
+                        showWatchSyncErrorToast = false
+                        showSettingsFromGatePopover = false
                         viewModel.itemToRemove = nil
                     }
                 }
@@ -118,14 +151,26 @@ struct PlanView: View {
                 ScheduleWorkoutView(
                     preSelectedDate: viewModel.selectedDate,
                     preSelectedTemplate: viewModel.preSelectedTemplate,
-                    onSchedule: { template, date, time, recurrence in
-                        viewModel.scheduleWorkout(
+                    onSchedule: { template, date, time, recurrence, syncToWatch in
+                        let created = viewModel.scheduleWorkout(
                             template: template,
                             date: date,
                             time: time,
                             recurrenceRule: recurrence,
+                            syncToAppleWatch: syncToWatch,
                             context: modelContext
                         )
+                        if syncToWatch {
+                            for sw in created {
+                                Task { await watchScheduleService.schedule(sw, context: modelContext) }
+                            }
+                        }
+                    },
+                    onOpenSettings: {
+                        viewModel.showScheduleSheet = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showSettingsFromGatePopover = true
+                        }
                     }
                 )
             }
@@ -135,7 +180,11 @@ struct PlanView: View {
                     completionRPE: $viewModel.completionRPE,
                     completionDuration: $viewModel.completionDuration,
                     onSave: {
+                        let planId = viewModel.activeScheduledWorkout?.appleWorkoutPlanId
                         viewModel.completeWorkout(context: modelContext)
+                        if let planId {
+                            Task { await watchScheduleService.removePlan(uuid: planId) }
+                        }
                     },
                     onModifyExercises: {
                         viewModel.showCompletionSheet = false
@@ -155,7 +204,7 @@ struct PlanView: View {
                 if viewModel.showEmptyState {
                     VStack {
                         Spacer()
-                        Text("Schedule your first workout to start planning")
+                        Text("Schedule your first workout to start planning.")
                             .font(FortiFitTypography.body)
                             .foregroundStyle(FortiFitColors.mutedText)
                             .multilineTextAlignment(.center)
@@ -198,7 +247,7 @@ struct PlanView: View {
                 FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
                         FortiFitEllipsisButton(menuItems: [
-                            (label: "Saved Templates", systemImage: "doc.on.doc", identifier: AccessibilityID.planSavedTemplatesMenuItem, action: {
+                            (label: "View Workout Templates", systemImage: "doc.on.doc", identifier: AccessibilityID.planSavedTemplatesMenuItem, action: {
                                 showSavedTemplates = true
                             })
                         ])
@@ -266,6 +315,32 @@ struct PlanView: View {
             .offset(y: viewModel.showRemovedFromPlanToast ? 0 : -60)
             .allowsHitTesting(viewModel.showRemovedFromPlanToast)
             .animation(.easeInOut(duration: 0.2), value: viewModel.showRemovedFromPlanToast)
+
+            // Watch sync error toast
+            VStack {
+                HStack(spacing: FortiFitSpacing.elementSpacing) {
+                    Text(AppConstants.AppleWatch.errorToast)
+                        .font(FortiFitTypography.bodySmall)
+                        .foregroundStyle(.white)
+                    Button(AppConstants.AppleWatch.errorToastRetry) {
+                        showWatchSyncErrorToast = false
+                        Task { await watchScheduleService.reconcile(context: modelContext) }
+                    }
+                    .font(FortiFitTypography.bodySmall.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .accessibilityIdentifier(AccessibilityID.watchSyncErrorToast_retryButton)
+                }
+                .padding(.horizontal, FortiFitSpacing.cardPadding)
+                .padding(.vertical, FortiFitSpacing.elementSpacing)
+                .background(Capsule().fill(FortiFitColors.alert))
+                .padding(.top, FortiFitSpacing.screenTop)
+                Spacer()
+            }
+            .accessibilityIdentifier(AccessibilityID.watchSyncErrorToast)
+            .opacity(showWatchSyncErrorToast ? 1 : 0)
+            .offset(y: showWatchSyncErrorToast ? 0 : -60)
+            .allowsHitTesting(showWatchSyncErrorToast)
+            .animation(.easeInOut(duration: 0.2), value: showWatchSyncErrorToast)
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.showCompletedToast)
     }
@@ -300,13 +375,37 @@ struct PlanView: View {
                     FortiFitScheduledWorkoutCard(
                         scheduledWorkout: scheduledWorkout,
                         onComplete: { viewModel.initiateCompletion(scheduledWorkout: scheduledWorkout) },
-                        onSkip: { viewModel.skipWorkout(scheduledWorkout, context: modelContext) },
-                        onRestore: { viewModel.restoreWorkout(scheduledWorkout, context: modelContext) },
+                        onSkip: {
+                            let planId = scheduledWorkout.appleWorkoutPlanId
+                            viewModel.skipWorkout(scheduledWorkout, context: modelContext)
+                            if let planId {
+                                Task { await watchScheduleService.removePlan(uuid: planId) }
+                            }
+                        },
+                        onRestore: {
+                            viewModel.restoreWorkout(scheduledWorkout, context: modelContext)
+                            if scheduledWorkout.syncToAppleWatch {
+                                Task { await watchScheduleService.schedule(scheduledWorkout, context: modelContext) }
+                            }
+                        },
                         onRemoveFromPlan: { viewModel.confirmRemoveFromPlan(item) },
                         isCompletedHealthKitLinked: isCompletedWorkoutHealthKitLinked(scheduledWorkout),
                         onTap: scheduledWorkout.status == "completed" ? {
                             navigateToWorkoutDetail(completedWorkoutId: scheduledWorkout.completedWorkoutId)
-                        } : nil
+                        } : nil,
+                        watchSyncGlyphState: watchSyncGlyphState(for: scheduledWorkout),
+                        onWatchSyncTap: {
+                            handleWatchSyncGlyphTap(scheduledWorkout)
+                        },
+                        onEditWorkout: (scheduledWorkout.status == "planned" || scheduledWorkout.status == "skipped") ? {
+                            scheduledWorkoutToEdit = scheduledWorkout
+                            showEditScheduledWorkout = true
+                        } : nil,
+                        cardIndex: index,
+                        gatePopoverTitle: gatePopoverTitle(for: scheduledWorkout),
+                        gatePopoverBody: gatePopoverBody(for: scheduledWorkout),
+                        gatePopoverButtonLabel: gatePopoverButtonLabel(for: scheduledWorkout),
+                        onGatePopoverButton: gatePopoverAction(for: scheduledWorkout)
                     )
                     .accessibilityIdentifier(AccessibilityID.scheduledWorkoutCard(index))
 
@@ -375,6 +474,89 @@ struct PlanView: View {
         }
     }
 
+    // MARK: - Watch Sync Helpers
+
+    private func watchSyncGlyphState(for sw: ScheduledWorkout) -> FortiFitWatchSyncGlyph.State {
+        if watchScheduleService.gateFailureReason(for: sw) != nil {
+            return .disabled
+        }
+        return sw.syncToAppleWatch ? .active : .inactive
+    }
+
+    private func handleWatchSyncGlyphTap(_ sw: ScheduledWorkout) {
+        let state = watchSyncGlyphState(for: sw)
+        switch state {
+        case .active:
+            sw.syncToAppleWatch = false
+            try? modelContext.save()
+            if let planId = sw.appleWorkoutPlanId {
+                Task { await watchScheduleService.removePlan(uuid: planId) }
+            }
+            viewModel.updateSelectedDayItems(context: modelContext)
+        case .inactive:
+            sw.syncToAppleWatch = true
+            try? modelContext.save()
+            Task { await watchScheduleService.schedule(sw, context: modelContext) }
+            viewModel.updateSelectedDayItems(context: modelContext)
+        case .disabled:
+            break
+        }
+    }
+
+    private func gatePopoverTitle(for sw: ScheduledWorkout) -> String? {
+        guard let failure = watchScheduleService.gateFailureReason(for: sw) else { return nil }
+        switch failure {
+        case .masterOff, .authDenied:
+            return AppConstants.AppleWatch.masterOffTitle
+        case .noExercises, .pastDate:
+            return nil
+        }
+    }
+
+    private func gatePopoverBody(for sw: ScheduledWorkout) -> String? {
+        guard let failure = watchScheduleService.gateFailureReason(for: sw) else { return nil }
+        switch failure {
+        case .masterOff:
+            return AppConstants.AppleWatch.masterOffBody
+        case .authDenied:
+            return AppConstants.AppleWatch.authDeniedBody
+        case .noExercises:
+            return AppConstants.AppleWatch.gateNoExercises
+        case .pastDate:
+            return nil
+        }
+    }
+
+    private func gatePopoverButtonLabel(for sw: ScheduledWorkout) -> String? {
+        guard let failure = watchScheduleService.gateFailureReason(for: sw) else { return nil }
+        switch failure {
+        case .masterOff:
+            return AppConstants.AppleWatch.masterOffOpenSettings
+        case .authDenied:
+            return AppConstants.AppleWatch.authDeniedOpenSettings
+        case .noExercises, .pastDate:
+            return nil
+        }
+    }
+
+    private func gatePopoverAction(for sw: ScheduledWorkout) -> (() -> Void)? {
+        guard let failure = watchScheduleService.gateFailureReason(for: sw) else { return nil }
+        switch failure {
+        case .masterOff:
+            return { showSettingsFromGatePopover = true }
+        case .authDenied:
+            return {
+                #if os(iOS)
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                #endif
+            }
+        case .noExercises, .pastDate:
+            return nil
+        }
+    }
+
     // MARK: - Helpers
 
     private func prepareLogWorkoutFromScheduled(_ scheduled: ScheduledWorkout) {
@@ -386,7 +568,7 @@ struct PlanView: View {
         workoutVM.selectedRPE = nil
         workoutVM.scheduledWorkoutId = scheduled.id
 
-        if let snapshotData = scheduled.templateSnapshot {
+        if let snapshotData = scheduled.scheduledWorkoutSnapshot {
             let exercises = PlanService.decodeSnapshot(data: snapshotData)
             let settings = UserSettings.shared
             var seen = Set<String>()

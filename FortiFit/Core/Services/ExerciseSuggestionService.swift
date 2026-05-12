@@ -136,6 +136,23 @@ struct ExerciseSuggestionService {
         return Array(results.prefix(5))
     }
 
+    // MARK: - Isometric Lookup
+
+    static func isIsometric(
+        _ exerciseName: String,
+        aliasMap: [String: String] = AppConstants.exerciseAliasMap,
+        isometricNames: Set<String> = AppConstants.isometricExerciseNames,
+        ambiguousDefaults: [String: Bool] = AppConstants.ambiguousExerciseDefaultModes
+    ) -> Bool {
+        let resolved = aliasMap[exerciseName] ?? exerciseName
+
+        if isometricNames.contains(resolved) { return true }
+
+        if let isTime = ambiguousDefaults[resolved] { return isTime }
+
+        return false
+    }
+
     // MARK: - Levenshtein Distance
 
     static func levenshteinDistance(_ s1: String, _ s2: String) -> Int {

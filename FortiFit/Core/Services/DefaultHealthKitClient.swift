@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import WorkoutKit
 
 final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
     private let healthStore = HKHealthStore()
@@ -50,7 +51,7 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
             hkAnchor = nil
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        let (rawWorkouts, deletedUUIDs, anchorData) = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<([HKWorkout], [UUID], Data?), Error>) in
             let query = HKAnchoredObjectQuery(
                 type: HKObjectType.workoutType(),
                 predicate: nil,
@@ -63,18 +64,26 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
                 }
 
                 let workouts = (samplesOrNil as? [HKWorkout]) ?? []
-                let snapshots = workouts.compactMap { self.makeSnapshot(from: $0) }
-                let deletedUUIDs = (deletedObjectsOrNil ?? []).map(\.uuid)
+                let deleted = (deletedObjectsOrNil ?? []).map(\.uuid)
 
                 var anchorData: Data?
                 if let newAnchor {
                     anchorData = try? NSKeyedArchiver.archivedData(withRootObject: newAnchor, requiringSecureCoding: true)
                 }
 
-                continuation.resume(returning: (snapshots, deletedUUIDs, anchorData))
+                continuation.resume(returning: (workouts, deleted, anchorData))
             }
             healthStore.execute(query)
         }
+
+        var snapshots: [HealthKitWorkoutSnapshot] = []
+        for workout in rawWorkouts {
+            if let snapshot = await makeSnapshot(from: workout) {
+                snapshots.append(snapshot)
+            }
+        }
+
+        return (snapshots, deletedUUIDs, anchorData)
     }
 
     func observeWorkoutChanges(handler: @escaping @Sendable () -> Void) {
@@ -261,7 +270,7 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
 
     // MARK: - Helpers
 
-    private func makeSnapshot(from workout: HKWorkout) -> HealthKitWorkoutSnapshot? {
+    private func makeSnapshot(from workout: HKWorkout) async -> HealthKitWorkoutSnapshot? {
         let durationMinutes = Int((workout.duration / 60.0).rounded())
 
         var distanceKm: Double?
@@ -307,6 +316,11 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
 
         let isIndoor = workout.metadata?[HKMetadataKeyIndoorWorkout] as? Bool
 
+        var planId: UUID?
+        if let plan = try? await workout.workoutPlan {
+            planId = plan.id
+        }
+
         return HealthKitWorkoutSnapshot(
             uuid: workout.uuid,
             activityTypeRawValue: workout.workoutActivityType.rawValue,
@@ -321,7 +335,8 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
             totalEnergyBurnedKcal: totalKcal,
             elevationAscendedMeters: elevation,
             exerciseMinutes: exerciseMin,
-            indoor: isIndoor
+            indoor: isIndoor,
+            workoutPlanId: planId
         )
     }
 }

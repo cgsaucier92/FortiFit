@@ -457,3 +457,88 @@
 | Root Cause | SwiftUI Charts renders marks in its own compositing layer. `.chartXSelection` uses an internal gesture recognizer that XCUI coordinate-based gestures (`.tap()`, `.press(forDuration:)`, `.press(forDuration:thenDragTo:)`) do not trigger. Chart mark `.accessibilityIdentifier()` modifiers create accessibility tree entries but these are not hittable XCUI elements. This is a known platform limitation of XCUI + Swift Charts. |
 | Resolution | Tests rewritten to verify achievable assertions: chart card renders with data (card + header summary identifiers exist), time range toggle responds without crashing. Full selection annotation verification deferred to manual QA (see IMPLEMENTATION_PLAN.md § Manual QA). |
 | Status | Open — pending platform support |
+
+### BUG-035
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-10 |
+| Phase | Phase 8.7 — Apple Watch Workout Scheduling |
+| Description | When a user completes a planned workout via the Custom Workout push-to-Watch flow, the app creates a new workout record on the Plan screen instead of completing the existing ScheduledWorkout. The plan-ID round-trip fast-path in `HealthKitSyncService.processSnapshot()` never fires, so the incoming HK workout falls through to `autoCreate()`. |
+| Root Cause | `DefaultHealthKitClient.makeSnapshot()` looked up the plan UUID via a guessed metadata key string (`"HKWorkoutPlanId"`). No public `HKMetadataKeyWorkoutPlanId` constant exists in HealthKit. WorkoutKit provides the plan identity through `HKWorkout.workoutPlan` (an async extension property), not through raw metadata. Because the metadata lookup always missed, `snapshot.workoutPlanId` was always `nil`, the fast-path in `HealthKitSyncService.processSnapshot()` was skipped, and the workout was treated as a brand-new import. |
+| Resolution | Replaced metadata key lookup with `try? await workout.workoutPlan` (WorkoutKit extension on `HKWorkout`). Reads `plan.id` directly. Required making `makeSnapshot` async and restructuring `fetchWorkouts` to process snapshots outside the synchronous `HKAnchoredObjectQuery` callback. |
+| Status | Resolved |
+
+### BUG-036
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-10 |
+| Phase | Phase 8.7 — Apple Watch Workout Scheduling |
+| Description | Fatal crash ("Index out of range" in `ContiguousArrayBuffer`) when deleting an exercise on the Edit Planned Workout screen. |
+| Root Cause | `exerciseCard(index:)` used `$viewModel.exercises[index]` subscript bindings throughout (text fields, rest/time toggles, row bindings). When `removeExercise(at:)` mutated the array, SwiftUI re-evaluated existing bindings from the previous render cycle before tearing down old views. Those bindings still held the now-stale integer index, which was out of bounds on the shrunken array. The same pattern existed for the inner row-level `ForEach`. |
+| Resolution | Replaced all index-based `$viewModel.exercises[index]` bindings with ID-based safe `Binding` wrappers (`exerciseBinding(for: UUID)` and `rowBinding(exerciseId:rowId:)`). Getters use `first(where:)` with a harmless default fallback; setters guard with `firstIndex(where:)`. All mutation call sites (`removeExercise`, `removeRow`, `addRow`) now resolve the index at call time via `firstIndex`. |
+| Status | Resolved |
+
+### BUG-037
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-11 |
+| Phase | Phase 7 — Plan (Workout Scheduler) |
+| Description | When drag-swiping the week strip on the Plan screen, the day-of-week labels (MON, TUE, etc.) stay fixed while the date numbers shift. Labels and numbers become misaligned after any non-week-multiple drag. |
+| Root Cause | `dayAbbreviations` is a hardcoded array `["MON"..."SUN"]` indexed by ForEach enumeration position (0-6). The drag gesture shifts `effectiveOffset` by individual days, changing which date lands at each position, but the label at each position never changes — position 0 always reads "MON" even when its date is a Tuesday. Additionally, the `.animation` modifier cross-fades numbers in place rather than sliding the entire strip, creating a visual split between static labels and transitioning numbers. |
+| Resolution | Replaced the hardcoded array with a `dayAbbreviation(for:)` helper that derives the label from each date's actual weekday. Added `.id(effectiveOffset)` with a `.push` transition and explicit `withAnimation` to make the entire strip (labels + numbers + dots) slide as a unit on drag. |
+| Status | Resolved |
+
+---
+
+### BUG-038
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-11 |
+| Phase | Phase 7 — Plan (Schedule Workout template preview) |
+| Description | On the Plan Workout (Schedule Workout) screen, the exercise count shown in the template preview cards is incorrect. For example, a template with 5 distinct exercises (each having 2 set rows) displays "10 exercises" instead of "5 exercises". The count reflects the total number of `TemplateExerciseSet` rows rather than the number of unique exercises. |
+| Root Cause | `ScheduleWorkoutView.swift:361` uses `template.exerciseSets.count`, which counts every `TemplateExerciseSet` row (one per set/rep variation). A single exercise with 3 sets produces 3 `TemplateExerciseSet` records, so the displayed count is inflated by the number of sets per exercise. The count should instead be the number of distinct exercise names across those sets. |
+| Resolution | Replaced `template.exerciseSets.count` with `Set(template.exerciseSets.map(\.exerciseName)).count` in `ScheduleWorkoutView.swift:361` to count distinct exercises instead of individual set rows. |
+| Status | Resolved |
+
+---
+
+### BUG-039
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-11 |
+| Phase | Phase 3 / Phase 7 — Edit Workout Template + Edit Planned Workout (exercise set ordering) |
+| Description | On the Edit Workout Template and Edit Planned Workout screens, exercise set rows within each exercise appear in a non-deterministic order instead of the order they were entered. For example, a user entering Overhead Press at 95, 115, 135 lbs (ascending) may see 115, 135, 95 after reopening the screen. Same class of bug as BUG-010, which was fixed for Log Workout / Edit Workout but not applied to these two surfaces. |
+| Root Cause | **Edit Workout Template:** `WorkoutTemplateViewModel.buildExerciseData()` (line 158) assigns `sortOrder: index` where `index` is the exercise-level enumeration index, not a per-row counter. All rows within the same exercise receive the same `sortOrder` value. When `TemplateExerciseSet` records are later queried from SwiftData, rows with identical `sortOrder` appear in non-deterministic order. This bad data also propagates downstream to scheduled workout snapshots via `PlanService.encodeSnapshot(template:)`, which reads from `template.exerciseSets.sorted { $0.sortOrder < $1.sortOrder }`. **Edit Planned Workout:** The `performSave` path correctly uses a global counter (line 152), so re-saving fixes ordering. However, if the initial snapshot was created from a template with duplicate `sortOrder` values, the loaded rows inherit the ambiguous ordering. |
+| Resolution | Changed `WorkoutTemplateViewModel.buildExerciseData()` to use a global sequential counter (`globalSortOrder`) incremented per row instead of using the exercise-level enumeration index. Each row now gets a unique, sequential `sortOrder` value. Regression test: `WorkoutTemplateServiceTests/test_multiRowExercise_producesUniqueSortOrders`. |
+| Status | Resolved |
+
+---
+
+### BUG-040
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-11 |
+| Phase | Phase 6.2 — Trends Chart Detail View (Strength Tracker exercise dropdown missing) |
+| Description | The Strength Tracker chart on the compact Trends card correctly shows an inline `FortiFitSelect` dropdown to pick which exercise to display (e.g. Barbell Rows, Barbell Squats, Overhead Press). When the user taps into the detail view (`FortiFitChartDetailView`), the dropdown is absent — the chart renders with whatever exercise was last selected on the compact card, but there is no way to change it. The Personal Records detail view does not have this problem; it renders its own `FortiFitSelect` dropdown. |
+| Root Cause | `FortiFitChartDetailView` reads `selectedStrengthExercise` from UserDefaults at init (key `"trendsSelectedExercise"`) and passes it to `lineChartDetail(...)` via `exerciseNameForChart(...)`, but never renders a `FortiFitSelect` control for the Strength Tracker chart type. The compact card's dropdown lives in `FortiFitProgressView.strengthTrackerCard` and uses `ProgressViewModel.selectedExercise` / `selectExercise(...)` — none of that wiring exists in the detail view. By contrast, the Personal Records detail view (`prTimelineDetail`) renders its own `FortiFitSelect` bound to `selectedPRExercise` with inline UserDefaults persistence, demonstrating the intended pattern. |
+| Resolution | Added `TrendsChartService.exercisesWithStrengthData(context:)` to fetch sorted exercise names that have weight data. Added a `FortiFitSelect` dropdown to the `strengthTracker` case in `FortiFitChartDetailView.detailChartContent(...)`, bound to `selectedStrengthExercise` with inline UserDefaults persistence and `selectedIndex` reset on change — same pattern as `prTimelineDetail`. |
+| Status | Resolved |
+
+---
+
+### BUG-041
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-12 |
+| Phase | Phase 6 — Trends Screen (chart reorder drag state stuck) |
+| Description | On the Trends screen, when reordering charts via drag-and-drop, one or more chart cards remain visually greyed out (opacity 0.5) after the drag ends. The greyed state persists even after exiting reorder/edit mode by tapping the screen or switching tabs. The chart still functions, but its appearance is incorrect until the view is recreated (e.g., relaunching the app). The same pattern likely affects the other reorderable screens (Home widgets, Goals, Workouts), though only Trends has been reported so far. |
+| Root Cause | The dragged chart's greyed appearance is driven by `.opacity(draggingChartType == chart.chartType ? 0.5 : 1.0)` in `FortiFitProgressView.swift:172`. The `@State var draggingChartType: String?` is set inside `.onDrag { draggingChartType = chart.chartType ... }` (line 179) but is only reset to `nil` in `ChartDropDelegate.performDrop(...)` (line 1036). SwiftUI's `.onDrag` modifier does not provide a "drag ended" callback, and `performDrop` is only invoked when the drag terminates over a valid drop target. If the drag is cancelled (released outside any drop zone, or the gesture is interrupted), `draggingChartType` is never cleared and the source chart stays at 0.5 opacity indefinitely. Compounding factors after the BUG-041-adjacent change that kept reorder mode active across drops: the user now performs multiple successive drags before tapping to exit, increasing the surface area for a cancelled or mis-targeted drop to leave state stale. Neither the tap-to-exit handler, `onDisappear`, nor the tab-change handler reset `draggingChartType`, so leaving reorder mode does not recover. |
+| Resolution | Two-layer fix on all four reorderable screens (`FortiFitProgressView`, `HomeView`, `GoalsView`, `WorkoutListView`): (1) **`onChange(of: isReorderMode/isEditMode)`** resets the dragging state variable when reorder/edit mode transitions to false, so any path out of edit mode (tap, tab switch, `onDisappear`) recovers stale state. (2) **Catch-all `.onDrop(of: [.text], isTargeted: nil)`** on the outer ScrollView/container fires when a drop lands outside any inner card/widget/goal, immediately clearing the stale drag state while the user is still in edit mode. SwiftUI's drop-target nesting routes successful inner drops to their inner delegates and only routes "missed" drops to the outer catch-all (which returns `false` to signal the drop wasn't actually consumed for reordering — just used for cleanup). The first fix alone left stuck-greyed cards visible during long edit sessions; the catch-all closes that gap. |
+| Status | Resolved |

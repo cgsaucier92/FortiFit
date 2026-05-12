@@ -207,6 +207,21 @@ struct FortiFitChartDetailView: View {
 
         switch chartId {
         case "strengthTracker":
+            let strengthExercises = TrendsChartService.exercisesWithStrengthData(context: modelContext)
+            if !strengthExercises.isEmpty {
+                FortiFitSelect(
+                    options: strengthExercises,
+                    selected: Binding(
+                        get: { selectedStrengthExercise },
+                        set: {
+                            selectedStrengthExercise = $0
+                            selectedIndex = nil
+                            UserDefaults.standard.set($0, forKey: "trendsSelectedExercise")
+                        }
+                    ),
+                    placeholder: "Select Exercise"
+                )
+            }
             lineChartDetail(chartId: chartId, range: range, exerciseName: exerciseName, color: FortiFitColors.chartPink, gradientAnchor: gradientAnchor, yLabel: settings.useLbs ? "lbs" : "kg")
         case "trainingFrequency":
             barChartDetail(chartId: chartId, range: range, color: FortiFitColors.positive, gradientAnchor: gradientAnchor, yLabel: "sessions")

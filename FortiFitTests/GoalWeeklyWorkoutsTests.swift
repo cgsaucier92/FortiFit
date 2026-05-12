@@ -94,7 +94,7 @@ struct GoalWeeklyWorkoutsTests {
         context.insert(w)
         try context.save()
 
-        let progress = GoalService.weeklyWorkoutsProgress(context: context)
+        let progress = GoalService.weeklyWorkoutsProgress(context: context, target: 0)
         #expect(progress.percentage == 0)
         #expect(progress.isComplete == false)
     }
@@ -116,7 +116,7 @@ struct GoalWeeklyWorkoutsTests {
         }
         try context.save()
 
-        let progress = GoalService.weeklyWorkoutsProgress(context: context)
+        let progress = GoalService.weeklyWorkoutsProgress(context: context, target: 2)
         #expect(progress.percentage == 100)
         #expect(progress.isComplete == true)
     }
@@ -166,14 +166,15 @@ struct GoalWeeklyWorkoutsTests {
     // WEEK-009 — Deleting weeklyWorkouts goal does not affect Streak calculation
     @Test func deletingGoalDoesNotAffectStreak() throws {
         let context = try makeGoalContext()
-        let originalStreak = UserSettings.shared.currentStreak
 
         GoalService.createWeeklyWorkoutsGoal(context: context)
         let goal = GoalService.fetchAll(context: context).first { $0.goalType == "weeklyWorkouts" }!
 
+        let streakBefore = StreakService.calculateStreak(context: context, writeToSettings: false)
         GoalService.deleteGoal(goal, context: context)
+        let streakAfter = StreakService.calculateStreak(context: context, writeToSettings: false)
 
-        #expect(UserSettings.shared.currentStreak == originalStreak)
+        #expect(streakAfter.streak == streakBefore.streak)
     }
 
     // WEEK-010 — Recalculates on workout save, edit, AND delete (same triggers as Streak)

@@ -456,7 +456,9 @@ final class WorkoutViewModel {
                         sets: max(Int(row.sets) ?? 1, 1),
                         reps: max(Int(row.reps) ?? 1, 1),
                         weightKg: parseWeight(row.weight),
-                        sortOrder: globalSortOrder
+                        sortOrder: globalSortOrder,
+                        restSeconds: entry.restSeconds,
+                        displayAsTime: entry.displayAsTime
                     )
                     workout.exerciseSets.append(exerciseSet)
                     globalSortOrder += 1
@@ -597,6 +599,8 @@ final class WorkoutViewModel {
                 let entry = ExerciseFormEntry()
                 entry.name = name
                 if let sets = grouped[name] {
+                    entry.restSeconds = sets.first?.restSeconds
+                    entry.displayAsTime = sets.first?.displayAsTime
                     entry.rows = sets.map { exerciseSet in
                         let row = SetRow()
                         row.sets = String(exerciseSet.sets)
@@ -631,7 +635,9 @@ final class WorkoutViewModel {
                         sets: max(Int(row.sets) ?? 1, 1),
                         reps: max(Int(row.reps) ?? 1, 1),
                         weightKg: parseWeight(row.weight),
-                        sortOrder: globalSortOrder
+                        sortOrder: globalSortOrder,
+                        restSeconds: entry.restSeconds,
+                        displayAsTime: entry.displayAsTime
                     )
                     newSets.append(exerciseSet)
                     globalSortOrder += 1
@@ -729,7 +735,9 @@ final class WorkoutViewModel {
                     sets: set.sets,
                     reps: set.reps,
                     weightKg: set.weightKg,
-                    sortOrder: set.sortOrder
+                    sortOrder: set.sortOrder,
+                    restSeconds: set.restSeconds,
+                    displayAsTime: set.displayAsTime
                 )
             }
         WorkoutTemplateService.create(
@@ -752,7 +760,9 @@ final class WorkoutViewModel {
                     sets: max(Int(row.sets) ?? 1, 1),
                     reps: max(Int(row.reps) ?? 1, 1),
                     weightKg: parseWeight(row.weight),
-                    sortOrder: globalSortOrder
+                    sortOrder: globalSortOrder,
+                    restSeconds: entry.restSeconds,
+                    displayAsTime: entry.displayAsTime
                 ))
                 globalSortOrder += 1
             }
@@ -862,6 +872,12 @@ final class ExerciseFormEntry: Identifiable {
     let id = UUID()
     var name: String = ""
     var rows: [SetRow] = [SetRow()]
+    var restSeconds: Int?
+    var displayAsTime: Bool?
+
+    var resolvedDisplayAsTime: Bool {
+        displayAsTime ?? ExerciseSuggestionService.isIsometric(name)
+    }
 
     func addRow() {
         rows.append(SetRow())

@@ -303,7 +303,7 @@ Any time a workout is logged, edited, deleted, or batch-deleted via workout type
 - **Weekly streak** — recalculate across affected weeks.
 - **Power Level** — recalculate if Strength Training or HIIT was involved.
 - **Workout Type card** — update count. If last workout of a type is gone, remove the card and delete the WorkoutTypeOrder record.
-- **Scheduled workout linkage** — if the deleted workout's ID matches any `ScheduledWorkout.completedWorkoutId`, null that field and revert status to "planned".
+- **Scheduled workout linkage** — if the deleted workout's ID matches any `ScheduledWorkout.completedWorkoutId`, null that field and revert status to "planned". If the reverted `ScheduledWorkout` had `syncToAppleWatch == true` and gates still pass, `WatchScheduleService.schedule(_:)` is called to re-register the plan on Watch (the user will probably want to redo the session).
 
 ### Workout Deletion
 Apply the Workout Cascade to remaining data.
@@ -335,7 +335,7 @@ Remove HomeWidget record only. No underlying data affected. Widget re-addable vi
 Remove TrendsChart record only. No underlying data affected. Chart re-addable via Add Charts menu. Remaining charts re-index sortOrder. Identical behavior to Widget Deletion.
 
 ### Scheduled Workout Deletion
-Remove `ScheduledWorkout` record. No effect on any other data (no Workout is created until completion). For recurring workouts, "Remove from Plan → This and future" removes this instance and all future instances sharing the same `recurrenceGroupId` — past completed/skipped instances are preserved.
+Remove `ScheduledWorkout` record. **If `appleWorkoutPlanId != nil`, also call `WatchScheduleService.removePlan(_:)` to clear any Watch-side registration before deletion** (Phase 8.7+; see WORKOUTKIT.md § 12). The UUID is wiped along with the record. No effect on any other data (no Workout is created until completion). For recurring workouts, "Remove from Plan → This and future" removes this instance and all future instances sharing the same `recurrenceGroupId` — each with a separate `removePlan` call if synced — past completed/skipped instances are preserved.
 
 **Completed scheduled workout removed via Plan ("Remove from Plan" dual-action):** The `ScheduledWorkout` record is deleted AND the linked `Workout` has `hiddenFromPlan` set to `true`. See SERVICES.md § PlanService → Remove from Plan for full semantics. The underlying `Workout` is otherwise unaffected — all cascades (PR, Training Load, streaks, goals, charts) continue to include it.
 
@@ -454,6 +454,7 @@ See HEALTHKIT.md § 9 for the sync lifecycle overview.
 
 For each `HealthKitWorkoutSnapshot` returned by the anchored query:
 
+0. **Plan-ID Fast-Path (Phase 8.7+).** If `snapshot.workoutPlanId` is present (populated via `HKWorkout.workoutPlan?.id`, a WorkoutKit async extension), query `PlanService.findByPlanId(_:)` for a `ScheduledWorkout` with matching `appleWorkoutPlanId`. If found AND the matched `ScheduledWorkout.status == "planned"` AND no FitNavi `Workout` already exists with `healthKitUUID == snapshot.uuid`, route through `PlanService.completeFromWatch(scheduledWorkout:hkSnapshot:)` and skip the matcher entirely. See WORKOUTKIT.md § 8 for full mechanics. If the matched `ScheduledWorkout` is already completed/skipped, or if the plan ID doesn't resolve, fall through to the standard pipeline (Steps 1–4) — better to create a duplicate manual workout than silently overwrite a completed slot.
 1. **If `snapshot.isDeleted == true` → Upstream Delete handler.** Find the FitNavi `Workout` with matching `healthKitUUID`. If found, apply § HealthKit Upstream Delete rules (null out pointer fields, bump `lastModifiedDate`, no cascade). If not found, no-op.
 2. **Else if a FitNavi `Workout` exists with `healthKitUUID == snapshot.uuid` → Upstream Update handler.** Apply § HealthKit Upstream Update rules via `WorkoutService.update()`. HK wins on HK-owned fields; user-owned fields untouched. Full cascade fires.
 3. **Else (new HK workout) → Matcher path.** Call `WorkoutMatcher.findMatch(forIncomingHKWorkout: snapshot)`. Three possible outcomes:
@@ -651,24 +652,29 @@ Callers pass the enum case rather than a field name string. Each case maps to a 
 
 ## PlanService (PlanService.swift)
 
-**Purpose:** CRUD for scheduled workouts, recurrence generation, date resolution, template snapshot encoding/decoding, and completion flow.
+**Purpose:** CRUD for scheduled workouts, recurrence generation, date resolution, scheduled-workout snapshot encoding/decoding, and completion flow (including Watch-completion fast-path).
 
-### Template Snapshot
+### Scheduled Workout Snapshot
 
-When a user schedules a template, the exercise data (names, sets, reps, weights, sort order) is serialized into `ScheduledWorkout.templateSnapshot` as a JSON blob at scheduling time. This ensures:
-- Editing a template after scheduling does not silently alter planned workouts.
+When a user schedules a template, the exercise data (names, sets, reps, weights, restSeconds, displayAsTime, sort order) is serialized into `ScheduledWorkout.scheduledWorkoutSnapshot` as a JSON blob at scheduling time. **Renamed from `templateSnapshot` in Phase 8.7** to reflect the post-Phase-8.7 semantics: the `ScheduledWorkout` is the source of truth for everything Watch-relevant, and Edit Planned Workout (SCREENS.md § Edit Planned Workout) freely deviates the snapshot from the originating template. This ensures:
+
+- Editing a template after scheduling does not silently alter planned workouts (existing semantics, unchanged).
+- Editing a `ScheduledWorkout` mutates only that instance's snapshot (or "this and future" recurrences via the prompt — see § editScheduledWorkout below).
 - Deleting a template does not orphan scheduled workouts.
 - The "Complete Planned Workout" flow always has exercise data to populate.
+- The new per-exercise `restSeconds` and `displayAsTime` fields drive the Apple Watch CustomWorkout composition (WORKOUTKIT.md § 6).
 
-**encodeSnapshot(template: WorkoutTemplate) → Data:** Serializes the template's TemplateExerciseSets into a JSON array of `{ exerciseName, sets, reps, weightKg, sortOrder }` objects.
+**encodeSnapshot(template: WorkoutTemplate) → Data:** Serializes the template's TemplateExerciseSets into a JSON array of `{ exerciseName, sets, reps, weightKg, sortOrder, restSeconds, displayAsTime }` objects. The two new fields (Phase 8.7) are nullable — decoders default to nil for snapshots written before Phase 8.7.
 
-**decodeSnapshot(data: Data) → [SnapshotExercise]:** Deserializes the JSON blob back into an array of exercise structs for populating Log Workout or creating a Workout directly.
+**encodeSnapshot(exercises: [SnapshotExercise]) → Data:** Re-encodes a mutated exercise list back into the JSON blob. Used by the Edit Planned Workout flow's decode-edit-re-encode pattern.
+
+**decodeSnapshot(data: Data) → [SnapshotExercise]:** Deserializes the JSON blob back into an array of exercise structs for populating Log Workout, Edit Planned Workout, creating a Workout directly, or building the WorkoutKit `CustomWorkout` (via `WatchScheduleService`).
 
 ### Scheduling
 
-- **Schedule:** Create a `ScheduledWorkout` record. Copy name, workoutType, durationMinutes from the selected template. Encode template exercises into `templateSnapshot`. Set status = "planned". `scheduledDate` must be today or in the future — past dates are rejected.
-- **Schedule recurring:** Accept a recurrence rule ("weekly" / "biweekly") and generate individual `ScheduledWorkout` records for the next 12 weeks, each sharing the same `recurrenceGroupId` (a new UUID). Each instance gets its own `templateSnapshot` copied at creation time.
-- **Regenerate recurrence:** When the user opens the Plan tab and fewer than 4 future instances remain for a `recurrenceGroupId`, auto-generate additional instances to maintain a 12-week lookahead. Silent background operation.
+- **Schedule:** Create a `ScheduledWorkout` record. Copy name, workoutType, durationMinutes from the selected template. Encode template exercises (with the new `restSeconds` and `displayAsTime` fields) into `scheduledWorkoutSnapshot`. Set status = "planned". `scheduledDate` must be today or in the future — past dates are rejected. `syncToAppleWatch` is captured at sheet save time from the Plan Workout sheet's "Push to Apple Watch" toggle (Phase 8.7.1+ — see SCREENS.md § Plan → Push to Apple Watch Toggle). Toggle default at sheet open is driven by `UserSettings.syncPlanToAppleWatchEnabled` AND WorkoutKit auth state: `true` when both pass, `false` (greyed, non-interactive) otherwise. After save, if `syncToAppleWatch == true`, gates are validated server-side; on pass, `WatchScheduleService.schedule(_:)` is invoked.
+- **Schedule recurring:** Accept a recurrence rule ("weekly" / "biweekly") and generate individual `ScheduledWorkout` records for the next 12 weeks, each sharing the same `recurrenceGroupId` (a new UUID). Each instance gets its own `scheduledWorkoutSnapshot` copied at creation time. All instances inherit the `syncToAppleWatch` and `scheduledTime` values captured from the Plan Workout sheet (Phase 8.7.1+) — applied to each instance's own date. If the inherited `syncToAppleWatch == true`, `WatchScheduleService.schedule(_:)` fires for each new instance.
+- **Regenerate recurrence:** When the user opens the Plan tab and fewer than 4 future instances remain for a `recurrenceGroupId`, auto-generate additional instances to maintain a 12-week lookahead. Silent background operation. **Watch sync intent inheritance:** each newly-generated instance inherits `syncToAppleWatch` from the most recent existing instance in the same `recurrenceGroupId` (mirrors the user's expressed pattern). Each new instance with `syncToAppleWatch == true` triggers `WatchScheduleService.schedule(_:)` after creation. Each new instance gets a fresh `appleWorkoutPlanId` UUID stamped at first sync. See WORKOUTKIT.md § 13.
 
 ### Retrieval
 
@@ -684,8 +690,37 @@ When a user schedules a template, the exercise data (names, sets, reps, weights,
 
 ### Completion
 
-- **Complete:** Accept a `ScheduledWorkout`, RPE (optional), and duration (optional). Decode `templateSnapshot`, create a `Workout` + `ExerciseSet` records from the snapshot data plus RPE and duration. Set `ScheduledWorkout.status` = "completed" and `completedWorkoutId` = new Workout's ID. Trigger all standard workout-save cascades (PR recalc, goal auto-update, Training Load, streak, Power Level).
-- **Complete via Log Workout:** When the user taps "Modify Exercises," pass the `ScheduledWorkout.id` through to Log Workout. On workout save, call back to PlanService to mark the slot completed and link the workout ID.
+- **Complete:** Accept a `ScheduledWorkout`, RPE (optional), and duration (optional). Decode `scheduledWorkoutSnapshot`, create a `Workout` + `ExerciseSet` records from the snapshot data (preserving `restSeconds` and `displayAsTime` per exercise) plus RPE and duration. Set `ScheduledWorkout.status` = "completed" and `completedWorkoutId` = new Workout's ID. **If `syncToAppleWatch == true` and `appleWorkoutPlanId != nil`, call `WatchScheduleService.removePlan(_:)` to clear the now-stale Watch entry** (the workout is completed; no need for it to remain in the Scheduled section). Trigger all standard workout-save cascades (PR recalc, goal auto-update, Training Load, streak, Power Level).
+- **Complete via Log Workout:** When the user taps "Modify Exercises," pass the `ScheduledWorkout.id` through to Log Workout. On workout save, call back to PlanService to mark the slot completed and link the workout ID. Same `WatchScheduleService.removePlan(_:)` call applies if synced.
+- **Complete from Watch (Phase 8.7):** New entry point invoked by `HealthKitSyncService.importPendingWorkouts()` Step 0 (Plan-ID Fast-Path). Method signature: `completeFromWatch(scheduledWorkout: ScheduledWorkout, hkSnapshot: HealthKitWorkoutSnapshot)`. Flow:
+  1. Decode `scheduledWorkoutSnapshot`.
+  2. Build a `Workout` with: `name = scheduledWorkout.workoutName`, `workoutType = scheduledWorkout.workoutType`, `date = hkSnapshot.startDate`, `time = hkSnapshot.startDate` (time component), `healthKitUUID = hkSnapshot.uuid`, `healthKitSourceBundleID = hkSnapshot.sourceBundleID`, `healthKitActivityType = hkSnapshot.activityTypeDisplayString`, and all HK-owned fields (duration, distance, HR, calories, elevation, exerciseMinutes, indoor) populated from the snapshot.
+  3. Build `ExerciseSet` records from the decoded snapshot exercises (preserving `restSeconds` and `displayAsTime` per exercise).
+  4. Persist the `Workout` and its `ExerciseSet`s through `WorkoutService.log()` — this fires the standard Workout Cascade (PR recalc, goal auto-update, Training Load, streak, Power Level, GoalSnapshot).
+  5. Set `scheduledWorkout.status = "completed"` and `completedWorkoutId = workout.id`.
+  6. Call `WatchScheduleService.removePlan(scheduledWorkout.appleWorkoutPlanId)` to clear the Watch-side registration (workout is completed; no longer needs to be in the Scheduled section).
+  7. iOS 18+: if no RPE was set on the snapshot exercises and HK has a `workoutEffortScore` for this workout, run the standard nil-fill path (HEALTHKIT.md § 8).
+
+  **Bypasses `WorkoutMatcher` entirely** — plan-ID match is deterministic. See WORKOUTKIT.md § 8 for full mechanics and edge cases.
+
+- **findByPlanId(_ planId: UUID) → ScheduledWorkout?:** Lookup helper used by `HealthKitSyncService` Step 0. Queries SwiftData for a `ScheduledWorkout` whose `appleWorkoutPlanId == planId`. Returns nil if not found (e.g., the `ScheduledWorkout` was deleted between scheduling and Watch completion).
+
+### Edit Planned Workout (Phase 8.7)
+
+`editScheduledWorkout(_ scheduledWorkout: ScheduledWorkout, edits: ScheduledWorkoutEdits, applyTo: RecurrenceScope)` — invoked from the Edit Planned Workout screen on Save (SCREENS.md § Edit Planned Workout).
+
+Where:
+- `ScheduledWorkoutEdits` is a struct carrying all editable fields: `workoutName`, `scheduledDate`, `scheduledTime`, `durationMinutes`, `exercises: [SnapshotExercise]`, `syncToAppleWatch`.
+- `RecurrenceScope` is an enum: `.thisOnly` / `.thisAndFuture`. Caller resolves by prompting the user when `recurrenceGroupId != nil`. Single-instance edits skip the prompt and pass `.thisOnly`.
+
+Flow:
+
+1. Apply edits to the target `ScheduledWorkout`(s):
+   - For `.thisOnly`: this instance only. Re-encode `exercises` into `scheduledWorkoutSnapshot`. Update `workoutName`, `scheduledDate`, `scheduledTime`, `durationMinutes`, `syncToAppleWatch` directly on this record.
+   - For `.thisAndFuture`: this instance plus all future instances in the same `recurrenceGroupId` (`scheduledDate >= this instance's date`). Apply the same field updates to each. Past completed/skipped instances untouched.
+2. **Date-change rule:** if `scheduledDate` changed and `recurrenceGroupId != nil`, force `applyTo = .thisOnly` regardless of caller's choice — applying a date change to a series doesn't have coherent semantics. Caller's UI should suppress the "this and future" option when a date change is detected (SCREENS.md § Edit Planned Workout).
+3. **Watch sync re-sync:** for each affected `ScheduledWorkout` whose `syncToAppleWatch == true` after the edits AND whose gates pass, call `WatchScheduleService.resync(_:)` — `removePlan(uuid)` followed by `schedule(plan, at:)` with the same `appleWorkoutPlanId`. For `.thisAndFuture`, each affected instance is re-synced individually with its own UUID. Errors surface via the standard error toast (WORKOUTKIT.md § 11); per-card flags retained.
+4. No cascade fires (the `ScheduledWorkout` doesn't drive any algorithm until completion).
 
 ### Date Resolution
 
@@ -725,6 +760,112 @@ Historical note: the action previously named "Delete from Schedule" has been ren
 ### Workout Deletion Linkage
 
 When a `Workout` that is linked to a `ScheduledWorkout` (via `completedWorkoutId`) is deleted, PlanService sets `completedWorkoutId` to nil and reverts status to "planned". This allows the user to re-complete the scheduled slot.
+
+---
+
+## WorkoutSchedulerProtocol (WorkoutSchedulerProtocol.swift) — Phase 8.7
+
+**Purpose:** Protocol abstraction over Apple's WorkoutKit framework. All WorkoutKit access in FitNavi goes through this protocol. The concrete implementation (`DefaultWorkoutScheduler`) is the only file in the codebase that imports `WorkoutKit` (besides the model-builder helpers in `WatchScheduleService` for `CustomWorkout` / `IntervalBlock` types). Integration tests inject `StubWorkoutScheduler` from `TestFixtures.swift` instead.
+
+See WORKOUTKIT.md § 4 (Architecture Decisions) for the rationale (mirrors `HealthKitClient`).
+
+### Protocol Surface
+
+```swift
+protocol WorkoutSchedulerProtocol {
+    func authorizationState() async -> WorkoutSchedulerAuthState  // .notDetermined | .granted | .denied
+    func requestAuthorization() async -> WorkoutSchedulerAuthState
+    func schedule(_ plan: WorkoutPlan, at date: Date) async throws
+    func removePlan(id: UUID) async throws
+    func scheduledPlans() async -> [ScheduledPlanInfo]  // for reconciliation: returns IDs + scheduled dates
+}
+```
+
+`StubWorkoutScheduler` records every call and exposes assertion helpers (e.g., `assertScheduled(uuid:atDate:)`, `assertRemoved(uuid:)`). No test file outside the stub itself imports `WorkoutKit`.
+
+---
+
+## WatchScheduleService (WatchScheduleService.swift) — Phase 8.7
+
+**Purpose:** Orchestrate the full WorkoutKit outbound scheduling lifecycle — schedule plans for synced `ScheduledWorkout`s, remove plans on toggle-off / completion / deletion, reconcile state on master-toggle and foreground transitions, and surface errors via the standard error toast. All `WorkoutSchedulerProtocol` interactions are serialized through this service to prevent races.
+
+See WORKOUTKIT.md § 7 for the lifecycle overview.
+
+### Responsibilities
+
+- Own the lone reference to `WorkoutSchedulerProtocol`.
+- Build `WorkoutPlan` (containing a `WorkoutComposition` of type `.custom`) from a `ScheduledWorkout` per WORKOUTKIT.md § 6 plan composition rules.
+- Call `requestAuthorization()` when invoked from the master-toggle on path.
+- Maintain in-memory effective-state cache: `(scheduledWorkoutId: UUID, planId: UUID, scheduledAt: Date, snapshotHash: String)` for reconciliation diffing.
+- Marshal all calls onto a serial actor or single-threaded queue to prevent race conditions when multiple per-card toggles fire concurrently.
+- Surface failures via error toast (caller-provided closure).
+
+### Triggers
+
+| Source | Behavior |
+|---|---|
+| Per-card toggle on (Plan card glyph or Edit Planned Workout toggle) | `schedule(scheduledWorkout:)` |
+| Per-card toggle off | `removePlan(scheduledWorkout.appleWorkoutPlanId)` |
+| Edit Planned Workout save (synced instance) | `resync(scheduledWorkout:)` — `removePlan` + `schedule` with same UUID |
+| `ScheduledWorkout` skipped, completed (in-app or Watch path), removed-from-plan, deleted | `removePlan(uuid)` if `appleWorkoutPlanId != nil` |
+| Settings master toggle on | `requestAuthorization()` (if `.notDetermined`); on grant, `reconcile()` |
+| Settings master toggle off | Loop: `removePlan` for every `ScheduledWorkout` with `syncToAppleWatch == true` and `appleWorkoutPlanId != nil` |
+| App foreground transition | `reconcile()` (defensive sweep + past-dated cleanup) |
+| WorkoutKit auth state change (granted ↔ denied) | `reconcile()` |
+| 12-week recurrence regeneration creates new instances | `schedule(_:)` for each new instance with inherited `syncToAppleWatch == true` |
+| "This and Future" recurrence edit | `resync(_:)` for each affected synced instance |
+
+### Plan Composition (`buildPlan(scheduledWorkout:)`)
+
+See WORKOUTKIT.md § 6 for full mechanics. Summary:
+
+1. Decode `scheduledWorkoutSnapshot`.
+2. Map `scheduledWorkout.workoutType` → `HKWorkoutActivityType` via the outbound table in HK_MAPPING.md § Outbound Mapping.
+3. For each exercise, resolve display mode: `displayAsTime ?? ExerciseSuggestionService.isIsometric(exerciseName)`.
+4. Build one `IntervalBlock` per exercise with one `IntervalStep(.work, goal:)` per set, plus `IntervalStep(.recovery, goal: .time(restSeconds, .seconds))` between sets when `restSeconds != nil`. No recovery after final set in each block.
+5. Set step display name per WORKOUTKIT.md § 6 formatting table.
+6. Wrap in `WorkoutPlan(id: scheduledWorkout.appleWorkoutPlanId, ...)`.
+
+### Schedule Date Resolution
+
+`schedule(_:at:)` requires a real `Date`. Computed from `scheduledWorkout.scheduledDate` + `scheduledWorkout.scheduledTime`. When `scheduledTime` is nil, the service falls back to noon (12:00 PM) on the scheduled date. Apple Watch does not surface the scheduled time to users, and the writeback uses the actual start time from iOS/watchOS.
+
+### Sync Gates (assertion before any operation)
+
+Before calling `schedule(_:)` for any `ScheduledWorkout`, assert all of:
+1. `UserSettings.syncPlanToAppleWatchEnabled == true`
+2. `authorizationState() == .granted`
+3. `scheduledWorkout.scheduledDate >= today`
+4. `scheduledWorkout.scheduledWorkoutSnapshot` decodes to ≥1 exercise
+
+If any fail, the schedule call is skipped and the caller is responsible for reflecting the gate failure in the UI (disabled glyph, popover). Defensive — UI should already be gating, but service must not silently produce broken Watch state.
+
+### Error Handling
+
+- **Auth not granted:** caught at gate-check; service no-ops. UI updates Settings status line to denied state.
+- **Auth revoked mid-session:** detected on next operation. Service updates internal auth-state cache to denied, triggers UI refresh, surfaces no error toast (it's a deliberate state, not a transient failure).
+- **Internal WorkoutKit error:** surfaced via error toast with [Retry]. Per-card flag retained.
+- **Plan ID collision (theoretical):** logged internally. No user-visible action.
+
+See WORKOUTKIT.md § 11 for full error matrix.
+
+### Reconciliation (`reconcile()`)
+
+Called from foreground, master-toggle on, auth-state change, and post-recurrence-regen. Loop:
+
+1. Query `WorkoutSchedulerProtocol.scheduledPlans()` to enumerate currently-registered plans on Watch.
+2. Build expected set: every `ScheduledWorkout` where `syncToAppleWatch == true` AND all gates pass.
+3. For each expected `ScheduledWorkout`:
+   - If its `appleWorkoutPlanId` is not in `scheduledPlans()`: schedule it.
+   - If it is in `scheduledPlans()` but the `(snapshotHash, scheduledAt)` doesn't match the cached effective state: `removePlan` + `schedule` (content drifted; re-register).
+4. For each plan in `scheduledPlans()` whose UUID isn't in any expected `ScheduledWorkout`: `removePlan` (orphan from prior session, deletion, or completion).
+5. **Past-dated sweep:** for any `ScheduledWorkout` with `syncToAppleWatch == true` AND `scheduledDate < today` AND `status == "planned"`, call `removePlan` (the plan is stale on Watch). Per-card flag retained.
+
+Reconciliation is idempotent — running it twice in succession produces no additional Watch operations.
+
+### Threading
+
+WorkoutKit's `WorkoutScheduler.shared` is documented as thread-safe, but `WatchScheduleService` serializes all calls through a single actor (or `DispatchQueue` with a serial executor) to ensure FitNavi-side state mutations are race-free. UI callbacks (toast, glyph state updates) marshal to `@MainActor`.
 
 ---
 
@@ -901,7 +1042,7 @@ For each `range`, the prior period is the immediately preceding window of the sa
 
 ## ExerciseSuggestionService (ExerciseSuggestionService.swift)
 
-**Purpose:** Hybrid autocomplete for exercise name inputs across Log Workout, Create Template, and Add Goal (Custom exercise).
+**Purpose:** Hybrid autocomplete for exercise name inputs across Log Workout, Create Workout Template, and Create Goal (Custom exercise).
 
 ### Data Sources
 1. **User history:** Exercise names from all previously logged workouts. Refreshed after workout save/delete.
@@ -927,8 +1068,23 @@ If no candidates match via prefix/word-boundary/contains, check Levenshtein edit
 - All matching is case-insensitive
 - `refreshHistory()` updates the history source after workout save/delete
 
+### isIsometric Lookup (Phase 8.7)
+
+`isIsometric(_ exerciseName: String) -> Bool` — resolves the dictionary's intended display mode for an exercise name. Used by:
+
+- The template editor / Log Workout / Edit Planned Workout UI to set the initial REPS/TIME segmented control state (SCREENS.md § Log Workout → Exercise Card Additions).
+- `WatchScheduleService` to resolve `displayAsTime ?? isIsometric(exerciseName)` for plan composition (WORKOUTKIT.md § 6).
+
+Resolution order:
+1. Resolve aliases first (e.g., "Plank" → "Planks") via the alias map.
+2. Check `CONSTANTS.md § Isometric Exercise Names` set membership. Return `true` if found.
+3. Check `CONSTANTS.md § Ambiguous Exercise Default Modes` map. Return the configured default if found (e.g., "Battle Ropes" → true; "Burpees" → false).
+4. Default: return `false` (rep-based).
+
+Stateless and pure. No history dependency — uses only the static dictionary plus alias map.
+
 ### FortiFitExerciseAutocomplete Component
-Dropdown overlay below input. Elevated surface (#2d2d2d), border (#404040). Each row: 44pt min height, 13px 600-weight #e5e5e5 text. First row highlighted (#3b82f6 at 10% opacity). Appears when ≥1 character typed and suggestions exist. Tap suggestion → populates input, dismisses immediately. Tap outside / press return / lose focus → dismisses, accepts typed text. Renders above sibling cards via zIndex. 0.15s opacity fade-in. Identical behavior across Log Workout, Create Template, and Add Goal.
+Dropdown overlay below input. Elevated surface (#2d2d2d), border (#404040). Each row: 44pt min height, 13px 600-weight #e5e5e5 text. First row highlighted (#3b82f6 at 10% opacity). Appears when ≥1 character typed and suggestions exist. Tap suggestion → populates input, dismisses immediately. Tap outside / press return / lose focus → dismisses, accepts typed text. Renders above sibling cards via zIndex. 0.15s opacity fade-in. Identical behavior across Log Workout, Create Workout Template, and Create Goal.
 
 ---
 
@@ -1009,7 +1165,7 @@ If `ImageRenderer` returns nil (render failure), show a brief toast: "Couldn't g
 
 ## TemplateShareService (TemplateShareService.swift)
 
-**Purpose:** Encodes workout templates into QR code URLs, generates QR code images, decodes incoming QR URLs, and handles template import with duplicate name resolution. See `SCREENS.md` § Saved Templates List (Share Template QR Modal) and `SCREENS.md` § Template Import Prompt for UI specs.
+**Purpose:** Encodes workout templates into QR code URLs, generates QR code images, decodes incoming QR URLs, and handles template import with duplicate name resolution. See `SCREENS.md` § Workout Templates List (Share Template QR Modal) and `SCREENS.md` § Template Import Prompt for UI specs.
 
 ### URL Scheme
 

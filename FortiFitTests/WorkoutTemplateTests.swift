@@ -620,6 +620,34 @@ struct WorkoutTemplateServiceTests {
         #expect(workout.durationMinutes == 45)
     }
 
+    // MARK: - BUG-039 Regression
+
+    /// BUG-039: buildExerciseData used exercise index for sortOrder, so multiple
+    /// rows within the same exercise all received the same sortOrder value.
+    @Test func test_multiRowExercise_producesUniqueSortOrders() throws {
+        let context = try makeTemplateTestContext()
+        let vm = WorkoutTemplateViewModel()
+
+        let entry = ExerciseFormEntry()
+        entry.name = "Bench Press"
+        let row1 = SetRow(); row1.sets = "1"; row1.reps = "8"; row1.weight = "60"
+        let row2 = SetRow(); row2.sets = "1"; row2.reps = "6"; row2.weight = "70"
+        let row3 = SetRow(); row3.sets = "1"; row3.reps = "4"; row3.weight = "80"
+        entry.rows = [row1, row2, row3]
+
+        vm.templateName = "Sort Order Test"
+        vm.exercises = [entry]
+        vm.saveTemplate(context: context)
+
+        let templates = WorkoutTemplateService.fetchAll(context: context)
+        #expect(templates.count == 1)
+        let sets = templates.first!.exerciseSets.sorted { $0.sortOrder < $1.sortOrder }
+        #expect(sets.count == 3)
+        #expect(sets[0].sortOrder == 0)
+        #expect(sets[1].sortOrder == 1)
+        #expect(sets[2].sortOrder == 2)
+    }
+
     // MARK: - Existing Tests (continued)
 
     @Test func deletingTemplateDoesNotAffectGoals() throws {

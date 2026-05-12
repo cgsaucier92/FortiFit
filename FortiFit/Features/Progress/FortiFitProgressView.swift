@@ -57,22 +57,23 @@ struct FortiFitProgressView: View {
                         }
                     }
                 }
+                // Catch-all: drops landing outside any chart clear the stale drag state
+                .onDrop(of: [.text], isTargeted: nil) { _, _ in
+                    draggingChartType = nil
+                    return false
+                }
 
                 FortiFitFixedHeader(headerHeight: $headerHeight) {
                     HStack {
-                        Menu {
-                            Button {
+                        FortiFitEllipsisButton(menuItems: [
+                            (label: "Add Charts", systemImage: "chart.xyaxis.line", identifier: AccessibilityID.trendsAddChartsMenuItem, action: {
                                 viewModel.showAddChartMenu = true
-                            } label: {
-                                Label("Add Charts", systemImage: "chart.xyaxis.line")
-                            }
-                            .accessibilityIdentifier(AccessibilityID.trendsAddChartsMenuItem)
-                        } label: {
-                            FortiFitEllipsisButton()
-                        }
+                            })
+                        ])
                         .accessibilityIdentifier(AccessibilityID.trendsEllipsisMenu)
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .background(FortiFitColors.background)
@@ -92,12 +93,16 @@ struct FortiFitProgressView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.showAddChartMenu)
         .onAppear { viewModel.loadData(context: modelContext) }
         .onDisappear { viewModel.isReorderMode = false }
+        .onChange(of: viewModel.isReorderMode) { _, isOn in
+            if !isOn { draggingChartType = nil }
+        }
         .onChange(of: selectedTab) { oldValue, _ in
             guard oldValue == 3 else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
+                    detailChartIndex = nil
                     viewModel.showAddChartMenu = false
                     viewModel.isReorderMode = false
                     showDeleteConfirm = false
@@ -1033,7 +1038,6 @@ private struct ChartDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         draggingChartType = nil
-        viewModel.isReorderMode = false
         return true
     }
 

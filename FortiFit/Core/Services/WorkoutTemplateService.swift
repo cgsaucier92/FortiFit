@@ -11,6 +11,8 @@ struct WorkoutTemplateService {
         let reps: Int
         let weightKg: Double?
         let sortOrder: Int
+        var restSeconds: Int?
+        var displayAsTime: Bool?
     }
 
     struct TemplateSnapshot {
@@ -61,7 +63,9 @@ struct WorkoutTemplateService {
                 sets: exercise.sets,
                 reps: exercise.reps,
                 weightKg: exercise.weightKg,
-                sortOrder: exercise.sortOrder
+                sortOrder: exercise.sortOrder,
+                restSeconds: exercise.restSeconds,
+                displayAsTime: exercise.displayAsTime
             )
             template.exerciseSets.append(set)
         }
@@ -93,7 +97,9 @@ struct WorkoutTemplateService {
                 sets: exercise.sets,
                 reps: exercise.reps,
                 weightKg: exercise.weightKg,
-                sortOrder: exercise.sortOrder
+                sortOrder: exercise.sortOrder,
+                restSeconds: exercise.restSeconds,
+                displayAsTime: exercise.displayAsTime
             )
             template.exerciseSets.append(set)
         }
@@ -139,7 +145,9 @@ struct WorkoutTemplateService {
                 sets: templateSet.sets,
                 reps: templateSet.reps,
                 weightKg: templateSet.weightKg,
-                sortOrder: baseSortOrder + offset
+                sortOrder: baseSortOrder + offset,
+                restSeconds: templateSet.restSeconds,
+                displayAsTime: templateSet.displayAsTime
             )
             workout.exerciseSets.append(new)
         }
@@ -164,7 +172,9 @@ struct WorkoutTemplateService {
                     sets: $0.sets,
                     reps: $0.reps,
                     weightKg: $0.weightKg,
-                    sortOrder: $0.sortOrder
+                    sortOrder: $0.sortOrder,
+                    restSeconds: $0.restSeconds,
+                    displayAsTime: $0.displayAsTime
                 )
             }
         return TemplateSnapshot(

@@ -59,7 +59,7 @@ struct GoalTriggerPathTests {
         // Schedule it
         let scheduled = ScheduledWorkout(
             templateId: template.id,
-            templateSnapshot: PlanService.encodeSnapshot(template: template),
+            scheduledWorkoutSnapshot: PlanService.encodeSnapshot(template: template),
             scheduledDate: Date(),
             workoutType: "Strength Training",
             workoutName: "Push Template"
@@ -96,7 +96,7 @@ struct GoalTriggerPathTests {
 
         let scheduled = ScheduledWorkout(
             templateId: template.id,
-            templateSnapshot: PlanService.encodeSnapshot(template: template),
+            scheduledWorkoutSnapshot: PlanService.encodeSnapshot(template: template),
             scheduledDate: Date(),
             workoutType: "Strength Training",
             workoutName: "Push Template"
@@ -150,7 +150,7 @@ struct GoalTriggerPathTests {
 
         let scheduled = ScheduledWorkout(
             templateId: template.id,
-            templateSnapshot: PlanService.encodeSnapshot(template: template),
+            scheduledWorkoutSnapshot: PlanService.encodeSnapshot(template: template),
             scheduledDate: Date(),
             workoutType: "Strength Training",
             workoutName: "Push Template"

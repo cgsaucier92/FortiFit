@@ -1,8 +1,10 @@
-# INFO_COPY.md: See Info Modal — User-Facing Copy
+# INFO_COPY.md: User-Facing Modal & Popover Copy
 
-> User-facing strings for the Chart Info Modal (Trends → long-press chart → "See Info") and the Widget Info Modal (Home → long-press widget → "See Info"). Both surfaces share the See Info Modal component (SCREENS.md § Standard Patterns → See Info Modal).
+> User-facing strings for:
+> - The Chart Info Modal (Trends → long-press chart → "See Info") and the Widget Info Modal (Home → long-press widget → "See Info"), which share the See Info Modal component (SCREENS.md § Standard Patterns → See Info Modal).
+> - Inline `info.circle` popovers (Phase 8.7+) — short explanatory popovers attached to specific form fields and toggles.
 >
-> Stored in `AppConstants` as static dictionaries keyed by `chartType` and `widgetType` respectively. Never hardcoded in views. Sections render top-to-bottom in the order listed.
+> Stored in `AppConstants` as static dictionaries keyed by identifier. Never hardcoded in views. Sections render top-to-bottom in the order listed.
 
 ---
 
@@ -18,7 +20,7 @@ One entry per chart type. Each entry: title + intro paragraph + ordered list of 
 
 **How it's calculated:** Each data point on the chart is the heaviest weight you lifted for the selected exercise on that date, taken from the top set across all of that day's matching workouts. If you trained the same exercise twice in one day, only the heavier of the two sets is plotted.
 
-**Time range:** The compact card toggles between 30, 60, and 90 days. Tap into the detail view for wider ranges: 30 days, 90 days, 6 months, 1 year, or All Time.
+**Time range:** Toggle 30, 60, or 90 days to widen or narrow the view. The chart re-renders immediately on switch.
 
 **What's tracked:** Only sets with a recorded weight count toward the trend. Bodyweight exercises (logged without a weight value) aren't included — they don't have a number to plot. Exercise names are matched case-insensitively, so "Bench Press" and "bench press" share the same line.
 
@@ -34,7 +36,7 @@ One entry per chart type. Each entry: title + intro paragraph + ordered list of 
 
 **Your target line:** The dashed blue line is your target workouts per week, set on the Weekly Streak widget via long-press → Configure Settings. Bars at or above the line mean you hit your target that week; bars below it mean you didn't.
 
-**Time range:** The compact card shows the 8 most recent calendar weeks, including the current in-progress week. Tap into the detail view for wider ranges: 8 weeks, 6 months, 1 year, or All Time.
+**Time range:** The 8 most recent calendar weeks, including the current in-progress week. Older weeks roll off as new ones begin.
 
 **Empty state:** You need at least one full Monday–Sunday week with at least one logged workout before the chart renders.
 
@@ -68,8 +70,6 @@ One entry per chart type. Each entry: title + intro paragraph + ordered list of 
 
 **The 7-day average line:** The dashed blue line is your 7-day rolling average, smoothing out single-day spikes so you can see the underlying trend. A rising line over a flat dot pattern means your overall load is climbing; a falling line means you're tapering.
 
-**Time range:** The compact card shows the last 14 days. Tap into the detail view for wider ranges: 14 days, 30 days, 90 days, or 6 months.
-
 **Empty state:** At least 3 days with at least one workout each in the last 14 days are needed before the chart renders.
 
 ### Workout Volume (`workoutVolume`)
@@ -82,7 +82,7 @@ One entry per chart type. Each entry: title + intro paragraph + ordered list of 
 
 **What's included:** Only Strength Training and HIIT workouts appear on the chart. Cardio, yoga, pilates, and other types don't track exercise sets the same way, so including them would distort the trend.
 
-**Time range:** The compact card toggles between 30, 60, and 90 days. Tap into the detail view for wider ranges: 30 days, 90 days, 6 months, 1 year, or All Time.
+**Time range:** Toggle 30, 60, or 90 days. The chart re-renders immediately on switch.
 
 **Empty state:** At least 2 Strength Training or HIIT workouts with at least one logged exercise set are needed before the chart renders.
 
@@ -96,7 +96,7 @@ One entry per chart type. Each entry: title + intro paragraph + ordered list of 
 
 **The reference line:** The dashed line at Effort 7 marks the rough threshold between hard and very hard sessions. Several weeks averaging well above 7 in a row may signal it's time for a deload.
 
-**Time range:** The compact card shows the 8 most recent calendar weeks, including the current in-progress week. Tap into the detail view for wider ranges: 8 weeks, 6 months, 1 year, or All Time.
+**Time range:** The 8 most recent calendar weeks, including the current in-progress week.
 
 **Apple Health import:** If you record a workout on Apple Watch and rate its effort there (iOS 18 or later), that effort score imports into FitNavi automatically when the workout is linked — but only if you haven't already entered an effort rating yourself. Your manually entered ratings always win.
 
@@ -112,7 +112,7 @@ One entry per chart type. Each entry: title + intro paragraph + ordered list of 
 
 **Workout types:** Six categories — Strength Training, HIIT, Cardio, Yoga, Pilates, and Other. Each has a fixed color shown in the legend. Workouts imported from Apple Health are mapped to one of these six based on their HealthKit activity type.
 
-**Time range:** The compact card toggles between 30 days, 60 days, 90 days, and All Time. Tap into the detail view for an additional 1 year option. "All Time" includes every workout you've ever logged.
+**Time range:** Toggle 30 days, 60 days, 90 days, or All Time. "All Time" includes every workout you've ever logged.
 
 **Empty state:** At least 2 workouts of any type are needed before the chart renders.
 
@@ -126,7 +126,7 @@ One entry per chart type. Each entry: title + intro paragraph + ordered list of 
 
 **The target line:** The dashed line is your target workout duration, set via long-press → Configure Settings on the Training Load widget. It's the same value FitNavi uses as a fallback in your training load score when a workout has no duration entered.
 
-**Time range:** The compact card shows the 8 most recent calendar weeks, including the current in-progress week. Tap into the detail view for wider ranges: 8 weeks, 6 months, 1 year, or All Time.
+**Time range:** The 8 most recent calendar weeks, including the current in-progress week.
 
 **Apple Health import:** Durations from Apple Watch and other Health-connected apps are imported automatically when you link a workout, so you don't need to re-enter them.
 
@@ -201,3 +201,27 @@ One entry per "See Info"-eligible widget (Training Load, Power Level, Activity R
 **Tap the widget** to open a detailed breakdown with sparklines and a calendar heatmap of which days you closed your rings (toggle between 7-day and 30-day views).
 
 **Requirements:** You'll need an Apple Watch and Apple Health enabled in FitNavi Settings. If either is missing, the widget shows a message explaining what to do next.
+
+---
+
+## Inline Popover Copy (Phase 8.7+)
+
+Short explanatory popovers attached to specific form fields and toggles via inline `info.circle` icons. Distinct from the See Info Modal pattern — no headers, no scrollable body, no close button. SwiftUI `.popover` modifier anchored to the icon, ~260pt width, dismissed on tap-outside.
+
+Stored in `AppConstants` as static strings or via a small accessor function. Never hardcoded in views.
+
+### Rest Per Set (`exerciseCard_restPerSetInfoPopover`)
+
+Anchor: `info.circle` icon (14pt, Muted Text) trailing the "REST PER SET" label on each exercise card. Surfaced in Create Workout Template, Edit Template, Log Workout, and Edit Planned Workout (SCREENS.md § Log Workout → Exercise Card Additions).
+
+> Rest period between each set of this exercise. On Apple Watch, the rest period appears as a countdown timer.
+
+Constant: `AppConstants.AppleWatch.restPerSetPopover`.
+
+### Watch Sync Toggle (`editScheduledWorkout_watchSyncInfoPopover` and `scheduleWorkout_pushToAppleWatchInfoPopover`)
+
+Anchor: `info.circle` icon trailing the "Push to Apple Watch" toggle on the **Plan Workout sheet** (SCREENS.md § Plan → Push to Apple Watch Toggle) and the **Edit Planned Workout screen** (SCREENS.md § Edit Planned Workout). Single string, reused on both surfaces.
+
+> Pushes this workout to your Apple Watch's Workout app. Appears in the Scheduled section on the workout's day.
+
+Constant: `AppConstants.AppleWatch.watchSyncInfoPopover`.

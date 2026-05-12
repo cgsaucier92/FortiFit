@@ -59,7 +59,8 @@ A holistic health app that helps users track and understand the interaction betw
 - **Charts:** Swift Charts (Apple native)
 - **Dependencies:** Zero third-party. Native frameworks only. Swift Package Manager.
 - **HealthKit:** Read-only integration in Phase 8 (see HEALTHKIT.md). Imports workouts from Apple Watch and other Health-connected sources. No write-back in MVP.
-- **Not in MVP:** CloudKit, authentication, user accounts, HealthKit write-back, biometrics (Phase 10), sleep data (Phase 11).
+- **WorkoutKit:** Outbound integration in Phase 8.7 (see WORKOUTKIT.md). Schedules `ScheduledWorkout`s onto the user's paired Apple Watch as native workouts in the Watch's Workout app. Requires watchOS 11+ for the Scheduled section to render. Native iOS framework, no third-party dependency. Plan-ID round-trip via `HKWorkout.workoutPlan?.id` (WorkoutKit extension) lets HealthKit's read pipeline match completed sessions back to the originating `ScheduledWorkout`.
+- **Not in MVP:** CloudKit, authentication, user accounts, HealthKit write-back, native watchOS companion app, biometrics (Phase 10), sleep data (Phase 11).
 
 ### Project Structure
 
@@ -105,7 +106,10 @@ FortiFit/
 │   │   ├── HealthKitSyncService.swift
 │   │   ├── WorkoutMatcher.swift
 │   │   ├── AppleActivityService.swift
-│   │   └── WorkoutMetricService.swift
+│   │   ├── WorkoutMetricService.swift
+│   │   ├── WorkoutSchedulerProtocol.swift
+│   │   ├── DefaultWorkoutScheduler.swift
+│   │   └── WatchScheduleService.swift
 │   └── Utilities/
 │       ├── Extensions/                # Date+, Double+, Color+
 │       ├── ShareSheet.swift           # UIActivityViewController wrapper
@@ -113,7 +117,7 @@ FortiFit/
 ├── Features/
 │   ├── Home/                          # HomeView, HomeViewModel
 │   ├── Workout/                       # WorkoutListView, WorkoutDetailView, LogWorkoutView, CreateTemplateView, SavedTemplatesListView, TemplateImportView, WorkoutViewModel
-│   ├── Plan/                          # PlanView, PlanViewModel, ScheduleWorkoutView, CompletePlanView
+│   ├── Plan/                          # PlanView, PlanViewModel, ScheduleWorkoutView, CompletePlanView, EditScheduledWorkoutView
 │   ├── Progress/                      # ProgressView, ProgressViewModel
 │   ├── Goals/                         # GoalsView, AddGoalView, GoalsViewModel
 │   └── Settings/                      # SettingsView, SettingsViewModel
@@ -156,13 +160,13 @@ Workouts → Sort, Filter, Reorder & Delete Type (long-press card header → con
 Workouts → Delete Workout Type (context menu → "Delete Workout Type" → confirm → bulk delete)
 Workouts → Workout Detail (tap preview row in expanded card)
 Workouts → Delete Workout (swipe left on preview row)
-Workouts → Ellipsis → Create Template / View Saved Templates
+Workouts → Ellipsis → Create Workout Template / View Workout Templates
 
-Saved Templates → Create Template ("+" button → new template mode)
-Saved Templates → Edit Template (tap row)
-Saved Templates → Share Template (long-press → context menu → QR modal)
-Saved Templates → Delete Template (long-press → context menu → confirm)
-Saved Templates → Schedule Template (long-press → context menu → Plan scheduling flow)
+Workout Templates → Create Workout Template ("+" button → new template mode)
+Workout Templates → Edit Template (tap row)
+Workout Templates → Share Template (long-press → context menu → QR modal)
+Workout Templates → Delete Template (long-press → context menu → confirm)
+Workout Templates → Schedule Template (long-press → context menu → Plan scheduling flow)
 
 Edit Template → Share Template (ellipsis → QR modal)
 Edit Template → Delete Template (trash icon → confirm)
@@ -176,8 +180,8 @@ Workout Detail → Metric Detail Sheet (tap any stat card in Summary grid)
 
 Log Workout → Ellipsis → Use Template / Save as Template (new-workout mode only)
 
-Plan → Schedule Workout ("+")
-Plan → Ellipsis → Saved Templates (→ SavedTemplatesListView)
+Plan → Plan Workout ("+")
+Plan → Ellipsis → Workout Templates (→ SavedTemplatesListView)
 Plan → Complete Planned Workout (tap planned day → "Complete Planned Workout" → compact confirmation sheet)
 Plan → Modify Exercises (compact confirmation sheet → "Modify Exercises" → Log Workout pre-populated)
 Plan → Skip Workout (long-press planned card → context menu)
@@ -185,13 +189,16 @@ Plan → Remove from Plan (long-press any non-planned card → context menu → 
 Plan → Show on Plan (Workout Detail ellipsis menu when `hiddenFromPlan == true`)
 Plan → Workout Detail (tap any completed scheduled or logged-only card on Plan)
 Plan → Toggle Week/Month View (segmented toggle)
+Plan → Edit Planned Workout (long-press planned/skipped scheduled card → "Edit Workout")
+Plan → Toggle Apple Watch Sync (tap FortiFitWatchSyncGlyph on scheduled card)
+Plan → Master Sync Off Popover (tap card glyph or Edit Planned Workout toggle when master is off → "Open Settings" → Settings → Apple Watch section)
 
 Trends → Add Chart Menu (ellipsis → "Add Charts" → overlay)
 Trends → Chart Info Modal (long-press chart → context menu → "See Info" → modal)
 Trends → Delete Chart (long-press chart → context menu → "Delete Chart" → confirm)
 Trends → Reorder Charts (long-press chart → context menu → "Reorder Charts" → edit mode with drag handles)
 
-Goals → Add Goal ("+ ADD")
+Goals → Create Goal ("+ ADD")
 Goals → Ellipsis → Filter Goals (Active / Completed / All)
 Goals → Ellipsis → Expand All / Collapse All
 Goals → Expand/Collapse Card (tap chevron on goal card)
@@ -240,9 +247,11 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | id | UUID | Yes | Auto-generated |
 | exerciseName | String | Yes | e.g., "Bench Press" |
 | sets | Int | Yes | Number of sets |
-| reps | Int | Yes | Reps per set |
+| reps | Int | Yes | Reps per set. When `displayAsTime` resolves to true (see below), the integer is interpreted as **seconds** at display and Watch-composition time. Field name unchanged for storage continuity. |
 | weightKg | Double? | No | Nil = bodyweight ("BW") |
 | sortOrder | Int | Yes | Display order within workout |
+| restSeconds | Int? | No | Default nil. Single rest value per exercise — UI keeps all rows of the same `exerciseName` in lockstep within a workout. Applied between each set; no rest after the final set. Drives the Apple Watch's recovery-step countdown when synced (see WORKOUTKIT.md § 6). Range 5–600 seconds in 5-second increments. |
+| displayAsTime | Bool? | No | Three-state override of the dictionary's isometric flag. `nil` = use the exercise dictionary's default (e.g., "Plank" → true; "Bench Press" → false). `true` = force time display regardless of dictionary. `false` = force reps display regardless of dictionary. Per-exercise-card override (UI keeps all rows of the same `exerciseName` in lockstep). See WORKOUTKIT.md § 6 and CONSTANTS.md § Isometric Exercise Names. |
 | workout | Workout | Yes | @Relationship back-reference (cascade delete) |
 
 #### Goal
@@ -298,9 +307,11 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | id | UUID | Yes | Auto-generated |
 | exerciseName | String | Yes | |
 | sets | Int | Yes | |
-| reps | Int | Yes | |
+| reps | Int | Yes | When `displayAsTime` resolves to true (see below), the integer is interpreted as **seconds** at display and Watch-composition time. Field name unchanged for storage continuity. |
 | weightKg | Double? | No | Nil = bodyweight |
 | sortOrder | Int | Yes | |
+| restSeconds | Int? | No | Default nil. Single rest value per exercise — UI keeps all rows of the same `exerciseName` in lockstep. Carried through into `ScheduledWorkout.scheduledWorkoutSnapshot` at scheduling time. Mirrors `ExerciseSet.restSeconds`. See WORKOUTKIT.md § 6. |
+| displayAsTime | Bool? | No | Three-state override of the dictionary's isometric flag. Same semantics as `ExerciseSet.displayAsTime`. Carried through into the snapshot at scheduling time. |
 | template | WorkoutTemplate | Yes | @Relationship back-reference (cascade delete) |
 
 #### ScheduledWorkout
@@ -308,17 +319,19 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 |----------|------|----------|-------|
 | id | UUID | Yes | Auto-generated |
 | templateId | UUID? | No | Reference to WorkoutTemplate. Nil if freeform. |
-| templateSnapshot | Data? | No | JSON blob capturing the template's exercises at scheduling time |
+| scheduledWorkoutSnapshot | Data? | No | JSON blob capturing the workout's exercises (names, sets, reps, weights, restSeconds, displayAsTime, sortOrder). Initialized from the template at scheduling time, then mutable via the Edit Planned Workout flow (see SCREENS.md § Edit Planned Workout). The `ScheduledWorkout` is the source of truth for this data — template edits do not propagate to existing scheduled workouts. Renamed from `templateSnapshot` in Phase 8.7. |
 | scheduledDate | Date | Yes | Target calendar day (time component zeroed for day-level matching) |
-| scheduledTime | Date? | No | Optional specific time of day |
+| scheduledTime | Date? | No | Optional specific time of day. Not required for Apple Watch push — when nil, `WatchScheduleService` falls back to noon (12:00 PM) on the scheduled date for the WorkoutKit API call. Apple Watch does not surface the scheduled time to users. UI label: "Scheduled Time" (toggle). |
 | workoutType | String | Yes | Copied from template at scheduling time |
 | workoutName | String | Yes | Copied from template name at scheduling time |
-| durationMinutes | Int? | No | Copied from template at scheduling time |
+| durationMinutes | Int? | No | Copied from template at scheduling time. Mutable via Edit Planned Workout. |
 | status | String | Yes | "planned" / "completed" / "skipped". Default: "planned" |
 | completedWorkoutId | UUID? | No | Links to the actual Workout record once logged |
 | recurrenceRule | String? | No | "weekly" / "biweekly" / nil |
 | recurrenceGroupId | UUID? | No | Shared UUID linking all instances of a recurring schedule |
 | dateCreated | Date | Yes | Auto-set on creation |
+| syncToAppleWatch | Bool | Yes | Default: `false`. Per-instance user intent flag for Apple Watch push. Captured at scheduling time by the Schedule Workout sheet's "Push to Apple Watch" toggle (Phase 8.7.1+, primary entry point); also toggleable post-creation via the `FortiFitWatchSyncGlyph` on the Plan card or the "Push to Apple Watch" toggle on the Edit Planned Workout screen. Gated by master `UserSettings.syncPlanToAppleWatchEnabled`, WorkoutKit auth, `scheduledDate >= today`, and ≥1 exercise in the snapshot. Internal field name retains "sync" for code-level continuity; user-facing copy uses "Push." See WORKOUTKIT.md § 7. |
+| appleWorkoutPlanId | UUID? | No | Stable plan UUID stamped on first sync, retained for the lifetime of the record across off/on cycles, edits, and master-toggle bounces. Used as the `WorkoutPlan.id` and round-trips through HealthKit via `HKWorkout.workoutPlan?.id` (WorkoutKit extension) for deterministic completion matching (see WORKOUTKIT.md § 8). Cleared only on `ScheduledWorkout` deletion. |
 
 #### HomeWidget
 | Property | Type | Required | Notes |
@@ -354,6 +367,7 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | healthKitEnabled | Bool | false | User-facing toggle for "Apple Health" section in Settings (see HEALTHKIT.md § 16). When `false`, all HK sync activity is suspended; existing linked workouts retain their `healthKitUUID`. |
 | healthKitAnchor | Data? | nil | Serialized `HKQueryAnchor` for catch-up sync (see HEALTHKIT.md § 9). Updated after every successful anchored query. |
 | healthKitLastSyncDate | Date? | nil | Timestamp of last successful sync. Drives the "Last sync X min ago" status line in Settings. |
+| syncPlanToAppleWatchEnabled | Bool | false | Master kill switch for Apple Watch workout scheduling (see WORKOUTKIT.md § 7, § 9, § 10 and SCREENS.md § Settings → Apple Watch Section). When `false`, all per-card `syncToAppleWatch` flags are visually disabled and any plans previously registered with the Watch are removed. Per-card flags are retained for restoration when master is flipped back on. First flip-on triggers `WorkoutScheduler.shared.requestAuthorization()` (just-in-time pattern). |
 
 #### WorkoutMatchRejection
 | Property | Type | Required | Notes |
@@ -373,7 +387,7 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 - Goals are standalone, ordered by sortOrder
 - GoalSnapshot: standalone. Links to Goal by UUID reference (goalId), not @Relationship. Deleting a Goal cascade-deletes all associated GoalSnapshot records. One snapshot per goal per day, deduplicating by date.
 - WorkoutTypeOrder: one per workout type with ≥ 1 workout. Link to Workout is implicit via matching workoutType strings.
-- ScheduledWorkout: standalone. Links to WorkoutTemplate and Workout by UUID reference, not @Relationship. Deleting a template does not delete associated scheduled workouts (templateSnapshot preserves exercise data). Deleting a Workout sets completedWorkoutId to nil and reverts status to "planned".
+- ScheduledWorkout: standalone. Links to WorkoutTemplate and Workout by UUID reference, not @Relationship. Deleting a template does not delete associated scheduled workouts (`scheduledWorkoutSnapshot` preserves exercise data). Deleting a Workout sets completedWorkoutId to nil and reverts status to "planned". Deleting a `ScheduledWorkout` with `appleWorkoutPlanId != nil` triggers `WatchScheduleService.removePlan(_:)` to clear the plan from any paired Apple Watch (see WORKOUTKIT.md § 12).
 - HomeWidget: one per active widget. No relationship to other entities.
 - TrendsChart: one per active chart. No relationship to other entities. Mirrors HomeWidget pattern.
 - WorkoutMatchRejection: standalone. Links to Workout and HK records by UUID reference, not @Relationship. See HEALTHKIT.md § 12 for matcher lookup semantics. Orphan rejections after Workout deletion are harmless and retained; no cascade.
@@ -392,23 +406,24 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 | Plan | Schedule workouts using templates (week strip / month grid, recurrence) |
 | Log Workout | Form for new or edit workout (type-adaptive; HK-aware in edit mode) |
 | Workout Detail | Per-session breakdown (stat-card Summary grid + Metric Detail Sheets, share image, edit, delete) |
-| Create Template | Build reusable Strength/HIIT template |
-| Saved Templates | Manage and share templates (QR sharing) |
+| Create Workout Template | Build reusable Strength/HIIT template |
+| Workout Templates | Manage and share templates (QR sharing) |
 | Template Import | Save a template from a QR deep link |
 | Trends | Customizable trend chart grid (Strength Tracker, Training Frequency, PRs, Load Trend, plus add-only charts) |
 | Goals | Track targets with progress rings + 30-day sparklines |
-| Add Goal | Create or edit a goal (4 types) |
+| Create Goal | Create or edit a goal (4 types) |
 | Settings | Unit preferences + Apple Health section |
 | Match Prompt Sheet | Resolve ambiguous HK-to-FitNavi workout matches (HEALTHKIT § 13) |
+| Edit Planned Workout | Edit a scheduled workout's exercises, name, date, time, duration, and Apple Watch push intent (WORKOUTKIT § 13; SCREENS § Edit Planned Workout) |
 
 ---
 
 ## 7. Out of Scope (v1)
 
 Do NOT build, scaffold UI for, or write service logic for:
-- Social features, multi-user (single-workout image export and template QR sharing are in scope — see SCREENS.md § Workout Detail, SCREENS.md § Saved Templates List)
+- Social features, multi-user (single-workout image export and template QR sharing are in scope — see SCREENS.md § Workout Detail, SCREENS.md § Workout Templates List)
 - Subscriptions or IAP
-- Apple Watch app (a native watchOS companion app). HealthKit read integration (Phase 8) covers consuming workouts recorded in Apple's Fitness app on Apple Watch — see HEALTHKIT.md.
+- Native watchOS companion app. HealthKit read integration (Phase 8) covers consuming workouts recorded in Apple's Fitness app on Apple Watch — see HEALTHKIT.md. WorkoutKit-based outbound scheduling of `ScheduledWorkout`s onto the user's paired Watch is in scope as of Phase 8.7 — see WORKOUTKIT.md.
 - Third-party device direct integration (Garmin, Whoop, Fitbit native SDKs). Workouts from these sources reach FitNavi indirectly via HealthKit when those apps write to Apple Health.
 - Cloud sync or user accounts
 - HealthKit write-back (FitNavi → HealthKit). Read integration is in scope as of Phase 8 — see HEALTHKIT.md § 2 and § 20.
@@ -430,7 +445,8 @@ Do NOT build, scaffold UI for, or write service logic for:
 | `SERVICES.md` | Algorithms (Training Load, Streak, Power Level), service specs, cascade behavior, goal auto-update | Building or modifying any Service or ViewModel |
 | `CONSTANTS.md` | Colors, typography, exercise dictionary, SF Symbols, advisory text, reference tables | Defining constants, theming |
 | `HEALTHKIT.md` | HealthKit integration spec — architecture, sync lifecycle, matcher, field ownership, UI surfaces, authorization | Any Phase 8 work |
-| `INFO_COPY.md` | User-facing strings for Chart Info Modals and Widget Info Modals (the "See Info" modal) | Implementing or editing those modals |
-| `HK_MAPPING.md` | Static `HKWorkoutActivityType` → FortiFit `workoutType` lookup table | Implementing or editing the HK type mapping |
+| `WORKOUTKIT.md` | WorkoutKit integration spec — outbound Apple Watch scheduling, plan composition, plan-ID round-trip, sync lifecycle, reconciliation, authorization, UI surfaces | Any Phase 8.7 work |
+| `INFO_COPY.md` | User-facing strings for Chart Info Modals and Widget Info Modals (the "See Info" modal), plus inline popover copy | Implementing or editing those modals/popovers |
+| `HK_MAPPING.md` | Static `HKWorkoutActivityType` → FortiFit `workoutType` lookup table (inbound) and FortiFit `workoutType` → `HKWorkoutActivityType` table (outbound, Phase 8.7+) | Implementing or editing the HK type mapping |
 | `TESTING.md` | Test target structure, framework rules, naming, accessibility identifiers, fixtures | Writing or modifying tests |
 | `BUGS.md` | Bugs, build failures, and unexpected behavior log | Logging any bug |

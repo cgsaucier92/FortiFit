@@ -252,13 +252,13 @@ struct WorkoutTimeNoSideEffectsTests {
         )
         WorkoutService.logWorkout(workout, context: context)
 
-        let streakBefore = StreakService.calculateStreak(context: context)
+        let streakBefore = StreakService.calculateStreak(context: context, writeToSettings: false)
 
         // Change only the time
         workout.time = Calendar.current.date(bySettingHour: 3, minute: 0, second: 0, of: Date())!
         try context.save()
 
-        let streakAfter = StreakService.calculateStreak(context: context)
+        let streakAfter = StreakService.calculateStreak(context: context, writeToSettings: false)
 
         #expect(streakBefore.streak == streakAfter.streak)
     }

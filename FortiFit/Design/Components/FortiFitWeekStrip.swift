@@ -5,29 +5,29 @@ struct FortiFitWeekStrip: View {
     @Binding var dayOffset: Int
     var planItems: [PlanCardItem]
 
-    @State private var dragDayDelta: Int = 0
+    @State private var dragTranslation: CGFloat = 0
     private let calendar = Calendar(identifier: .iso8601)
-    private let dayAbbreviations = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
-    /// Points of drag per day shift
-    private let pointsPerDay: CGFloat = 50
+    private let bufferDays = 7
 
-    /// The effective day offset including any in-progress drag.
-    private var effectiveOffset: Int {
-        dayOffset + dragDayDelta
+    private func allDates(for offset: Int) -> [Date] {
+        let today = Date()
+        guard let baseStart = calendar.date(byAdding: .day, value: offset - bufferDays, to: today.startOfWeek) else {
+            return []
+        }
+        let totalDays = 7 + bufferDays * 2
+        return (0..<totalDays).compactMap { calendar.date(byAdding: .day, value: $0, to: baseStart) }
     }
 
-    /// The 7 dates currently visible in the strip.
-    private var weekDates: [Date] {
+    private var visibleDates: [Date] {
         let today = Date()
-        guard let baseStart = calendar.date(byAdding: .day, value: effectiveOffset, to: today.startOfWeek) else {
+        guard let baseStart = calendar.date(byAdding: .day, value: dayOffset, to: today.startOfWeek) else {
             return []
         }
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: baseStart) }
     }
 
-    /// Month indicator label that shows above the week strip.
     private var monthIndicator: String {
-        guard let first = weekDates.first, let last = weekDates.last else { return "" }
+        guard let first = visibleDates.first, let last = visibleDates.last else { return "" }
         let firstMonth = calendar.component(.month, from: first)
         let firstYear = calendar.component(.year, from: first)
         let lastMonth = calendar.component(.month, from: last)
@@ -54,42 +54,52 @@ struct FortiFitWeekStrip: View {
         }
     }
 
+    private func dayAbbreviation(for date: Date) -> String {
+        let weekday = calendar.component(.weekday, from: date)
+        let labels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+        return labels[weekday - 1]
+    }
+
     var body: some View {
         VStack(spacing: FortiFitSpacing.elementSpacing) {
-            // Month indicator
             Text(monthIndicator.uppercased())
                 .font(.system(size: 13, weight: .bold))
                 .kerning(2)
                 .foregroundStyle(FortiFitColors.primaryText)
                 .frame(maxWidth: .infinity, alignment: .center)
 
-            // Day cells
-            HStack(spacing: 0) {
-                ForEach(Array(weekDates.enumerated()), id: \.offset) { index, date in
-                    dayCellView(date: date, dayLabel: dayAbbreviations[index])
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 72)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedDate = date
-                        }
-                }
-            }
-        }
-        .gesture(
-            DragGesture(minimumDistance: 20, coordinateSpace: .local)
-                .onChanged { value in
-                    let delta = -Int(round(value.translation.width / pointsPerDay))
-                    if delta != dragDayDelta {
-                        dragDayDelta = delta
+            GeometryReader { geo in
+                let cellWidth = geo.size.width / 7
+                let dates = allDates(for: dayOffset)
+                let restOffset = -CGFloat(bufferDays) * cellWidth + dragTranslation
+
+                HStack(spacing: 0) {
+                    ForEach(Array(dates.enumerated()), id: \.offset) { _, date in
+                        dayCellView(date: date, dayLabel: dayAbbreviation(for: date))
+                            .frame(width: cellWidth)
+                            .frame(minHeight: 72)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedDate = date
+                            }
                     }
                 }
-                .onEnded { _ in
-                    dayOffset += dragDayDelta
-                    dragDayDelta = 0
-                }
-        )
-        .animation(.easeInOut(duration: 0.08), value: effectiveOffset)
+                .offset(x: restOffset)
+                .gesture(
+                    DragGesture(minimumDistance: 10, coordinateSpace: .local)
+                        .onChanged { value in
+                            dragTranslation = value.translation.width
+                        }
+                        .onEnded { value in
+                            let daysDragged = -Int(round(value.translation.width / cellWidth))
+                            dayOffset += daysDragged
+                            dragTranslation = 0
+                        }
+                )
+            }
+            .frame(minHeight: 72)
+            .clipped()
+        }
     }
 
     private func dayCellView(date: Date, dayLabel: String) -> some View {

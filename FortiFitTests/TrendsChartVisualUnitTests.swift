@@ -131,7 +131,7 @@ struct HeaderSummaryTests {
         makeWorkout(date: weeksAgo(1), exercises: [("Bench Press", 3, 8, 200)], in: context)
 
         let result = TrendsChartService.headerSummary(
-            for: "strengthTracker", exerciseName: "Bench Press", context: context
+            for: "strengthTracker", exerciseName: "Bench Press", useLbs: true, context: context
         )
         #expect(result != nil)
         #expect(result?.hero == "441 lbs")

@@ -16,6 +16,7 @@ struct FortiFitApp: App {
     @State private var healthKitMatcher: WorkoutMatcher
     @State private var healthKitSyncService: HealthKitSyncService
     @State private var appleActivityService: AppleActivityService
+    @State private var watchScheduleService: WatchScheduleService
     @State private var currentPendingMatch: PendingMatch?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -51,6 +52,8 @@ struct FortiFitApp: App {
             try? FileManager.default.removeItem(at: storeURL)
             try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("wal"))
             try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
+            UserSettings.shared.healthKitAnchor = nil
+            UserSettings.shared.healthKitLastSyncDate = nil
             do {
                 return try ModelContainer(for: schema, configurations: [modelConfiguration])
             } catch {
@@ -74,6 +77,8 @@ struct FortiFitApp: App {
         _healthKitMatcher = State(initialValue: matcher)
         _healthKitSyncService = State(initialValue: HealthKitSyncService(client: client, matcher: matcher))
         _appleActivityService = State(initialValue: AppleActivityService(client: client))
+        let workoutScheduler: WorkoutSchedulerProtocol = isUITesting ? NoOpWorkoutScheduler() : DefaultWorkoutScheduler()
+        _watchScheduleService = State(initialValue: WatchScheduleService(scheduler: workoutScheduler))
     }
 
     private var isUITesting: Bool {
@@ -86,6 +91,7 @@ struct FortiFitApp: App {
                 ContentView()
                     .environment(healthKitSyncService)
                     .environment(appleActivityService)
+                    .environment(watchScheduleService)
                     .task {
                         let context = sharedModelContainer.mainContext
                         if CommandLine.arguments.contains("--seed-hk-workout") {
@@ -140,6 +146,7 @@ struct FortiFitApp: App {
                 ContentView()
                     .environment(healthKitSyncService)
                     .environment(appleActivityService)
+                    .environment(watchScheduleService)
                     .task {
                         let context = sharedModelContainer.mainContext
                         WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
@@ -159,6 +166,11 @@ struct FortiFitApp: App {
                             presentNextPendingMatch()
                         }
                         if UserSettings.shared.healthKitEnabled {
+                            if !UserSettings.shared.hasResetAnchorForPhase87 {
+                                UserSettings.shared.healthKitAnchor = nil
+                                UserSettings.shared.healthKitLastSyncDate = nil
+                                UserSettings.shared.hasResetAnchorForPhase87 = true
+                            }
                             try? await DefaultHealthKitClient().requestAuthorization()
                             await healthKitSyncService.importPendingWorkouts(context: context)
                             healthKitSyncService.startObserving()
@@ -167,10 +179,21 @@ struct FortiFitApp: App {
                             appleActivityService.refresh()
                             appleActivityService.refreshWorkoutContributions(context: context)
                         }
+                        if UserSettings.shared.syncPlanToAppleWatchEnabled {
+                            await watchScheduleService.refreshAuthState()
+                            await watchScheduleService.reconcile(context: context)
+                        }
                     }
                     .onChange(of: scenePhase) { _, newPhase in
                         if newPhase == .active {
                             presentNextPendingMatch()
+                            if UserSettings.shared.syncPlanToAppleWatchEnabled {
+                                let context = sharedModelContainer.mainContext
+                                Task {
+                                    await watchScheduleService.refreshAuthState()
+                                    await watchScheduleService.reconcile(context: context)
+                                }
+                            }
                         }
                     }
                     .sheet(item: $currentPendingMatch, onDismiss: {

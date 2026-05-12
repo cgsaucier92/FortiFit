@@ -83,7 +83,8 @@ struct ActivityRingsCanvas: View {
 
         // Over-100% overlay arc
         if overProgress > 0 && !muted {
-            let cappedOver = min(overProgress, 1.0)
+            // Minimum arc length so the overlap reads as a curved segment, not a dot
+            let cappedOver = min(max(overProgress, 0.08), 1.0)
 
             // Curved shadow behind trailing tip — drawn first so overlay covers it
             Circle()

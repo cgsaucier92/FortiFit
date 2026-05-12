@@ -9,12 +9,14 @@ func makePlanTestContext() throws -> ModelContext {
         Workout.self,
         ExerciseSet.self,
         Goal.self,
+        GoalSnapshot.self,
         WorkoutTypeOrder.self,
         WorkoutTemplate.self,
         TemplateExerciseSet.self,
         ScheduledWorkout.self,
         HomeWidget.self,
-        TrendsChart.self
+        TrendsChart.self,
+        WorkoutMatchRejection.self
     ])
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try ModelContainer(for: schema, configurations: [config])

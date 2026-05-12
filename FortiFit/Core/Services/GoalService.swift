@@ -114,8 +114,8 @@ struct GoalService {
 
     /// Computes the weekly workouts goal progress at runtime.
     /// Target comes from UserSettings, current from this week's workout count.
-    static func weeklyWorkoutsProgress(context: ModelContext) -> (current: Int, target: Int, percentage: Double, isComplete: Bool) {
-        let target = UserSettings.shared.targetWorkoutsPerWeek
+    static func weeklyWorkoutsProgress(context: ModelContext, target: Int? = nil) -> (current: Int, target: Int, percentage: Double, isComplete: Bool) {
+        let target = target ?? UserSettings.shared.targetWorkoutsPerWeek
         let current = WorkoutService.fetchCurrentWeekWorkouts(context: context).count
         let percentage = target > 0 ? min(Double(current) / Double(target) * 100, 100) : 0
         let isComplete = target > 0 && current >= target

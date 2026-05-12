@@ -1,6 +1,10 @@
-# HK_MAPPING.md: HealthKit → FitNavi Workout Type Mapping
+# HK_MAPPING.md: HealthKit ↔ FitNavi Workout Type Mapping
 
-> Static lookup table mapping every `HKWorkoutActivityType` enum case to a FortiFit `workoutType` plus a friendly display string (stored on `Workout.healthKitActivityType`). Consumed by `HealthKitSyncService` at import time. Architectural rationale lives in HEALTHKIT.md § 6.
+> Static lookup tables for the bidirectional mapping between HealthKit's `HKWorkoutActivityType` enum and FortiFit's `workoutType` strings.
+>
+> **Inbound (HK → FortiFit, Phase 8+):** every `HKWorkoutActivityType` case maps to a FortiFit `workoutType` plus a friendly display string (stored on `Workout.healthKitActivityType`). Consumed by `HealthKitSyncService` at import time. Many-to-one (multiple HK types collapse into one FortiFit type). Architectural rationale lives in HEALTHKIT.md § 6.
+>
+> **Outbound (FortiFit → HK, Phase 8.7+):** each FortiFit `workoutType` that can be scheduled (Strength Training, HIIT) maps to a single `HKWorkoutActivityType` for stamping on `WorkoutComposition`s sent to the Watch via WorkoutKit. One-to-one. Consumed by `WatchScheduleService` at plan composition time. Architectural rationale lives in WORKOUTKIT.md § 6.
 
 ## Rules
 
@@ -118,3 +122,48 @@ The mapping table above is authoritative. The notes below capture cases where mu
 ## Changing a Mapping
 
 Edit the table above, then verify the HK-to-category mapping unit test in `FortiFitTests` still passes (the test iterates every enum case and asserts the expected category — see TESTING.md § HealthKit Test Strategy).
+
+---
+
+## Outbound Mapping (FortiFit → HK, Phase 8.7+)
+
+When `WatchScheduleService` builds a `WorkoutComposition` to send to the Watch via WorkoutKit, it needs a single `HKWorkoutActivityType` to stamp on the plan. WorkoutKit doesn't accept "either Traditional or Functional" — it's one enum value per plan.
+
+### Mapping Table
+
+| FortiFit `workoutType` | Outbound `HKWorkoutActivityType` | Display String (post-completion via WorkoutKit) |
+|---|---|---|
+| Strength Training | `.traditionalStrengthTraining` | "Traditional Strength Training" |
+| HIIT | `.highIntensityIntervalTraining` | "HIIT" |
+
+### Why These Defaults
+
+- **Strength Training → `.traditionalStrengthTraining`.** FitNavi's user base tracks discrete sets/reps with barbells, dumbbells, and machines — Traditional Strength Training is the right fit. Functional Strength Training (kettlebell complexes, Turkish get-ups, multi-joint movement patterns) is a meaningfully different population. Defaulting to Traditional handles the dominant case; the rarer Functional crowd is acknowledged but not supported with a per-template override in MVP (see § No Per-Template Override below).
+- **HIIT → `.highIntensityIntervalTraining`.** The unambiguous match. The other HIIT-mapped inbound types (`crossTraining`, `fitnessGaming`) don't represent FitNavi's intent for outbound.
+
+### Round-Trip Consistency
+
+The outbound mapping pairs cleanly with the existing inbound table:
+
+1. FitNavi schedules a Strength Training workout → outbound stamps `.traditionalStrengthTraining`.
+2. Watch records the session → `HKWorkout` carries `workoutActivityType = .traditionalStrengthTraining`.
+3. Plan-ID matcher fast-path (HEALTHKIT.md § 12.0) routes through `PlanService.completeFromWatch(...)`. The resulting `Workout` has `workoutType = "Strength Training"` (matches the originating `ScheduledWorkout`) and `healthKitActivityType = "Traditional Strength Training"` (friendly display string from the inbound table).
+4. The user sees the resulting workout in FitNavi labeled "Traditional Strength Training" — accurate and consistent with how Apple's Fitness app labels the same session.
+
+### Out of Scope: Cardio / Yoga / Pilates / Other
+
+Today, only Strength Training and HIIT can be scheduled (templates only support those two `workoutType`s — see PRD.md § Data Model → WorkoutTemplate). The other FortiFit categories (Cardio, Yoga, Pilates, Other) have no scheduling path, so no outbound mapping entry is needed for them.
+
+### No Per-Template Override (MVP)
+
+A `WorkoutTemplate.appleHealthSubtype: HKWorkoutActivityType?` field could let users specify Functional vs Traditional Strength Training per template. Out of scope for Phase 8.7. Reasons:
+
+- Power-user feature — 95%+ of users won't need it.
+- Adds UI surface area (where does the picker live?).
+- The misclassification cost is low — Apple's Fitness app and Activity rings count both subtypes equivalently for Move/Exercise.
+
+If user feedback later shows the Functional crowd needs this, add it as a small Phase X polish.
+
+### Changing the Outbound Mapping
+
+Edit the table above, then verify the FortiFit-to-HK outbound mapping unit test in `FortiFitTests` still passes (the test iterates every supported FortiFit `workoutType` and asserts the expected outbound `HKWorkoutActivityType` — see TESTING.md § WorkoutKit Test Strategy).

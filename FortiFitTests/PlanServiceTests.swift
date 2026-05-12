@@ -137,7 +137,7 @@ struct PlanServiceTests {
         #expect(sw.durationMinutes == 60)
         #expect(sw.status == "planned")
         #expect(sw.templateId == template.id)
-        #expect(sw.templateSnapshot != nil)
+        #expect(sw.scheduledWorkoutSnapshot != nil)
         #expect(sw.recurrenceRule == nil)
         #expect(sw.recurrenceGroupId == nil)
     }
@@ -378,7 +378,7 @@ struct PlanServiceTests {
         let results = try context.fetch(descriptor)
 
         for sw in results {
-            #expect(sw.templateSnapshot != nil, "Each recurring instance should have its own snapshot")
+            #expect(sw.scheduledWorkoutSnapshot != nil, "Each recurring instance should have its own snapshot")
         }
     }
 
@@ -835,7 +835,7 @@ struct PlanServiceTests {
 
         // The scheduled workout's snapshot should be unchanged
         let sw = PlanService.fetchForDate(date: PlanTestFactory.tomorrow, context: context).first!
-        let decoded = PlanService.decodeSnapshot(data: sw.templateSnapshot!)
+        let decoded = PlanService.decodeSnapshot(data: sw.scheduledWorkoutSnapshot!)
 
         #expect(decoded[0].weightKg == 80.0, "Snapshot should reflect scheduling-time data, not edited template")
         #expect(decoded[0].reps == 8)
@@ -855,7 +855,7 @@ struct PlanServiceTests {
 
         // Should still be able to complete
         let sw = PlanService.fetchForDate(date: PlanTestFactory.today, context: context).first!
-        #expect(sw.templateSnapshot != nil, "Snapshot should survive template deletion")
+        #expect(sw.scheduledWorkoutSnapshot != nil, "Snapshot should survive template deletion")
 
         PlanService.completeWorkout(scheduledWorkout: sw, date: PlanTestFactory.today, rpe: 7, durationMinutes: 60, context: context)
 

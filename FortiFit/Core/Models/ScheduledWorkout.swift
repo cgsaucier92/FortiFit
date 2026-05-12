@@ -5,7 +5,7 @@ import SwiftData
 final class ScheduledWorkout {
     var id: UUID
     var templateId: UUID?
-    var templateSnapshot: Data?
+    @Attribute(originalName: "templateSnapshot") var scheduledWorkoutSnapshot: Data?
     var scheduledDate: Date
     var scheduledTime: Date?
     var workoutType: String
@@ -16,11 +16,13 @@ final class ScheduledWorkout {
     var recurrenceRule: String?
     var recurrenceGroupId: UUID?
     var dateCreated: Date
+    var syncToAppleWatch: Bool = false
+    var appleWorkoutPlanId: UUID?
 
     init(
         id: UUID = UUID(),
         templateId: UUID? = nil,
-        templateSnapshot: Data? = nil,
+        scheduledWorkoutSnapshot: Data? = nil,
         scheduledDate: Date,
         scheduledTime: Date? = nil,
         workoutType: String,
@@ -30,11 +32,13 @@ final class ScheduledWorkout {
         completedWorkoutId: UUID? = nil,
         recurrenceRule: String? = nil,
         recurrenceGroupId: UUID? = nil,
-        dateCreated: Date = Date()
+        dateCreated: Date = Date(),
+        syncToAppleWatch: Bool = false,
+        appleWorkoutPlanId: UUID? = nil
     ) {
         self.id = id
         self.templateId = templateId
-        self.templateSnapshot = templateSnapshot
+        self.scheduledWorkoutSnapshot = scheduledWorkoutSnapshot
         // Zero time component for day-level matching
         self.scheduledDate = Calendar.current.startOfDay(for: scheduledDate)
         self.scheduledTime = scheduledTime
@@ -46,5 +50,7 @@ final class ScheduledWorkout {
         self.recurrenceRule = recurrenceRule
         self.recurrenceGroupId = recurrenceGroupId
         self.dateCreated = dateCreated
+        self.syncToAppleWatch = syncToAppleWatch
+        self.appleWorkoutPlanId = appleWorkoutPlanId
     }
 }

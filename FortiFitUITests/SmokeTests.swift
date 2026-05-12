@@ -154,7 +154,7 @@ final class SmokeTests: XCTestCase {
 
         // Select goal type first (no default is pre-selected)
         let goalTypeButton = app.buttons["Select Goal Type"]
-        XCTAssertTrue(goalTypeButton.waitForExistence(timeout: 3), "Add Goal screen did not load")
+        XCTAssertTrue(goalTypeButton.waitForExistence(timeout: 3), "Create Goal screen did not load")
         goalTypeButton.tap()
 
         let strengthOption = app.buttons["Strength PR"]
@@ -230,7 +230,7 @@ final class SmokeTests: XCTestCase {
 
     // MARK: - Smoke 8: Save as Template
 
-    /// User can save a logged Strength workout as a template and see it in Saved Templates.
+    /// User can save a logged Strength workout as a template and see it in Workout Templates.
     func test_saveAsTemplate_templateAppearsInSavedTemplatesList() {
         // First log a minimal Strength workout
         app.tabBars.buttons[Tab.home.rawValue].tap()
@@ -256,14 +256,14 @@ final class SmokeTests: XCTestCase {
         // Name prompt accepts default (workout name)
         app.buttons["saveTemplateConfirmButton"].firstMatch.tap()
 
-        // Navigate to Saved Templates via Workouts → Ellipsis
+        // Navigate to Workout Templates via Workouts → Ellipsis
         app.tabBars.buttons[Tab.workouts.rawValue].tap()
         app.buttons["workoutsEllipsisMenu"].tap()
         app.buttons["viewSavedTemplatesMenuItem"].tap()
 
         XCTAssertTrue(
             app.staticTexts["Template Source"].waitForExistence(timeout: 3),
-            "Expected saved template to appear in Saved Templates list"
+            "Expected saved template to appear in Workout Templates list"
         )
     }
 
@@ -442,18 +442,18 @@ final class SmokeTests: XCTestCase {
 
     // MARK: - Smoke 13: Tab Reset — Workouts
 
-    /// Navigating away from Workouts while Saved Templates is pushed should pop back to root on return.
+    /// Navigating away from Workouts while Workout Templates is pushed should pop back to root on return.
     func test_workoutsTab_resetsNavigationOnTabSwitch() {
         app.tabBars.buttons[Tab.workouts.rawValue].tap()
 
-        // Push into Saved Templates via ellipsis menu
+        // Push into Workout Templates via ellipsis menu
         app.buttons["workoutsEllipsisMenu"].tap()
         let templatesItem = app.buttons["viewSavedTemplatesMenuItem"]
         XCTAssertTrue(templatesItem.waitForExistence(timeout: 2))
         templatesItem.tap()
 
         // Verify we navigated away from root (ellipsis should not be visible on Templates screen)
-        XCTAssertFalse(app.buttons["workoutsEllipsisMenu"].waitForExistence(timeout: 1), "Should have navigated to Saved Templates")
+        XCTAssertFalse(app.buttons["workoutsEllipsisMenu"].waitForExistence(timeout: 1), "Should have navigated to Workout Templates")
 
         // Switch away and back
         app.tabBars.buttons[Tab.home.rawValue].tap()
@@ -465,18 +465,18 @@ final class SmokeTests: XCTestCase {
 
     // MARK: - Smoke 14: Tab Reset — Plan
 
-    /// Navigating away from Plan while Saved Templates is pushed should pop back to root on return.
+    /// Navigating away from Plan while Workout Templates is pushed should pop back to root on return.
     func test_planTab_resetsNavigationOnTabSwitch() {
         app.tabBars.buttons[Tab.plan.rawValue].tap()
 
-        // Push into Saved Templates via Plan's ellipsis menu
+        // Push into Workout Templates via Plan's ellipsis menu
         app.buttons["planEllipsisMenu"].tap()
         let templatesItem = app.buttons["planSavedTemplatesMenuItem"]
         XCTAssertTrue(templatesItem.waitForExistence(timeout: 2))
         templatesItem.tap()
 
         // Verify we navigated away from root (Plan ellipsis should not be visible)
-        XCTAssertFalse(app.buttons["planEllipsisMenu"].waitForExistence(timeout: 1), "Should have navigated to Saved Templates")
+        XCTAssertFalse(app.buttons["planEllipsisMenu"].waitForExistence(timeout: 1), "Should have navigated to Workout Templates")
 
         // Switch away and back
         app.tabBars.buttons[Tab.home.rawValue].tap()
@@ -515,25 +515,25 @@ final class SmokeTests: XCTestCase {
 
     // MARK: - Smoke 16: Tab Reset — Goals
 
-    /// Navigating away from Goals while Add Goal is pushed should pop back to root on return.
+    /// Navigating away from Goals while Create Goal is pushed should pop back to root on return.
     func test_goalsTab_resetsNavigationOnTabSwitch() {
         app.tabBars.buttons[Tab.goals.rawValue].tap()
 
-        // Push into Add Goal
+        // Push into Create Goal
         let addButton = app.buttons["addGoalButton"]
         XCTAssertTrue(addButton.waitForExistence(timeout: 2))
         addButton.tap()
 
-        // Verify we're on Add Goal screen (goal type selector should exist)
-        XCTAssertTrue(app.buttons["Select Goal Type"].waitForExistence(timeout: 2), "Add Goal screen should be pushed")
+        // Verify we're on Create Goal screen (goal type selector should exist)
+        XCTAssertTrue(app.buttons["Select Goal Type"].waitForExistence(timeout: 2), "Create Goal screen should be pushed")
 
         // Switch away and back
         app.tabBars.buttons[Tab.home.rawValue].tap()
         app.tabBars.buttons[Tab.goals.rawValue].tap()
 
         // Should be back at Goals root
-        XCTAssertTrue(app.buttons["addGoalButton"].waitForExistence(timeout: 2), "Add Goal button should be visible after tab reset")
-        XCTAssertFalse(app.buttons["Select Goal Type"].exists, "Add Goal screen should be dismissed after tab reset")
+        XCTAssertTrue(app.buttons["addGoalButton"].waitForExistence(timeout: 2), "Create Goal button should be visible after tab reset")
+        XCTAssertFalse(app.buttons["Select Goal Type"].exists, "Create Goal screen should be dismissed after tab reset")
     }
 
     // MARK: - Smoke 17: Long-Press Training Load → Configure Settings
@@ -567,6 +567,7 @@ final class SmokeTests: XCTestCase {
         app.buttons["homeEllipsisMenu"].tap()
         app.buttons["addWidgetsMenuItem"].tap()
         app.buttons["addWidgetRow_weekStreak"].tap()
+        app.buttons["addWidgetsMenuDismiss"].tap()
 
         let streakText = app.staticTexts["Week Streak"]
         XCTAssertTrue(streakText.waitForExistence(timeout: 3), "Week Streak widget should be visible")
@@ -1015,7 +1016,11 @@ final class TrendsChartDetailSmokeTests: XCTestCase {
             .matching(identifier: "trendsChartDetail_strengthTracker_card").firstMatch
         XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
 
-        detailCard.swipeLeft()
+        // Swipe in the header area (dy: 0.15) to avoid the chart's
+        // DragGesture(minimumDistance: 0) overlay which captures all drags.
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.15))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.15))
+        start.press(forDuration: 0.01, thenDragTo: end)
 
         let nextCard = app.descendants(matching: .any)
             .matching(identifier: "trendsChartDetail_trainingFrequency_card").firstMatch
@@ -1123,10 +1128,6 @@ final class HealthKitSmokeTests: XCTestCase {
         let unlinkButton = app.buttons["workoutDetail_healthUnlinkButton"]
         XCTAssertTrue(unlinkButton.waitForExistence(timeout: 3))
         unlinkButton.tap()
-
-        let confirmButton = app.buttons["sourceInfoSheet_unlinkConfirmButton"].firstMatch
-        XCTAssertTrue(confirmButton.waitForExistence(timeout: 3), "Unlink confirmation dialog should appear")
-        confirmButton.tap()
 
         XCTAssertFalse(
             app.buttons["workoutDetail_healthSourceIndicator"].waitForExistence(timeout: 3),
@@ -1755,15 +1756,13 @@ final class ActivityRingsWidgetSmokeTests: XCTestCase {
         app.buttons["homeEllipsisMenu"].tap()
         app.buttons["addWidgetsMenuItem"].tap()
         app.buttons["addWidgetRow_appleActivity"].tap()
+        app.buttons["addWidgetsMenuDismiss"].tap()
 
-        let connectState = app.otherElements["homeWidget_appleActivity_state_connectAppleHealth"]
+        let stateMessage = app.staticTexts["Connect Apple Health to track your activity rings."].firstMatch
         XCTAssertTrue(
-            connectState.waitForExistence(timeout: 3),
+            stateMessage.waitForExistence(timeout: 3),
             "State 1 (Connect Apple Health) should be displayed when HK is disabled"
         )
-
-        let connectButton = app.buttons["homeWidget_appleActivity_connectButton"]
-        XCTAssertTrue(connectButton.exists, "Connect button should be visible in State 1")
     }
 
     // MARK: - Smoke AR-3: Long-Press Context Menu
@@ -1775,8 +1774,9 @@ final class ActivityRingsWidgetSmokeTests: XCTestCase {
         app.buttons["homeEllipsisMenu"].tap()
         app.buttons["addWidgetsMenuItem"].tap()
         app.buttons["addWidgetRow_appleActivity"].tap()
+        app.buttons["addWidgetsMenuDismiss"].tap()
 
-        let widgetHeader = app.staticTexts["Activity Rings"]
+        let widgetHeader = app.staticTexts["Activity Rings"].firstMatch
         XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
 
         widgetHeader.press(forDuration: 1.0)
@@ -1803,8 +1803,9 @@ final class ActivityRingsWidgetSmokeTests: XCTestCase {
         app.buttons["homeEllipsisMenu"].tap()
         app.buttons["addWidgetsMenuItem"].tap()
         app.buttons["addWidgetRow_appleActivity"].tap()
+        app.buttons["addWidgetsMenuDismiss"].tap()
 
-        let widgetHeader = app.staticTexts["Activity Rings"]
+        let widgetHeader = app.staticTexts["Activity Rings"].firstMatch
         XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
 
         widgetHeader.press(forDuration: 1.0)
@@ -1828,8 +1829,9 @@ final class ActivityRingsWidgetSmokeTests: XCTestCase {
         app.buttons["homeEllipsisMenu"].tap()
         app.buttons["addWidgetsMenuItem"].tap()
         app.buttons["addWidgetRow_appleActivity"].tap()
+        app.buttons["addWidgetsMenuDismiss"].tap()
 
-        let widgetHeader = app.staticTexts["Activity Rings"]
+        let widgetHeader = app.staticTexts["Activity Rings"].firstMatch
         XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
 
         widgetHeader.press(forDuration: 1.0)
@@ -1863,8 +1865,9 @@ final class ActivityRingsWidgetSmokeTests: XCTestCase {
         app.buttons["homeEllipsisMenu"].tap()
         app.buttons["addWidgetsMenuItem"].tap()
         app.buttons["addWidgetRow_appleActivity"].tap()
+        app.buttons["addWidgetsMenuDismiss"].tap()
 
-        let widgetHeader = app.staticTexts["Activity Rings"]
+        let widgetHeader = app.staticTexts["Activity Rings"].firstMatch
         XCTAssertTrue(widgetHeader.waitForExistence(timeout: 3))
 
         widgetHeader.press(forDuration: 1.0)

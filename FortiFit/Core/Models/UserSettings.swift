@@ -25,6 +25,8 @@ final class UserSettings {
         static let targetMoveCalories = "targetMoveCalories"
         static let targetExerciseMinutes = "targetExerciseMinutes"
         static let targetStandHours = "targetStandHours"
+        static let syncPlanToAppleWatchEnabled = "syncPlanToAppleWatchEnabled"
+        static let hasResetAnchorForPhase87 = "hasResetAnchorForPhase87"
     }
 
     var useLbs: Bool {
@@ -117,6 +119,14 @@ final class UserSettings {
         }
     }
 
+    var syncPlanToAppleWatchEnabled: Bool {
+        didSet { defaults.set(syncPlanToAppleWatchEnabled, forKey: Keys.syncPlanToAppleWatchEnabled) }
+    }
+
+    var hasResetAnchorForPhase87: Bool {
+        didSet { defaults.set(hasResetAnchorForPhase87, forKey: Keys.hasResetAnchorForPhase87) }
+    }
+
     private init() {
         // Register defaults for first launch
         defaults.register(defaults: [
@@ -132,7 +142,8 @@ final class UserSettings {
             Keys.hasMigratedSprintsToCardio: false,
             Keys.healthKitAuthorizationRequested: false,
             Keys.hasMigratedWorkoutInfoRemoval: false,
-            Keys.hasSeededDefaultHomeWidgets: false
+            Keys.hasSeededDefaultHomeWidgets: false,
+            Keys.syncPlanToAppleWatchEnabled: false
         ])
 
         self.useLbs = defaults.bool(forKey: Keys.useLbs)
@@ -150,6 +161,8 @@ final class UserSettings {
         self.healthKitAuthorizationRequested = defaults.bool(forKey: Keys.healthKitAuthorizationRequested)
         self.hasMigratedWorkoutInfoRemoval = defaults.bool(forKey: Keys.hasMigratedWorkoutInfoRemoval)
         self.hasSeededDefaultHomeWidgets = defaults.bool(forKey: Keys.hasSeededDefaultHomeWidgets)
+        self.syncPlanToAppleWatchEnabled = defaults.bool(forKey: Keys.syncPlanToAppleWatchEnabled)
+        self.hasResetAnchorForPhase87 = defaults.bool(forKey: Keys.hasResetAnchorForPhase87)
         self.targetMoveCalories = defaults.object(forKey: Keys.targetMoveCalories) as? Int
         self.targetExerciseMinutes = defaults.object(forKey: Keys.targetExerciseMinutes) as? Int
         self.targetStandHours = defaults.object(forKey: Keys.targetStandHours) as? Int

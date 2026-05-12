@@ -9,6 +9,18 @@ struct SnapshotExercise: Codable {
     let reps: Int
     let weightKg: Double?
     let sortOrder: Int
+    let restSeconds: Int?
+    let displayAsTime: Bool?
+
+    init(exerciseName: String, sets: Int, reps: Int, weightKg: Double?, sortOrder: Int, restSeconds: Int? = nil, displayAsTime: Bool? = nil) {
+        self.exerciseName = exerciseName
+        self.sets = sets
+        self.reps = reps
+        self.weightKg = weightKg
+        self.sortOrder = sortOrder
+        self.restSeconds = restSeconds
+        self.displayAsTime = displayAsTime
+    }
 }
 
 // MARK: - Date Resolution
@@ -55,7 +67,7 @@ enum RecurrenceScope {
 /// within the toast lifetime.
 struct RemovedPlanSnapshot {
     let templateId: UUID?
-    let templateSnapshot: Data?
+    let scheduledWorkoutSnapshot: Data?
     let scheduledDate: Date
     let scheduledTime: Date?
     let workoutType: String
@@ -83,7 +95,9 @@ struct PlanService {
                     sets: set.sets,
                     reps: set.reps,
                     weightKg: set.weightKg,
-                    sortOrder: set.sortOrder
+                    sortOrder: set.sortOrder,
+                    restSeconds: set.restSeconds,
+                    displayAsTime: set.displayAsTime
                 )
             }
         return try? JSONEncoder().encode(exercises)
@@ -95,72 +109,83 @@ struct PlanService {
 
     // MARK: - Scheduling
 
+    @discardableResult
     static func scheduleWorkout(
         template: WorkoutTemplate,
         date: Date,
         time: Date?,
         recurrenceRule: String?,
+        syncToAppleWatch: Bool = false,
         context: ModelContext
-    ) {
+    ) -> [ScheduledWorkout] {
         let today = Calendar.current.startOfDay(for: Date())
         let targetDate = Calendar.current.startOfDay(for: date)
-        guard targetDate >= today else { return }
+        guard targetDate >= today else { return [] }
 
         let snapshot = encodeSnapshot(template: template)
 
         if let rule = recurrenceRule {
-            generateRecurrence(
+            return generateRecurrence(
                 template: template,
                 snapshot: snapshot,
                 startDate: targetDate,
                 time: time,
                 rule: rule,
+                syncToAppleWatch: syncToAppleWatch,
                 context: context
             )
         } else {
             let scheduled = ScheduledWorkout(
                 templateId: template.id,
-                templateSnapshot: snapshot,
+                scheduledWorkoutSnapshot: snapshot,
                 scheduledDate: targetDate,
                 scheduledTime: time,
                 workoutType: template.workoutType,
                 workoutName: template.name,
-                durationMinutes: template.durationMinutes
+                durationMinutes: template.durationMinutes,
+                syncToAppleWatch: syncToAppleWatch
             )
             context.insert(scheduled)
             try? context.save()
+            return [scheduled]
         }
     }
 
+    @discardableResult
     static func generateRecurrence(
         template: WorkoutTemplate,
         snapshot: Data?,
         startDate: Date,
         time: Date?,
         rule: String,
+        syncToAppleWatch: Bool = false,
         context: ModelContext
-    ) {
+    ) -> [ScheduledWorkout] {
         let groupId = UUID()
         let interval = rule == "biweekly" ? 14 : 7
         let totalWeeks = AppConstants.recurrenceLookaheadWeeks
         let instanceCount = (totalWeeks * 7) / interval
 
+        var created: [ScheduledWorkout] = []
         for i in 0..<instanceCount {
             guard let date = Calendar.current.date(byAdding: .day, value: i * interval, to: startDate) else { continue }
             let scheduled = ScheduledWorkout(
                 templateId: template.id,
-                templateSnapshot: snapshot,
+                scheduledWorkoutSnapshot: snapshot,
                 scheduledDate: date,
                 scheduledTime: time,
                 workoutType: template.workoutType,
                 workoutName: template.name,
                 durationMinutes: template.durationMinutes,
                 recurrenceRule: rule,
-                recurrenceGroupId: groupId
+                recurrenceGroupId: groupId,
+                syncToAppleWatch: syncToAppleWatch
             )
             context.insert(scheduled)
+            created.append(scheduled)
         }
         try? context.save()
+        return created
     }
 
     static func regenerateRecurrenceIfNeeded(groupId: UUID, context: ModelContext) {
@@ -192,14 +217,15 @@ struct PlanService {
             guard let date = Calendar.current.date(byAdding: .day, value: i * interval, to: lastDate) else { continue }
             let scheduled = ScheduledWorkout(
                 templateId: latestInstance.templateId,
-                templateSnapshot: latestInstance.templateSnapshot,
+                scheduledWorkoutSnapshot: latestInstance.scheduledWorkoutSnapshot,
                 scheduledDate: date,
                 scheduledTime: latestInstance.scheduledTime,
                 workoutType: latestInstance.workoutType,
                 workoutName: latestInstance.workoutName,
                 durationMinutes: latestInstance.durationMinutes,
                 recurrenceRule: rule,
-                recurrenceGroupId: groupId
+                recurrenceGroupId: groupId,
+                syncToAppleWatch: latestInstance.syncToAppleWatch
             )
             context.insert(scheduled)
         }
@@ -378,7 +404,7 @@ struct PlanService {
                 // Planned or skipped — capture snapshot for undo
                 let snapshot = RemovedPlanSnapshot(
                     templateId: sw.templateId,
-                    templateSnapshot: sw.templateSnapshot,
+                    scheduledWorkoutSnapshot: sw.scheduledWorkoutSnapshot,
                     scheduledDate: sw.scheduledDate,
                     scheduledTime: sw.scheduledTime,
                     workoutType: sw.workoutType,
@@ -418,7 +444,7 @@ struct PlanService {
     static func restoreRemovedPlan(snapshot: RemovedPlanSnapshot, context: ModelContext) {
         let restored = ScheduledWorkout(
             templateId: snapshot.templateId,
-            templateSnapshot: snapshot.templateSnapshot,
+            scheduledWorkoutSnapshot: snapshot.scheduledWorkoutSnapshot,
             scheduledDate: snapshot.scheduledDate,
             scheduledTime: snapshot.scheduledTime,
             workoutType: snapshot.workoutType,
@@ -481,7 +507,7 @@ struct PlanService {
         context: ModelContext
     ) {
         let exercises: [SnapshotExercise]
-        if let snapshotData = scheduledWorkout.templateSnapshot {
+        if let snapshotData = scheduledWorkout.scheduledWorkoutSnapshot {
             exercises = decodeSnapshot(data: snapshotData)
         } else {
             exercises = []
@@ -504,7 +530,9 @@ struct PlanService {
                     sets: exercise.sets,
                     reps: exercise.reps,
                     weightKg: exercise.weightKg,
-                    sortOrder: exercise.sortOrder
+                    sortOrder: exercise.sortOrder,
+                    restSeconds: exercise.restSeconds,
+                    displayAsTime: exercise.displayAsTime
                 )
                 workout.exerciseSets.append(set)
             }
@@ -596,5 +624,159 @@ struct PlanService {
             scheduled.status = "planned"
         }
         try? context.save()
+    }
+
+    // MARK: - Plan-ID Lookup (Phase 8.7)
+
+    static func findByPlanId(_ planId: UUID, context: ModelContext) -> ScheduledWorkout? {
+        let predicate = #Predicate<ScheduledWorkout> { sw in
+            sw.appleWorkoutPlanId == planId
+        }
+        let descriptor = FetchDescriptor<ScheduledWorkout>(predicate: predicate)
+        return (try? context.fetch(descriptor))?.first
+    }
+
+    // MARK: - Complete from Watch (Phase 8.7)
+
+    static func completeFromWatch(
+        scheduledWorkout: ScheduledWorkout,
+        hkSnapshot: HealthKitWorkoutSnapshot,
+        context: ModelContext
+    ) {
+        let exercises: [SnapshotExercise]
+        if let snapshotData = scheduledWorkout.scheduledWorkoutSnapshot {
+            exercises = decodeSnapshot(data: snapshotData)
+        } else {
+            exercises = []
+        }
+
+        let activityTypeDisplay = OutboundHKMapping.activityTypeDisplayString(for: scheduledWorkout.workoutType) ?? hkSnapshot.mapping.displayString
+
+        let workout = Workout(
+            name: scheduledWorkout.workoutName,
+            date: hkSnapshot.startDate,
+            workoutType: scheduledWorkout.workoutType,
+            durationMinutes: hkSnapshot.durationMinutes,
+            distanceKm: hkSnapshot.distanceKm,
+            time: hkSnapshot.startDate,
+            healthKitUUID: hkSnapshot.uuid,
+            healthKitSourceBundleID: hkSnapshot.sourceBundleID,
+            healthKitActivityType: activityTypeDisplay,
+            avgHeartRate: hkSnapshot.avgHeartRate,
+            maxHeartRate: hkSnapshot.maxHeartRate,
+            activeEnergyKcal: hkSnapshot.activeEnergyKcal,
+            totalEnergyBurnedKcal: hkSnapshot.totalEnergyBurnedKcal,
+            elevationAscendedMeters: hkSnapshot.elevationAscendedMeters,
+            exerciseMinutes: hkSnapshot.exerciseMinutes,
+            indoor: hkSnapshot.indoor
+        )
+
+        if scheduledWorkout.workoutType == "Strength Training" || scheduledWorkout.workoutType == "HIIT" {
+            for exercise in exercises {
+                let set = ExerciseSet(
+                    exerciseName: exercise.exerciseName,
+                    sets: exercise.sets,
+                    reps: exercise.reps,
+                    weightKg: exercise.weightKg,
+                    sortOrder: exercise.sortOrder,
+                    restSeconds: exercise.restSeconds,
+                    displayAsTime: exercise.displayAsTime
+                )
+                workout.exerciseSets.append(set)
+            }
+        }
+
+        WorkoutService.logWorkout(workout, context: context)
+        WorkoutTypeOrderService.ensureOrderExists(for: workout.workoutType, context: context)
+        let exerciseNames = workout.exerciseSets.map { $0.exerciseName }
+        GoalService.recalculateGoals(
+            affectedExerciseNames: exerciseNames,
+            affectedWorkoutTypes: [workout.workoutType],
+            workout: workout,
+            context: context
+        )
+
+        scheduledWorkout.status = "completed"
+        scheduledWorkout.completedWorkoutId = workout.id
+        try? context.save()
+    }
+
+    // MARK: - Edit Scheduled Workout (Phase 8.7)
+
+    struct ScheduledWorkoutEdits {
+        var workoutName: String
+        var scheduledDate: Date
+        var scheduledTime: Date?
+        var durationMinutes: Int?
+        var exercises: [SnapshotExercise]
+        var syncToAppleWatch: Bool
+        var workoutType: String
+    }
+
+    static func editScheduledWorkout(
+        _ scheduledWorkout: ScheduledWorkout,
+        edits: ScheduledWorkoutEdits,
+        applyTo: RecurrenceScope,
+        context: ModelContext
+    ) -> [ScheduledWorkout] {
+        let dateChanged = Calendar.current.startOfDay(for: edits.scheduledDate) != scheduledWorkout.scheduledDate
+        let effectiveScope: RecurrenceScope
+        if dateChanged && scheduledWorkout.recurrenceGroupId != nil {
+            effectiveScope = .thisOnly
+        } else {
+            effectiveScope = applyTo
+        }
+
+        let snapshotData = try? JSONEncoder().encode(edits.exercises)
+
+        var affected: [ScheduledWorkout] = []
+
+        switch effectiveScope {
+        case .thisOnly:
+            applyEdits(to: scheduledWorkout, edits: edits, snapshotData: snapshotData)
+            affected = [scheduledWorkout]
+
+        case .thisAndFuture:
+            guard let groupId = scheduledWorkout.recurrenceGroupId else {
+                applyEdits(to: scheduledWorkout, edits: edits, snapshotData: snapshotData)
+                affected = [scheduledWorkout]
+                break
+            }
+
+            let cutoffDate = scheduledWorkout.scheduledDate
+            let plannedStatus = "planned"
+            let predicate = #Predicate<ScheduledWorkout> { sw in
+                sw.recurrenceGroupId == groupId &&
+                sw.scheduledDate >= cutoffDate &&
+                sw.status == plannedStatus
+            }
+            let descriptor = FetchDescriptor<ScheduledWorkout>(predicate: predicate)
+            let instances = (try? context.fetch(descriptor)) ?? []
+
+            for instance in instances {
+                applyEdits(to: instance, edits: edits, snapshotData: snapshotData, preserveDate: instance.id != scheduledWorkout.id)
+            }
+            affected = instances
+        }
+
+        try? context.save()
+        return affected
+    }
+
+    private static func applyEdits(
+        to sw: ScheduledWorkout,
+        edits: ScheduledWorkoutEdits,
+        snapshotData: Data?,
+        preserveDate: Bool = false
+    ) {
+        sw.workoutName = edits.workoutName
+        if !preserveDate {
+            sw.scheduledDate = Calendar.current.startOfDay(for: edits.scheduledDate)
+            sw.scheduledTime = edits.scheduledTime
+        }
+        sw.durationMinutes = edits.durationMinutes
+        sw.workoutType = edits.workoutType
+        sw.scheduledWorkoutSnapshot = snapshotData
+        sw.syncToAppleWatch = edits.syncToAppleWatch
     }
 }

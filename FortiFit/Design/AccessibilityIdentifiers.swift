@@ -265,6 +265,48 @@ enum AccessibilityID {
         "trendsChartDetail_workoutTypeBreakdown_legendSortHeader_\(column)"
     }
 
+    // MARK: - Watch Sync (Phase 8.7)
+
+    static let settingsAppleWatchToggle = "settings_appleWatchToggle"
+    static let settingsAppleWatchOpenSettingsButton = "settings_appleWatchOpenSettingsButton"
+
+    static func scheduledWorkoutCardWatchSyncGlyph(_ index: Int) -> String {
+        "scheduledWorkoutCard_\(index)_watchSyncGlyph"
+    }
+
+    static let editScheduledWorkout_watchSyncToggle = "editScheduledWorkout_watchSyncToggle"
+    static let editScheduledWorkout_watchSyncInfoPopover = "editScheduledWorkout_watchSyncInfoPopover"
+    static let editScheduledWorkout_recurrencePrompt_thisOnly = "editScheduledWorkout_recurrencePrompt_thisOnly"
+    static let editScheduledWorkout_recurrencePrompt_thisAndFuture = "editScheduledWorkout_recurrencePrompt_thisAndFuture"
+    static let editScheduledWorkout_saveButton = "editScheduledWorkout_saveButton"
+    static let editScheduledWorkout_backButton = "editScheduledWorkout_backButton"
+    static let editScheduledWorkout_dateField = "editScheduledWorkout_dateField"
+    static let editScheduledWorkout_timeField = "editScheduledWorkout_timeField"
+
+    static func exerciseCardRestPerSetField(_ index: Int) -> String {
+        "exerciseCard_\(index)_restPerSetField"
+    }
+
+    static func exerciseCardRestPerSetInfoPopover(_ index: Int) -> String {
+        "exerciseCard_\(index)_restPerSetInfoPopover"
+    }
+
+    static func exerciseCardRepsTimeToggle(_ index: Int) -> String {
+        "exerciseCard_\(index)_repsTimeToggle"
+    }
+
+    static let masterSyncOff_popover = "masterSyncOff_popover"
+    static let masterSyncOff_openSettingsButton = "masterSyncOff_openSettingsButton"
+    static let watchSyncErrorToast = "watchSyncErrorToast"
+    static let watchSyncErrorToast_retryButton = "watchSyncErrorToast_retryButton"
+
+    // MARK: - Schedule Workout (Phase 8.7.1)
+
+    static let scheduleWorkout_pushToAppleWatchToggle = "scheduleWorkout_pushToAppleWatchToggle"
+    static let scheduleWorkout_pushToAppleWatchInfoPopover = "scheduleWorkout_pushToAppleWatchInfoPopover"
+
+    static let planScheduledCardEditMenuItem = "planScheduledCardEditMenuItem"
+
     // MARK: - Helpers
 
     /// Sanitizes a display string for use in an identifier (removes spaces).

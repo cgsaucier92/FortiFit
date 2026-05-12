@@ -118,7 +118,7 @@ struct PlanViewModelTests {
             workoutType: "Strength Training",
             workoutName: "Push Day"
         )
-        sw.templateSnapshot = "[]".data(using: .utf8)
+        sw.scheduledWorkoutSnapshot = "[]".data(using: .utf8)
         context.insert(sw)
         try context.save()
 

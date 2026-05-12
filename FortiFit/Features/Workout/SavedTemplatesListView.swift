@@ -32,7 +32,7 @@ struct SavedTemplatesListView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        FortiFitScreenHeading("Saved Templates")
+                        FortiFitScreenHeading("Workout Templates")
 
                         ForEach(templates) { template in
                             templateRow(template)
@@ -108,12 +108,13 @@ struct SavedTemplatesListView: View {
             ScheduleWorkoutView(
                 preSelectedDate: Date(),
                 preSelectedTemplate: templateToSchedule,
-                onSchedule: { template, date, time, recurrence in
+                onSchedule: { template, date, time, recurrence, syncToWatch in
                     PlanService.scheduleWorkout(
                         template: template,
                         date: date,
                         time: time,
                         recurrenceRule: recurrence,
+                        syncToAppleWatch: syncToWatch,
                         context: modelContext
                     )
                     showScheduleSheet = false

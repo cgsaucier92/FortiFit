@@ -374,8 +374,10 @@ private func mondayAt(_ weeksAgo: Int) -> Date {
 
 /// Creates N workouts spread across a given week (starting from weekMonday).
 private func createWorkouts(count: Int, inWeekStarting weekMonday: Date, context: ModelContext) {
+    var calendar = Calendar(identifier: .iso8601)
+    calendar.firstWeekday = 2
     for i in 0..<count {
-        let date = Calendar.current.date(byAdding: .day, value: i % 7, to: weekMonday)!
+        let date = calendar.date(byAdding: .day, value: i % 7, to: weekMonday)!
         let w = Workout(name: "W-\(i)", date: date, workoutType: "Strength Training")
         WorkoutService.logWorkout(w, context: context)
     }
@@ -389,15 +391,8 @@ struct StreakServiceTests {
     // TEST.md line 177: returns currentStreak = 0 and tier "Dormant" when no workouts exist
     @Test func noWorkoutsReturnsDormant() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 3
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 3, writeToSettings: false)
         #expect(result.streak == 0)
         #expect(result.tier == .dormant)
     }
@@ -409,7 +404,7 @@ struct StreakServiceTests {
         // Log some workouts anyway
         createWorkouts(count: 5, inWeekStarting: mondayAt(1), context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 0)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 0, writeToSettings: false)
         #expect(result.streak == 0)
         #expect(result.tier == .dormant)
     }
@@ -417,17 +412,10 @@ struct StreakServiceTests {
     // TEST.md line 179: 1 completed week returns streak=1 and tier "Building"
     @Test func oneCompletedWeekReturnsBuilding() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 3
 
         createWorkouts(count: 3, inWeekStarting: mondayAt(1), context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 3, writeToSettings: false)
         #expect(result.streak == 1)
         #expect(result.tier == .building)
     }
@@ -435,19 +423,12 @@ struct StreakServiceTests {
     // TEST.md line 180: 3 consecutive completed weeks returns streak=3 and tier "Building"
     @Test func threeWeeksReturnsBuilding() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 2
 
         for w in 1...3 {
             createWorkouts(count: 2, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 2, writeToSettings: false)
         #expect(result.streak == 3)
         #expect(result.tier == .building)
     }
@@ -455,19 +436,12 @@ struct StreakServiceTests {
     // TEST.md line 181: 4 consecutive completed weeks returns streak=4 and tier "Committed"
     @Test func fourWeeksReturnsCommitted() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 2
 
         for w in 1...4 {
             createWorkouts(count: 2, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 2, writeToSettings: false)
         #expect(result.streak == 4)
         #expect(result.tier == .committed)
     }
@@ -475,19 +449,12 @@ struct StreakServiceTests {
     // TEST.md line 182: 7 consecutive completed weeks returns streak=7 and tier "Committed"
     @Test func sevenWeeksReturnsCommitted() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 1
 
         for w in 1...7 {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 1, writeToSettings: false)
         #expect(result.streak == 7)
         #expect(result.tier == .committed)
     }
@@ -495,19 +462,12 @@ struct StreakServiceTests {
     // TEST.md line 183: 8 consecutive completed weeks returns streak=8 and tier "Elite"
     @Test func eightWeeksReturnsElite() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 1
 
         for w in 1...8 {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 1, writeToSettings: false)
         #expect(result.streak == 8)
         #expect(result.tier == .elite)
     }
@@ -515,16 +475,7 @@ struct StreakServiceTests {
     // TEST.md line 184: missed week between two completed weeks resets streak
     @Test func missedWeekResetsStreak() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 2
 
-        // Weeks 3,2 completed; week 1 missed (gap); should count only from most recent consecutive
-        // Actually: week 1 (most recent completed) = streak continues; we need gap BEFORE recent streak
         // Completed: weeks 2 and 1; missed: week 3; completed: weeks 5 and 4
         // Walking back from week 1: week 1 ✓, week 2 ✓, week 3 ✗ → streak = 2
         createWorkouts(count: 2, inWeekStarting: mondayAt(1), context: context)
@@ -533,20 +484,13 @@ struct StreakServiceTests {
         createWorkouts(count: 2, inWeekStarting: mondayAt(4), context: context)
         createWorkouts(count: 2, inWeekStarting: mondayAt(5), context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 2, writeToSettings: false)
         #expect(result.streak == 2)
     }
 
     // TEST.md line 185: 5 completed + 1 missed + 2 completed = currentStreak = 2
     @Test func fiveCompletedOneMissedTwoCompletedReturnsTwoStreak() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 1
 
         // Most recent 2 completed weeks: weeks 1, 2
         createWorkouts(count: 1, inWeekStarting: mondayAt(1), context: context)
@@ -557,20 +501,13 @@ struct StreakServiceTests {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 1, writeToSettings: false)
         #expect(result.streak == 2)
     }
 
     // TEST.md line 186: week = Monday 00:00:00 through Sunday 23:59:59
     @Test func weekBoundaryMondayToSunday() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 1
 
         // Place a workout on Sunday of last week (day 6 from Monday)
         var calendar = Calendar(identifier: .iso8601)
@@ -582,27 +519,20 @@ struct StreakServiceTests {
         let w = Workout(name: "Sunday", date: sundayEvening, workoutType: "Yoga")
         WorkoutService.logWorkout(w, context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 1, writeToSettings: false)
         #expect(result.streak == 1)
     }
 
     // TEST.md line 187: provisional +1 extension when current week meets target
     @Test func provisionalExtensionWhenCurrentWeekMeetsTarget() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 2
 
         // Last week completed
         createWorkouts(count: 2, inWeekStarting: mondayAt(1), context: context)
         // Current week also meets target
         createWorkouts(count: 2, inWeekStarting: mondayAt(0), context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 2, writeToSettings: false)
         // 1 (last week) + 1 (provisional current) = 2
         #expect(result.streak == 2)
     }
@@ -610,32 +540,19 @@ struct StreakServiceTests {
     // TEST.md line 188: no provisional extension when current week below target
     @Test func noProvisionalExtensionWhenCurrentWeekBelowTarget() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 3
 
         // Last week completed
         createWorkouts(count: 3, inWeekStarting: mondayAt(1), context: context)
         // Current week has only 1 workout (below target of 3)
         createWorkouts(count: 1, inWeekStarting: mondayAt(0), context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 3, writeToSettings: false)
         #expect(result.streak == 1) // no provisional extension
     }
 
     // TEST.md line 189: lowering target can increase streak
     @Test func loweringTargetIncreasesStreak() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
 
         // 3 weeks with 2 workouts each
         for w in 1...3 {
@@ -643,25 +560,17 @@ struct StreakServiceTests {
         }
 
         // With target=3, none of these weeks meet the target
-        UserSettings.shared.targetWorkoutsPerWeek = 3
-        let highTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let highTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 3, writeToSettings: false)
         #expect(highTarget.streak == 0)
 
         // Lower target to 2: all 3 weeks now meet the target
-        UserSettings.shared.targetWorkoutsPerWeek = 2
-        let lowTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let lowTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 2, writeToSettings: false)
         #expect(lowTarget.streak == 3)
     }
 
     // TEST.md line 190: raising target can reset streak
     @Test func raisingTargetResetsStreak() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
 
         // 3 weeks with 2 workouts each
         for w in 1...3 {
@@ -669,26 +578,19 @@ struct StreakServiceTests {
         }
 
         // With target=2, all weeks meet target
-        UserSettings.shared.targetWorkoutsPerWeek = 2
-        let lowTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let lowTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 2, writeToSettings: false)
         #expect(lowTarget.streak == 3)
 
         // Raise target to 5: no weeks meet the target
-        UserSettings.shared.targetWorkoutsPerWeek = 5
-        let highTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let highTarget = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 5, writeToSettings: false)
         #expect(highTarget.streak == 0)
     }
 
     // TEST.md line 191: longestStreak updates when currentStreak exceeds it
     @Test func longestStreakUpdatesWhenCurrentExceedsIt() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
         let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 1
+        defer { UserSettings.shared.longestStreak = originalLongest }
         UserSettings.shared.longestStreak = 0
 
         // 3 completed weeks
@@ -696,7 +598,7 @@ struct StreakServiceTests {
             createWorkouts(count: 1, inWeekStarting: mondayAt(w), context: context)
         }
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 1)
         #expect(result.streak == 3)
         #expect(UserSettings.shared.longestStreak == 3)
     }
@@ -704,19 +606,14 @@ struct StreakServiceTests {
     // TEST.md line 192: longestStreak does not decrease when currentStreak resets
     @Test func longestStreakDoesNotDecrease() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
         let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
-        UserSettings.shared.targetWorkoutsPerWeek = 1
+        defer { UserSettings.shared.longestStreak = originalLongest }
         UserSettings.shared.longestStreak = 10
 
         // Only 1 completed week → streak = 1, but longest should stay 10
         createWorkouts(count: 1, inWeekStarting: mondayAt(1), context: context)
 
-        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let result = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 1)
         #expect(result.streak == 1)
         #expect(UserSettings.shared.longestStreak == 10)
     }
@@ -724,12 +621,6 @@ struct StreakServiceTests {
     // TEST.md line 193 (implied): retroactive recalculation when target changes
     @Test func retroactiveRecalculationOnTargetChange() throws {
         let context = try makeTestContext()
-        let original = UserSettings.shared.targetWorkoutsPerWeek
-        let originalLongest = UserSettings.shared.longestStreak
-        defer {
-            UserSettings.shared.targetWorkoutsPerWeek = original
-            UserSettings.shared.longestStreak = originalLongest
-        }
 
         // Week 1: 3 workouts, Week 2: 2 workouts, Week 3: 3 workouts
         createWorkouts(count: 3, inWeekStarting: mondayAt(1), context: context)
@@ -737,13 +628,11 @@ struct StreakServiceTests {
         createWorkouts(count: 3, inWeekStarting: mondayAt(3), context: context)
 
         // Target=3: week 2 misses → streak = 1 (only week 1)
-        UserSettings.shared.targetWorkoutsPerWeek = 3
-        let high = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let high = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 3, writeToSettings: false)
         #expect(high.streak == 1)
 
         // Target=2: all 3 weeks meet → streak = 3
-        UserSettings.shared.targetWorkoutsPerWeek = 2
-        let low = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate)
+        let low = StreakService.calculateStreak(context: context, referenceDate: streakReferenceDate, target: 2, writeToSettings: false)
         #expect(low.streak == 3)
     }
 }

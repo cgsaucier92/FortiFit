@@ -8,6 +8,16 @@ struct FortiFitScheduledWorkoutCard: View {
     var onRemoveFromPlan: () -> Void
     var isCompletedHealthKitLinked: Bool = false
     var onTap: (() -> Void)? = nil
+    var watchSyncGlyphState: FortiFitWatchSyncGlyph.State? = nil
+    var onWatchSyncTap: (() -> Void)? = nil
+    var onEditWorkout: (() -> Void)? = nil
+    var cardIndex: Int = 0
+    var gatePopoverTitle: String? = nil
+    var gatePopoverBody: String? = nil
+    var gatePopoverButtonLabel: String? = nil
+    var onGatePopoverButton: (() -> Void)? = nil
+
+    @State private var showGatePopover = false
 
     private var isOverdue: Bool {
         scheduledWorkout.status == "planned" &&
@@ -18,11 +28,54 @@ struct FortiFitScheduledWorkoutCard: View {
         Button(action: { onTap?() }) {
         FortiFitCard(borderColor: cardBorderColor) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
-                // Workout name
-                Text(scheduledWorkout.workoutName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(nameColor)
-                    .strikethrough(scheduledWorkout.status == "skipped")
+                // Workout name + watch sync glyph
+                HStack(alignment: .top) {
+                    Text(scheduledWorkout.workoutName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(nameColor)
+                        .strikethrough(scheduledWorkout.status == "skipped")
+
+                    Spacer()
+
+                    if let glyphState = watchSyncGlyphState, scheduledWorkout.status != "completed" {
+                        FortiFitWatchSyncGlyph(state: glyphState) {
+                            if glyphState == .disabled, gatePopoverBody != nil {
+                                showGatePopover = true
+                            } else {
+                                onWatchSyncTap?()
+                            }
+                        }
+                        .popover(isPresented: $showGatePopover) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if let title = gatePopoverTitle {
+                                    Text(title)
+                                        .font(FortiFitTypography.label)
+                                        .foregroundStyle(FortiFitColors.primaryText)
+                                }
+                                if let body = gatePopoverBody {
+                                    Text(body)
+                                        .font(FortiFitTypography.bodySmall)
+                                        .foregroundStyle(FortiFitColors.primaryText)
+                                }
+                                if let buttonLabel = gatePopoverButtonLabel {
+                                    Button(buttonLabel) {
+                                        showGatePopover = false
+                                        onGatePopoverButton?()
+                                    }
+                                    .font(FortiFitTypography.bodySmall)
+                                    .foregroundStyle(FortiFitColors.primaryAccent)
+                                    .accessibilityIdentifier(AccessibilityID.masterSyncOff_openSettingsButton)
+                                }
+                            }
+                            .padding()
+                            .frame(width: 280)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .presentationCompactAdaptation(.popover)
+                            .accessibilityIdentifier(AccessibilityID.masterSyncOff_popover)
+                        }
+                        .accessibilityIdentifier(AccessibilityID.scheduledWorkoutCardWatchSyncGlyph(cardIndex))
+                    }
+                }
 
                 // Workout type pill
                 HStack(spacing: 0) {
@@ -51,6 +104,11 @@ struct FortiFitScheduledWorkoutCard: View {
                 HStack(spacing: FortiFitSpacing.elementSpacing) {
                     if let duration = scheduledWorkout.durationMinutes {
                         Text("\(duration) min")
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
+                    }
+                    if scheduledWorkout.durationMinutes != nil && scheduledWorkout.scheduledTime != nil {
+                        Text("·")
                             .font(FortiFitTypography.bodySmall)
                             .foregroundStyle(FortiFitColors.mutedText)
                     }
@@ -111,6 +169,15 @@ struct FortiFitScheduledWorkoutCard: View {
     private var contextMenuItems: some View {
         switch scheduledWorkout.status {
         case "planned":
+            if onEditWorkout != nil {
+                Button {
+                    onEditWorkout?()
+                } label: {
+                    Label("Edit Planned Workout", systemImage: "pencil")
+                }
+                .accessibilityIdentifier(AccessibilityID.planScheduledCardEditMenuItem)
+            }
+
             Button {
                 onSkip()
             } label: {
@@ -126,6 +193,15 @@ struct FortiFitScheduledWorkoutCard: View {
             .accessibilityIdentifier(AccessibilityID.planRemoveFromPlanMenuItem)
 
         case "skipped":
+            if onEditWorkout != nil {
+                Button {
+                    onEditWorkout?()
+                } label: {
+                    Label("Edit Planned Workout", systemImage: "pencil")
+                }
+                .accessibilityIdentifier(AccessibilityID.planScheduledCardEditMenuItem)
+            }
+
             Button {
                 onRestore()
             } label: {

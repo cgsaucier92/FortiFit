@@ -332,11 +332,11 @@ struct ExerciseLoadServiceTests {
     }
 
     @Test func postTrainingAdvisoryLow() {
-        #expect(ExerciseLoadService.classifyZone(score: 20, trainedToday: true).advisory == "Session logged. You may have more capacity to train again if you choose.")
+        #expect(ExerciseLoadService.classifyZone(score: 20, trainedToday: true).advisory == "Session logged. You have more capacity to train again if you choose.")
     }
 
     @Test func readinessAdvisoryModerate() {
-        #expect(ExerciseLoadService.classifyZone(score: 40, trainedToday: false).advisory == "Some muscle fatigue. A moderate session could be ideal.")
+        #expect(ExerciseLoadService.classifyZone(score: 40, trainedToday: false).advisory == "Some muscle fatigue. A moderate session would be ideal.")
     }
 
     @Test func postTrainingAdvisoryModerate() {

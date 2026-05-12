@@ -42,20 +42,20 @@ Icons displayed to the left of each option in the top-nav ellipsis (`…`) menus
 |--------|--------|-----------|
 | Home | Add Widgets | `plus.rectangle.on.rectangle` |
 | Workouts | Create Workout Template | `square.and.pencil` |
-| Workouts | View Saved Templates | `doc.on.doc` |
+| Workouts | View Workout Templates | `doc.on.doc` |
 | Log Workout (new mode) | Use workout template | `doc.badge.arrow.up` |
 | Log Workout (new mode) | Save as workout template | `square.and.arrow.down` |
 | Edit Workout (Strength / HIIT only) | Use Template | `doc.badge.arrow.up` |
-| Create Template (edit mode) | Share Template | `qrcode` |
+| Create Workout Template (edit mode) | Share Template | `qrcode` |
 | Workout Detail (Strength/HIIT only) | Save as workout template | `square.and.arrow.down` |
 | Workout Detail (when `hiddenFromPlan == true`) | Show on Plan | `calendar.badge.plus` |
-| Plan | Saved Templates | `doc.on.doc` |
+| Plan | Workout Templates | `doc.on.doc` |
 | Trends | Add Charts | `chart.xyaxis.line` |
 | Goals | Filter Goals | `line.3.horizontal.decrease.circle` |
 | Goals | Expand All | `rectangle.expand.vertical` |
 | Goals | Collapse All | `rectangle.compress.vertical` |
 
-**Shared-symbol consistency:** "Save as workout template" uses the same symbol (`square.and.arrow.down`) wherever it appears (Log Workout ellipsis, Workout Detail ellipsis). "Saved Templates" navigation uses the same symbol (`doc.on.doc`) on both the Workouts and Plan ellipsis menus. "Use Template" / "Use workout template" uses the same symbol (`doc.badge.arrow.up`) on both Log Workout new-mode and Edit Workout (Strength / HIIT only) ellipsis menus — the Edit Workout label is shortened to "Use Template" since the ellipsis is screen-scoped to a single template-related action.
+**Shared-symbol consistency:** "Save as workout template" uses the same symbol (`square.and.arrow.down`) wherever it appears (Log Workout ellipsis, Workout Detail ellipsis). "Workout Templates" navigation uses the same symbol (`doc.on.doc`) on both the Workouts and Plan ellipsis menus. "Use Template" / "Use workout template" uses the same symbol (`doc.badge.arrow.up`) on both Log Workout new-mode and Edit Workout (Strength / HIIT only) ellipsis menus — the Edit Workout label is shortened to "Use Template" since the ellipsis is screen-scoped to a single template-related action.
 
 **Goals Expand/Collapse toggle:** The symbol swaps alongside the label based on dominant card state — `rectangle.expand.vertical` when most cards are collapsed (label: "Expand All"), `rectangle.compress.vertical` when most are expanded (label: "Collapse All"). See SCREENS.md § Goals Ellipsis Menu.
 
@@ -399,7 +399,10 @@ Curated list for ExerciseSuggestionService cold-start suggestions. Organized by 
 - **Legs:** "Barbell Squats", "Front Squats", "Goblet Squats", "Bulgarian Split Squats", "Leg Press", "Hack Squats", "Lunges", "Walking Lunges", "Romanian Deadlifts", "Leg Extensions", "Leg Curls", "Hip Thrusts", "Glute Bridges", "Calf Raises", "Seated Calf Raises"
 - **Arms:** "Barbell Curls", "Dumbbell Curls", "Hammer Curls", "Preacher Curls", "Concentration Curls", "Cable Curls", "Tricep Pushdowns", "Skull Crushers", "Overhead Tricep Extensions", "Tricep Dips", "Close-Grip Bench Press"
 - **Compound / Full Body:** "Deadlifts", "Sumo Deadlifts", "Trap Bar Deadlifts", "Power Cleans", "Clean and Press", "Kettlebell Swings", "Farmers Walks", "Turkish Get-Ups"
-- **Core:** "Planks", "Hanging Leg Raises", "Cable Crunches", "Ab Wheel Rollouts", "Russian Twists", "Woodchoppers"
+- **Core:** "Planks", "Side Planks", "Hollow Hold", "L-Sit", "Bear Hold", "Hanging Leg Raises", "Cable Crunches", "Ab Wheel Rollouts", "Russian Twists", "Woodchoppers"
+- **Back (Hangs):** "Dead Hang"
+- **Legs (Holds):** "Wall Sit", "Glute Bridge Hold"
+- **Functional:** "Bear Crawl"
 - **HIIT / Cardio Exercises:** "Box Jumps", "Burpees", "Battle Ropes", "Sled Push", "Sled Pull", "Rowing Machine", "Assault Bike"
 
 ---
@@ -433,10 +436,167 @@ Curated list for ExerciseSuggestionService cold-start suggestions. Organized by 
 "Face Pull": "Face Pulls",
 "Hip Thrust": "Hip Thrusts",
 "Calf Raise": "Calf Raises",
-"KB Swings": "Kettlebell Swings"
+"KB Swings": "Kettlebell Swings",
+"Plank": "Planks",
+"Side Plank": "Side Planks",
+"Hollow Body Hold": "Hollow Hold",
+"L Sit": "L-Sit",
+"Wall Sits": "Wall Sit",
+"Dead Hangs": "Dead Hang",
+"Glute Bridge": "Glute Bridge Hold"
 ```
 
 All alias targets must exist in the Exercise Dictionary.
+
+---
+
+## Isometric Exercise Names (Phase 8.7)
+
+Set of exercise names whose `reps` field is interpreted as **seconds** rather than rep count by default. Used by:
+- Template editor / Log Workout / Edit Planned Workout: drives initial REPS/TIME segmented control state and column-header label (SCREENS.md § Log Workout → Exercise Card Additions).
+- `WatchScheduleService` plan composition: drives `IntervalStep` goal type (`.time(reps, .seconds)` vs `.open`) and step display name format (WORKOUTKIT.md § 6).
+- Resolved at lookup time via `ExerciseSuggestionService.isIsometric(_:)` (SERVICES.md § ExerciseSuggestionService → isIsometric Lookup).
+
+Stored as a `Set<String>`. Lookup is case-insensitive after alias resolution (the alias map normalizes "Plank" → "Planks" before this set is queried).
+
+```swift
+let isometricExerciseNames: Set<String> = [
+    "Planks",
+    "Side Planks",
+    "Hollow Hold",
+    "L-Sit",
+    "Bear Hold",
+    "Dead Hang",
+    "Wall Sit",
+    "Glute Bridge Hold"
+]
+```
+
+The user can override on a per-exercise-card basis via the REPS/TIME segmented control (writes to `TemplateExerciseSet.displayAsTime` / `ExerciseSet.displayAsTime`). Resolution: `displayAsTime ?? isometricExerciseNames.contains(resolvedName)`.
+
+---
+
+## Ambiguous Exercise Default Modes (Phase 8.7)
+
+For exercises in the dictionary that are commonly performed both as reps **and** for time (e.g., Burpees, Battle Ropes), this map provides a default display mode. Resolved by `ExerciseSuggestionService.isIsometric(_:)` after the isometric set check.
+
+```swift
+let ambiguousExerciseDefaultModes: [String: Bool] = [
+    // true = default to TIME, false = default to REPS
+    "Burpees":         false,
+    "Box Jumps":       false,
+    "Battle Ropes":    true,
+    "Farmers Walks":   true,
+    "Sled Push":       true,
+    "Sled Pull":       true,
+    "Rowing Machine":  true,
+    "Assault Bike":    true
+]
+```
+
+Defaults reflect the most common form of each exercise. Users who want the alternate form override per-card via the REPS/TIME toggle.
+
+Exercises NOT in the isometric set AND NOT in the ambiguous map default to REPS (safe default for unknown / custom exercises).
+
+---
+
+## Watch Sync Glyph (Phase 8.7)
+
+Used by the `FortiFitWatchSyncGlyph` component (SCREENS.md § Standard Patterns → Watch Sync Card Glyph) on Plan cards and the Edit Planned Workout screen.
+
+| Constant | Value | Notes |
+|---|---|---|
+| `glyphActiveSymbol` | `applewatch.watchface` | SF Symbol when sync is on AND plan is registered with Watch |
+| `glyphInactiveSymbol` | `applewatch.slash` | SF Symbol when sync is off (or disabled) |
+| `glyphActiveColor` | `#22c55e` | "Watch Sync Green" — distinct from the existing positive-feedback green; matches Apple Watch's accent green |
+| `glyphInactiveColor` | `FortiFitColors.mutedText` | Standard muted text color |
+| `glyphActiveOpacity` | `1.0` | Full opacity when active or inactive-but-tappable |
+| `glyphDisabledOpacity` | `0.4` | Reduced opacity when gates fail (master off, auth denied, scheduledTime missing, ≥1 exercise gate fails) |
+| `glyphSize` | `24pt` | Glyph render size |
+| `glyphTapTarget` | `44×44pt` | Hit area (Apple HIG) |
+
+Tap behavior driven by effective state — see SCREENS.md § Standard Patterns → Watch Sync Card Glyph.
+
+---
+
+## Apple Watch Strings (Phase 8.7)
+
+Lives under `AppConstants.AppleWatch.*`. Strings must be read from `AppConstants` — do not hardcode in views. Cross-referenced from SCREENS.md § Settings → Apple Health & Devices, SCREENS.md § Edit Planned Workout, SCREENS.md § Standard Patterns → Master Sync Off Popover, and INFO_COPY.md § Inline Popover Copy.
+
+### Settings Section
+
+User-facing copy uses "Push" everywhere per the Phase 8.7.1 rename. Internal Swift identifiers (`syncToAppleWatch`, `syncPlanToAppleWatchEnabled`) are unchanged for code-level continuity.
+
+| Constant | Value |
+|---|---|
+| `settingsSectionHeader` | *(removed — Apple Watch card now lives under the "Apple Health & Devices" heading with no separate header)* |
+| `settingsToggleLabel` | "Push planned workouts to Apple Watch" |
+| `settingsDescription` | "Push planned workouts from your Plan tab to your Apple Watch. Pushed workouts appear in the Workout app's Scheduled section and complete automatically when finished. Requires watchOS 11 or later." |
+| `settingsStatusConnected` | *(removed — no status line shown on Apple Watch card)* |
+| `settingsStatusDenied` | "PERMISSION DENIED IN IOS SETTINGS" |
+| `settingsOpenIOSSettingsButton` | "Open iOS Settings" |
+| `settingsTurnOffConfirmTitle` | "Turn off Push to Apple Watch?" |
+| `settingsTurnOffConfirmMessage` | "All scheduled workouts currently pushed to your Apple Watch will be removed. You can turn it back on anytime — your push preferences will be remembered." |
+| `settingsTurnOffConfirmDestructive` | "Turn Off" |
+| `settingsTurnOffConfirmCancel` | "Cancel" |
+
+### Plan Workout Sheet (Phase 8.7.1)
+
+Strings for the new Push to Apple Watch toggle on the Plan Workout sheet (SCREENS.md § Plan → Push to Apple Watch Toggle).
+
+| Constant | Value |
+|---|---|
+| `scheduleWorkout_toggleLabel` | "Push to Apple Watch" |
+| `scheduleWorkout_masterOffCaption` | "Push to Apple Watch is off in Settings" |
+| `scheduleWorkout_authDeniedCaption` | "Apple Health permission required — open iOS Settings" |
+| `scheduleWorkout_validationFailedToast` | "Couldn't push to Apple Watch — check Settings." |
+
+### Edit Planned Workout Toggle (Phase 8.7.1)
+
+| Constant | Value |
+|---|---|
+| `editScheduledWorkout_toggleLabel` | "Push to Apple Watch" |
+
+### Master Sync Off Popover
+
+| Constant | Value |
+|---|---|
+| `masterOffPopoverTitle` | "Push to Apple Watch is off" |
+| `masterOffPopoverBody` | "Turn it on in Settings to push this workout to your Apple Watch." |
+| `masterOffPopoverButton` | "Open Settings" |
+
+In-app navigation (NavigationPath push), not iOS Settings. (Component / API names retain "Sync" / "MasterSyncOff" for code-level continuity; user-visible strings use "Push.")
+
+### Field-Specific Gate Popovers
+
+When the card glyph is disabled because a specific field is missing:
+
+| Failure mode | Popover copy |
+|---|---|
+| Zero exercises in snapshot | "Add at least one exercise to push to Apple Watch." |
+| Auth denied | (uses Master Sync Off Popover variant with body: "Permission denied. Open iOS Settings to grant access." and button: "Open iOS Settings" → `UIApplication.openSettingsURLString`.) |
+| `scheduledDate < today` | (no popover — past-dated cards are read-only by design.) |
+
+Constant: `AppConstants.AppleWatch.gatePopoverCopy(for: SyncGate) -> String`.
+
+### Error Toast
+
+| Constant | Value |
+|---|---|
+| `errorToastMessage` | "Couldn't push to Apple Watch. Try again later." |
+| `errorToastRetryButton` | "Retry" |
+
+Uses the existing capsule style — see § Toast Style. Auto-dismisses after 4 seconds (with-action standard).
+
+### Rest / Time Picker Range
+
+| Constant | Value | Notes |
+|---|---|---|
+| `durationPickerMinSeconds` | `5` | Minimum value for both REST PER SET and the TIME column |
+| `durationPickerMaxSeconds` | `600` | Maximum value (10 minutes) |
+| `durationPickerIncrementSeconds` | `5` | Increment between picker values |
+| `durationDisplayFormatSubMinute` | `"\(seconds)s"` | E.g., `"30s"` |
+| `durationDisplayFormatOverMinute` | `"\(minutes):\(secondsRemainder, .padded2)"` | E.g., `"1:30"` |
 
 ---
 

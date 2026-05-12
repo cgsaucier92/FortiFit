@@ -113,6 +113,8 @@ final class WorkoutTemplateViewModel {
                 let entry = ExerciseFormEntry()
                 entry.name = name
                 if let rows = grouped[name] {
+                    entry.restSeconds = rows.first?.restSeconds
+                    entry.displayAsTime = rows.first?.displayAsTime
                     entry.rows = rows.map { templateSet in
                         let row = SetRow()
                         row.sets = String(templateSet.sets)
@@ -145,7 +147,8 @@ final class WorkoutTemplateViewModel {
 
     private func buildExerciseData() -> [WorkoutTemplateService.ExerciseData] {
         var data: [WorkoutTemplateService.ExerciseData] = []
-        for (index, entry) in exercises.enumerated() {
+        var globalSortOrder = 0
+        for entry in exercises {
             guard !entry.name.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
             for row in entry.rows {
                 data.append(WorkoutTemplateService.ExerciseData(
@@ -153,8 +156,11 @@ final class WorkoutTemplateViewModel {
                     sets: max(Int(row.sets) ?? 1, 1),
                     reps: max(Int(row.reps) ?? 1, 1),
                     weightKg: parseWeight(row.weight),
-                    sortOrder: index
+                    sortOrder: globalSortOrder,
+                    restSeconds: entry.restSeconds,
+                    displayAsTime: entry.displayAsTime
                 ))
+                globalSortOrder += 1
             }
         }
         return data
