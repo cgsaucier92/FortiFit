@@ -3,6 +3,13 @@ import Charts
 
 struct ActivityDetailSheet: View {
     let activityService: AppleActivityService
+    /// Phase 8.8 retrofit — called when the user taps the See Info footer button.
+    /// Host should open the Activity Rings See Info Modal after the sheet dismisses.
+    var onSeeInfo: (() -> Void)?
+    /// Phase 8.8 retrofit — called when the user taps the Configure Settings footer button.
+    /// Host should open the Activity Rings Settings Modal after the sheet dismisses.
+    var onConfigureSettings: (() -> Void)?
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedRange: Int = 7
     @State private var summaries: [ActivitySummarySnapshot] = []
@@ -26,7 +33,7 @@ struct ActivityDetailSheet: View {
                 }
 
                 // Title
-                Text("\(AppConstants.ActivityRings.detailSheetHeading) – \(Date().formatted(.dateTime.month(.wide).day()))")
+                Text(AppConstants.ActivityRings.detailSheetHeading)
                     .font(.system(size: 20, weight: .black))
                     .foregroundStyle(FortiFitColors.primaryAccent)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -86,6 +93,10 @@ struct ActivityDetailSheet: View {
                 // Closure heatmap
                 closureHeatmap
                     .padding(.bottom, FortiFitSpacing.gapMedium)
+
+                // Phase 8.8 — Footer (See Info / Configure Settings)
+                footer
+                    .padding(.top, FortiFitSpacing.gapLarge)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, FortiFitSpacing.gapXLarge)
@@ -264,5 +275,42 @@ struct ActivityDetailSheet: View {
 
     private func loadSummaries() async {
         summaries = await activityService.fetchSummaries(days: selectedRange)
+    }
+
+    // MARK: - Footer (Phase 8.8 retrofit)
+
+    private var footer: some View {
+        HStack(spacing: 0) {
+            Spacer()
+            Button {
+                dismiss()
+                onSeeInfo?()
+            } label: {
+                Text("See Info")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(FortiFitColors.primaryAccent)
+                    .frame(minHeight: FortiFitSpacing.minTouchTarget)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(AccessibilityID.activityDetailSheet_seeInfoButton)
+
+            Text("·")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(FortiFitColors.mutedText)
+                .padding(.horizontal, FortiFitSpacing.elementSpacing)
+
+            Button {
+                dismiss()
+                onConfigureSettings?()
+            } label: {
+                Text("Configure Settings")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(FortiFitColors.primaryAccent)
+                    .frame(minHeight: FortiFitSpacing.minTouchTarget)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(AccessibilityID.activityDetailSheet_configureSettingsButton)
+            Spacer()
+        }
     }
 }

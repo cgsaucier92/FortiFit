@@ -15,6 +15,7 @@ struct SavedTemplatesListView: View {
     @State private var showScheduleSheet = false
     @State private var showCreateTemplate = false
     @State private var headerHeight: CGFloat = 0
+    @State private var showPlannedToast = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -68,11 +69,28 @@ struct SavedTemplatesListView: View {
                     }
                 }
             }
+
+            // Workout Planned toast
+            VStack {
+                Text("Workout Planned")
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, FortiFitSpacing.cardPadding)
+                    .padding(.vertical, FortiFitSpacing.elementSpacing)
+                    .background(Capsule().fill(FortiFitColors.primaryAccent))
+                    .padding(.top, FortiFitSpacing.screenTop)
+                Spacer()
+            }
+            .opacity(showPlannedToast ? 1 : 0)
+            .offset(y: showPlannedToast ? 0 : -60)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.2), value: showPlannedToast)
         }
         .background(FortiFitColors.background)
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .swipeToDismiss()
         .navigationDestination(item: $selectedTemplate) { template in
             CreateTemplateView(editingTemplate: template)
         }
@@ -104,7 +122,7 @@ struct SavedTemplatesListView: View {
             }
         }
         #endif
-        .sheet(isPresented: $showScheduleSheet) {
+        .navigationDestination(isPresented: $showScheduleSheet) {
             ScheduleWorkoutView(
                 preSelectedDate: Date(),
                 preSelectedTemplate: templateToSchedule,
@@ -119,6 +137,10 @@ struct SavedTemplatesListView: View {
                     )
                     showScheduleSheet = false
                     templateToSchedule = nil
+                    showPlannedToast = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        showPlannedToast = false
+                    }
                 }
             )
         }

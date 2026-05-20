@@ -81,6 +81,7 @@ struct AddGoalView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .swipeToDismiss()
     }
 
     // MARK: - Shared Exercise Input
@@ -125,15 +126,19 @@ struct AddGoalView: View {
                         #if os(iOS)
                         .keyboardType(.decimalPad)
                         #endif
+                        .frame(width: 120, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
-                HStack(spacing: FortiFitSpacing.gapSmall) {
+                VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
                     VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                         FortiFitLabel("Current (\(weightUnit))", color: FortiFitColors.primaryText)
                         FortiFitInput(placeholder: "0", text: $viewModel.currentWeightText)
                             #if os(iOS)
                             .keyboardType(.decimalPad)
                             #endif
+                            .frame(width: 120, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
@@ -143,6 +148,8 @@ struct AddGoalView: View {
                             #if os(iOS)
                             .keyboardType(.decimalPad)
                             #endif
+                            .frame(width: 120, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -169,15 +176,19 @@ struct AddGoalView: View {
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
+                        .frame(width: 120, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
-                HStack(spacing: FortiFitSpacing.gapSmall) {
+                VStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
                     VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                         FortiFitLabel("Current Reps", color: FortiFitColors.primaryText)
                         FortiFitInput(placeholder: "0", text: $viewModel.currentRepsText)
                             #if os(iOS)
                             .keyboardType(.numberPad)
                             #endif
+                            .frame(width: 120, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
@@ -186,6 +197,8 @@ struct AddGoalView: View {
                             #if os(iOS)
                             .keyboardType(.numberPad)
                             #endif
+                            .frame(width: 120, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -218,12 +231,12 @@ struct AddGoalView: View {
                     .font(FortiFitTypography.dataValue)
                     .foregroundStyle(FortiFitColors.primaryText)
                     .padding(.horizontal, FortiFitSpacing.cardPadding)
-                    .frame(height: FortiFitSpacing.minTouchTarget, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(width: 120, height: FortiFitSpacing.minTouchTarget, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadiusSmall)
                             .fill(FortiFitColors.elevatedSurface.opacity(0.5))
                     )
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Text("This goal tracks your weekly workout target. To change the target, long-press the Weekly Streak widget on the DASHBOARD screen and tap Configure Settings.")
@@ -242,10 +255,12 @@ struct AddGoalView: View {
 
             FortiFitLabel("Workout Type", color: FortiFitColors.primaryText)
             FortiFitSelect(
-                options: AppConstants.workoutTypes,
+                options: ["Cardio", "HIIT"],
                 selected: $viewModel.selectedLinkedWorkoutType,
                 placeholder: "Select Workout Type"
             )
+            .frame(width: 220, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .disabled(viewModel.isEditMode)
 
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
@@ -254,6 +269,8 @@ struct AddGoalView: View {
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
+                    .frame(width: 120, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
@@ -262,11 +279,18 @@ struct AddGoalView: View {
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
+                    .frame(width: 120, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Text("Select a workout type and set at least one target (distance or duration)")
                 .font(FortiFitTypography.note)
                 .foregroundStyle(FortiFitColors.mutedText)
+        }
+        .onAppear {
+            if !viewModel.isEditMode && viewModel.selectedLinkedWorkoutType.isEmpty {
+                viewModel.selectedLinkedWorkoutType = "Cardio"
+            }
         }
     }
 }

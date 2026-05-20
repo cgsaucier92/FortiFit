@@ -286,6 +286,23 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Tests + new accessibility identifiers (`scheduleWorkout_*`) | TESTING § Accessibility Identifiers (Apple Watch push) |
 | Implementation plan | IMPLEMENTATION_PLAN_PHASE_8_7_1.md |
 
+### Phase 8.8: Home Widget Detail Sheets + Settings Modal Done Buttons
+*Every Home widget opens a per-widget detail sheet on tap. Settings modals gain an outlined Done button. Activity Rings settings modal restructured (Done replaces Reset to defaults; Import from Apple Health moves to first position below the Stand slider). Activity Detail Sheet retrofitted with See Info / Configure Settings footer for parity with the four new sheets.*
+
+| Feature | Spec |
+|---|---|
+| Home Widget Tap-to-Open pattern (routing + edit-mode suppression) | SCREENS § Standard Patterns → Home Widget Tap-to-Open; SERVICES § HomeWidgetService → Widget Tap Routing; CONSTANTS § Widget Tap Behavior |
+| Today's Plan Detail Sheet (`FortiFitTodaysPlanDetailSheet`) + per-row Complete button + Schedule More chip + completed-row visibility windowing | SCREENS § Today's Plan Detail Sheet; SERVICES § PlanService → Retrieval (`fetchTodaysScheduledWorkouts`); CONSTANTS § Today's Plan Detail Sheet; INFO_COPY § Widget Detail Sheet Empty States |
+| Training Load Detail Sheet (`FortiFitTrainingLoadDetailSheet`) + 14-day chart + contributing workouts + week comparison + recovery callout | SCREENS § Training Load Detail Sheet; SERVICES § Training Load Algorithm → Detail Sheet Helpers; CONSTANTS § Training Load Detail Sheet; INFO_COPY § Widget Detail Sheet Empty States |
+| Weekly Streak Insights Sheet (`FortiFitWeeklyStreakDetailSheet`) — typographic hero, stat row, this-week ring, 26-week heatmap, milestone shelf — no flame | SCREENS § Weekly Streak Insights Sheet; SERVICES § Streak Algorithm → Weekly Streak Insights Helpers; CONSTANTS § Weekly Streak Insights; INFO_COPY § Widget Detail Sheet Empty States |
+| Power Level Breakdown Sheet (`FortiFitPowerLevelDetailSheet`) + 30-day volume chart + top 3 exercises (≥ 3-session filter) + window comparison + **calculated** nudge | SCREENS § Power Level Breakdown Sheet; SERVICES § Power Level Algorithm → Top Contributing Exercises / Window Comparison / Nudge Computation; CONSTANTS § Power Level Detail Sheet; INFO_COPY § Power Level Nudge Copy |
+| Activity Detail Sheet footer retrofit (See Info / Configure Settings) | SCREENS § Activity Detail Sheet (Phase 8.8 retrofit) |
+| Settings Modal `Done` button (outlined) on Weekly Streak / Training Load / Activity Rings modals | SCREENS § Widget Definitions (Weekly Streak / Training Load Settings Modals), § Activity Rings Settings Modal; CONSTANTS § Settings Modal Done Button |
+| Activity Rings Settings Modal — Reset removed; Import moved to first position | SCREENS § Activity Rings Settings Modal; CONSTANTS § Activity Rings → Settings Modal Strings |
+| Workout Cascade hook for derived data refresh while a detail sheet is presented | SERVICES § Workout Cascade |
+| Tests + new accessibility identifiers (and retirement of `activityRingsSettings_resetButton`) | TESTING § Widget Detail Sheet Test Strategy; TESTING § Accessibility Identifiers → Widget Detail Sheets |
+| Implementation plan | IMPLEMENTATION_PLAN_PHASE_8_8.md |
+
 ### Phase 9: Launch Prep
 *Ready for TestFlight or App Store.*
 

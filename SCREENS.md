@@ -69,7 +69,7 @@ Each screen specifies only seed defaults, card definitions, and deviations.
 | Color | Primary Accent Blue `#3b82f6` |
 | Tap target | 24×24pt circular, 44×44pt hit area (Apple HIG) |
 | Position | Top-leading, inset under the Scroll Fade Header (when present) |
-| Action | Pops one level on the navigation stack. iOS edge-swipe-back gesture also works (free with `NavigationStack`). |
+| Action | Pops one level on the navigation stack. Left-to-right edge-swipe-back also dismisses, restored via the `.swipeToDismiss()` view modifier (`Core/Utilities/Extensions/ViewExtensions.swift`) — required because every drill-down screen sets `.toolbar(.hidden, for: .navigationBar)` to make room for its custom header, which otherwise suppresses the built-in interactive pop. Exception: Trends Chart Detail does not support edge-swipe-back — see § Trends Chart Detail. |
 | Identifier convention | `{screenId}_backButton` — e.g., `workoutDetail_backButton`, `trendsChartDetail_strengthTracker_backButton` |
 | VoiceOver label | "Back, button" |
 
@@ -98,6 +98,22 @@ The glyph is positioned in the upper-right corner of any card hosting it (44×44
 The "Open Settings" button (ID `masterSyncOff_openSettingsButton`) navigates **in-app** to Settings → Apple Watch section via `NavigationPath` push (not iOS Settings). This is distinct from the auth-denied "Open iOS Settings" button which deep-links via `UIApplication.openSettingsURLString`. When the user is on the master-on but auth-denied path, the popover instead surfaces auth-denial copy and the iOS Settings deep-link.
 
 Tap-outside dismisses. Does not flip the underlying per-card `syncToAppleWatch` flag (the user's intent is preserved; only the gate is the obstacle).
+
+**Home Widget Tap-to-Open (Phase 8.8):** Every Home widget card opens a per-widget detail sheet on tap. Tap routing lives in `HomeWidgetService.detailSheet(for:)` (see SERVICES.md § HomeWidgetService → Widget Tap Routing); presentation reuses the Activity Detail Sheet conventions (iOS modal sheet, `.large` detent, swipe-down dismiss, drag indicator visible, Card Surface bg, close button top-right). Per-widget routing:
+
+| Widget | Tap behavior |
+|---|---|
+| Today's Plan | Opens Today's Plan Detail Sheet (§ below) regardless of populated/completed/empty state. |
+| Training Load | Opens Training Load Detail Sheet (§ below). |
+| Weekly Streak | Opens Weekly Streak Insights Sheet (§ below). |
+| Power Level | Opens Power Level Breakdown Sheet (§ below). |
+| Activity Rings | Live state → Activity Detail Sheet (existing, § below). `Connect Apple Health` state → navigates to Settings → Apple Health (existing behavior, unchanged). `Pair an Apple Watch` state → no-op (existing behavior, unchanged). |
+
+**Edit-mode suppression:** Tap-to-open is suppressed when the home is in Widget Edit Mode (`HomeViewModel.isEditMode == true`). Taps in edit mode reach the existing delete-and-drag chrome only — no detail sheet opens. Long-press context menus remain the entry point for `See Info`, `Configure Settings`, `Complete Workout`, `Reorder Widgets`, and `Delete Widget` on every widget, in every mode.
+
+**Footer button block (shared across the four new detail sheets and the Activity Detail Sheet retrofit):** When a sheet has both `See Info` and `Configure Settings` entries available, they render as side-by-side text buttons in the sheet footer, separated by a `·`. Primary Accent Blue `#3b82f6`, 13px / 600 weight, ~44pt vertical tap target each. When only one entry applies (e.g., Power Level has no settings modal), that single entry renders alone, centered. Tapping either dismisses the detail sheet and opens the corresponding modal — never stacked sheet-on-sheet. Identifier convention: `{widgetDetailSheetId}_seeInfoButton`, `{widgetDetailSheetId}_configureSettingsButton`.
+
+---
 
 **Trends Chart Card Visual Treatment:** Shared visual styling for every chart card on the Trends screen. Implemented via `FortiFitChartCard` (Design/Components/), which wraps `FortiFitCard` and composes a gradient backdrop, inner plot hairline, header summary block, latest-point highlight, rounded bar tops, smoothed line interpolation, donut center label, and tap-to-select state. Per-chart values (gradient anchor, header summary formula, selection availability) live in CONSTANTS.md § Trends Chart Visual Tokens — never hardcoded in views.
 
@@ -166,15 +182,15 @@ Entered via the context menu's "Reorder Widgets" item. Unlike the standard reord
 
 ### Widget Definitions
 
-**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header + zone label (e.g., "Moderate") + gradient progress bar (LOW→HIGH) + context-aware advisory below. Advisory uses readiness variant (no workout today) or post-training variant (trained today) — see CONSTANTS § Training Load Zones / Advisory Text. Algorithm: SERVICES § Training Load. Long-press → "See Info" (INFO_COPY § Training Load) or "Configure Settings" → Training Load Settings Modal. Updates in real time on workout log/edit/delete.
+**Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header + zone label (e.g., "Moderate") + gradient progress bar (LOW→HIGH) + context-aware advisory below. Advisory uses readiness variant (no workout today) or post-training variant (trained today) — see CONSTANTS § Training Load Zones / Advisory Text. Algorithm: SERVICES § Training Load. **Tap** → Training Load Detail Sheet (§ below). **Long-press** → "See Info" (INFO_COPY § Training Load) or "Configure Settings" → Training Load Settings Modal. Updates in real time on workout log/edit/delete. Tap-to-open is suppressed in Widget Edit Mode (§ Standard Patterns → Home Widget Tap-to-Open).
 
-**Training Load Settings Modal:** Centered modal, dimmed bg. "Configure Training Load" heading + "?" tooltip. Two slider cards: Training Experience (3-position: Beginner/Intermediate/Advanced) and Target Workout Duration (0–300 min, fallback for the Training Load algorithm). Changes apply immediately; experience change triggers recalc. Dismiss: close button or outside tap.
+**Training Load Settings Modal:** Centered modal, dimmed bg. "Configure Training Load" heading + "?" tooltip. Two slider cards: Training Experience (3-position: Beginner/Intermediate/Advanced) and Target Workout Duration (0–300 min, fallback for the Training Load algorithm). Changes apply immediately; experience change triggers recalc. Bottom action row: full-width **`Done` button** (outlined Primary Accent Blue, copy from CONSTANTS § Settings Modal Done Button) dismisses the modal — same dismiss path as the close X. Dismiss: Done button, close button (top-right `xmark`), or outside tap. ID `trainingLoadSettings_doneButton`.
 
-**Weekly Streak** (`weekStreak`): "Weekly Streak" card. Left: animated blue flame SVG scaling by tier (1.2s outer / 0.9s inner flicker loops). Right: streak count (32px, 900 weight) + "WEEK STREAK" label (blue uppercase) + motivational message (muted italic). See CONSTANTS § Streak Flame Tiers / Streak Motivational Messages and SERVICES § Streak Algorithm. Long-press → "Configure Settings" → Weekly Streak Settings Modal.
+**Weekly Streak** (`weekStreak`): "Weekly Streak" card. Left: animated blue flame SVG scaling by tier (1.2s flicker loop). Right: streak count (32px, 900 weight) + "WEEK STREAK" label (blue uppercase) + motivational message (muted italic). See CONSTANTS § Streak Flame Tiers / Streak Motivational Messages and SERVICES § Streak Algorithm. **Tap** → Weekly Streak Insights Sheet (§ below). **Long-press** → "Configure Settings" → Weekly Streak Settings Modal. Tap-to-open is suppressed in Widget Edit Mode (§ Standard Patterns → Home Widget Tap-to-Open).
 
-**Weekly Streak Settings Modal:** Centered modal, dimmed bg. "Configure Streak Widget" heading. Single slider: Target Workouts per Week (0–99). Used exclusively by the Streak algorithm. Changes apply immediately and recalculate streak retroactively. Dismiss: close button or outside tap.
+**Weekly Streak Settings Modal:** Centered modal, dimmed bg. "Configure Streak Widget" heading. Single slider: Target Workouts per Week (0–99). Used exclusively by the Streak algorithm. Changes apply immediately and recalculate streak retroactively. Bottom action row: full-width **`Done` button** (outlined Primary Accent Blue, copy from CONSTANTS § Settings Modal Done Button) dismisses the modal — same dismiss path as the close X. Dismiss: Done button, close button (top-right `xmark`), or outside tap. ID `weeklyStreakSettings_doneButton`.
 
-**Power Level** (`powerLevel`): Blue-bordered card. "Power Level" header + status label (Deloading/Steady/Rising) + directional indicator (↓/—/↑, status-colored) + contextual message (muted italic). See CONSTANTS § Power Level Statuses and SERVICES § Power Level Algorithm. Long-press → "See Info" (INFO_COPY § Power Level).
+**Power Level** (`powerLevel`): Blue-bordered card. "Power Level" header + status label (Deloading/Steady/Rising) + directional indicator (↓/—/↑, status-colored) + contextual message (muted italic). See CONSTANTS § Power Level Statuses and SERVICES § Power Level Algorithm. **Tap** → Power Level Breakdown Sheet (§ below). **Long-press** → "See Info" (INFO_COPY § Power Level). Tap-to-open is suppressed in Widget Edit Mode (§ Standard Patterns → Home Widget Tap-to-Open).
 
 **Today's Plan** (`todaysPlan`): "Today's Plan" header. Two-column card.
 
@@ -186,6 +202,8 @@ Entered via the context menu's "Reorder Widgets" item. Unlike the standard reord
 **Background silhouette (left column):** When a planned workout exists today, render the workout type's SF Symbol (CONSTANTS § Workout Type SF Symbols) as a watermark behind the workout name. Muted Text at 20% opacity. ~140pt symbol against ~100pt column so the icon bleeds top/bottom — `.scaledToFit()` + explicit `.frame(140×140)`, ZStack centered, clipped by the parent card. Hidden in completed / empty / no-plan states. ID: `homeWidget_todaysPlan_silhouette` (rendered only when a planned workout exists; tests assert presence/absence by state).
 
 **Right column (calendar square):** Always visible. Rounded rectangle styled after the iOS Calendar icon in FitNavi colors — Primary Accent Blue top bar with day abbreviation (white, bold uppercase), dark body with month + date number (Primary Text, large). Below the date: blue dot = planned `ScheduledWorkout`, green dot = completed (scheduled OR logged-only surfaced on Plan; see § Plan → Logged-Only Workout Surfacing). Logged-only workouts do **not** appear in the left column — that area remains scoped to `ScheduledWorkout` records.
+
+**Tap** → Today's Plan Detail Sheet (§ below). Opens in all states (populated, all-completed, empty). Tap-to-open is suppressed in Widget Edit Mode (§ Standard Patterns → Home Widget Tap-to-Open). **Long-press** → "Complete Workout" (when an uncompleted plan exists today) → compact confirmation sheet (existing behavior, see § Widget Context Menu).
 
 Included in default widget set; also available via Add Widgets menu.
 
@@ -235,11 +253,13 @@ Body — three slider cards (track tints to ring accent color, white thumb):
 
 Slider changes apply immediately to `UserSettings.targetMoveCalories` / `targetExerciseMinutes` / `targetStandHours` — no save button. Widget rings update on dismiss.
 
-Action buttons (two, full-width, stacked):
-- **"Reset to defaults"** (blue-outlined). Sets 500 / 30 / 12. No confirmation. ID `activityRingsSettings_resetButton`.
-- **"Import from Apple Health"** (blue-filled). Calls `AppleActivityService.importGoalsFromAppleHealth()` (SERVICES § AppleActivityService → Goal Import). Sliders animate to imported values. Disabled when `healthKitEnabled == false` OR `appleWatchDetected == false`; disabled-state caption: *"Connect Apple Health to import your goals."* ID `activityRingsSettings_importButton`.
+Action buttons (two, full-width, stacked, in this top-to-bottom order — Phase 8.8):
+1. **"Import from Apple Health"** (blue-filled, **first position — directly below the Stand slider**). Calls `AppleActivityService.importGoalsFromAppleHealth()` (SERVICES § AppleActivityService → Goal Import). Sliders animate to imported values. Disabled when `healthKitEnabled == false` OR `appleWatchDetected == false`; disabled-state caption: *"Connect Apple Health to import your goals."* ID `activityRingsSettings_importButton`.
+2. **"Done"** (blue-outlined, **second position — bottom of the modal; replaces the previous "Reset to defaults" button, which has been removed entirely in Phase 8.8**). Copy from CONSTANTS § Settings Modal Done Button. Dismisses the modal — same dismiss path as the close X. ID `activityRingsSettings_doneButton`.
 
-Dismiss: close button (top-right `xmark`) or outside tap. No live ring preview in the modal.
+Dismiss: Done button, close button (top-right `xmark`), or outside tap. No live ring preview in the modal.
+
+> **Phase 8.8 note — Reset to defaults removed.** The previous "Reset to defaults" button (formerly `activityRingsSettings_resetButton`) has been removed entirely. Users who want to revert to FitNavi defaults can re-import from Apple Health (if their HK goals are at defaults) or adjust the sliders manually. The identifier `activityRingsSettings_resetButton` is retired and must not be reused.
 
 ### Activity Detail Sheet
 
@@ -247,7 +267,7 @@ Tap the Activity Rings widget in live state → opens `FortiFitActivityDetailShe
 
 Presentation: iOS modal sheet, `.large` detent, swipe-down dismiss, Card Surface bg, drag indicator visible.
 
-Header: centered title "Activity – {Month} {Day}" (dynamic date). Close button top-right (`xmark`, Muted Text). ID `activityDetailSheet_closeButton`.
+Header: centered title `Activity Insights`. Close button top-right (`xmark`, Muted Text). ID `activityDetailSheet_closeButton`.
 
 Range toggle below header: segmented "7 days" (default) / "30 days". Tapping refetches and re-renders all blocks. IDs `activityDetailSheet_range7d`, `activityDetailSheet_range30d`.
 
@@ -267,16 +287,158 @@ Empty / insufficient data: day with no HK summary → empty cell + 0 sparkline p
 
 Tap behavior on cells / sparkline points: none in v1 (passive breakdown).
 
+**Footer (Phase 8.8 retrofit):** Side-by-side `See Info` · `Configure Settings` text buttons per § Standard Patterns → Home Widget Tap-to-Open → Footer button block. `See Info` opens the Activity Rings See Info Modal (§ below); `Configure Settings` opens the Activity Rings Settings Modal (§ above). Both dismiss the Activity Detail Sheet first — never stacked sheet-on-sheet. IDs `activityDetailSheet_seeInfoButton`, `activityDetailSheet_configureSettingsButton`.
+
 ### Activity Rings See Info Modal
 
 Standard See Info Modal (§ Standard Patterns). Content from INFO_COPY § Activity Rings. Title "About Activity Rings". Reuses `seeInfoModal_closeButton`.
 
+### Today's Plan Detail Sheet
+
+Opened by tapping the Today's Plan widget in any state (populated / all-completed / empty). Component: `FortiFitTodaysPlanDetailSheet.swift` in `Design/Components/`.
+
+**Presentation:** iOS modal sheet, `.large` detent, swipe-down dismiss, drag indicator visible, Card Surface bg.
+
+**Header:** Centered title `Today's Plan – {Month Day}` (e.g., `Today's Plan – May 17`). Close button top-right (`xmark`, Muted Text). ID `todaysPlanDetailSheet_closeButton`.
+
+**Body — scrollable stack of mini-cards, one per `ScheduledWorkout` for today.** Sort: `Planned` and `Skipped` rows first, then `Completed` rows (mirrors the Plan tab day-detail stack order — finished work sinks to the bottom). Within each group, rows order by `scheduledTime` ascending (nil times sort last), then by `dateCreated`. Each mini-card is a `FortiFitCard`. **Card border:** Positive Green on `Completed` rows, default Border token otherwise — matches the Plan tab's `FortiFitScheduledWorkoutCard` border convention. Mini-card contains:
+
+| Slot | Content |
+|---|---|
+| Top row | Workout-type SF Symbol (CONSTANTS § Workout Type SF Symbols, 18pt, type color) + template name (Primary Text 17/700) + status pill (right-aligned). Pill states: `Planned` (Primary Accent Blue outlined), `Completed` (Positive Green filled), `Skipped` (Muted Text outlined). |
+| Meta row | Scheduled time (e.g., `7:30 AM`, hidden when nil) · estimated duration · `FortiFitWatchSyncGlyph` (Phase 8.7 — present only on Strength/HIIT since `ScheduledWorkout` is template-backed and templates are restricted to those two types per § Create Workout Template). `·` separated. All Muted Text 13px. |
+| Exercise list | Per-exercise listing of the snapshot's `SnapshotExercise` entries (sorted by `sortOrder`). Same `exerciseName` entries are grouped under one header (exercise name in `FortiFitTypography.labelSmall` Primary Text); each group renders one line per `SnapshotExercise` set group below (`FortiFitTypography.labelSmall` Muted Text). Per-line format: `{sets} × {reps} reps[ · {weight} kg/lbs][ · rest {restSeconds}s]`. Time-based exercises render `{sets} × {reps}s` instead. **`displayAsTime` resolution:** explicit value on the snapshot wins; when nil, falls back to `ExerciseSuggestionService.isIsometric(exerciseName)` so isometric exercises (Planks, Dead Hang, etc.) and ambiguous-default-time exercises (Battle Ropes, Farmers Walks, etc.) still render as time even when the template author didn't toggle the REPS/TIME control. Weight is suppressed for bodyweight (`weightKg == nil` or 0). `restSeconds` segment appears only when present. Unit follows `UserSettings.useLbs`. Hidden when the underlying snapshot has no exercises. Replaces the previous summary row "`{n} exercises · {m} sets`" — full listing was added in response to user feedback that the summary obscured the workout's contents. |
+| Action row | **`Complete Workout` button** (blue-filled, full-width within the card, Primary Accent Blue) on `Planned` rows. Tapping opens the **same compact confirmation sheet used by the Plan tab's Complete Planned Workout Flow** (§ Plan → Complete Planned Workout Flow) and the Today's Plan widget long-press flow (SERVICES.md § HomeWidgetService → Today's Plan — Complete Workout). On `Completed` rows: action row is **hidden entirely** — the green `Completed` pill in the top-right is the sole completion signal (removed the redundant bottom checkmark + label). On `Skipped` rows: action row hidden entirely (status pill is the only signal). ID `todaysPlanDetailSheet_row_{scheduledWorkoutId}_completeButton`. |
+
+**Row tap (outside the Complete button):** Tap a `Planned` row → dismiss sheet, navigate to that workout's Schedule Workout sheet (existing flow per § Plan → Scheduling Flow). Tap a `Completed` row → dismiss sheet, navigate to the linked `Workout` Detail (existing § Workout Detail). Tap a `Skipped` row → no-op (status pill is the only signal).
+
+**Completed-row visibility windowing:** Completed rows remain visible in this sheet **only on the day they were completed**. After local midnight rolls over, completed rows from the prior day no longer appear — the sheet renders only `ScheduledWorkout`s where `scheduledDate == today` (calendar-local), regardless of their status. This filter is identical for the populated and empty branches.
+
+**Empty state (no `ScheduledWorkout` for today):** Centered Muted Text message: *"No workouts planned for today."* ID `todaysPlanDetailSheet_emptyState`.
+
+> **Phase 8.8 follow-up — `+ Schedule another workout for today` chip removed.** The chip below the list (populated state) and below the empty-state copy (empty state) was removed entirely; users schedule additional workouts via the Plan tab. The identifier `todaysPlanDetailSheet_scheduleMoreButton` is retired and must not be reused.
+
+**Footer:** This sheet has **no** `See Info` / `Configure Settings` entries (Today's Plan widget has neither a See Info Modal nor a Settings Modal). Footer area is empty padding.
+
+**Reactivity:** Sheet subscribes to `PlanService` published changes — when a workout is completed from this sheet (via the Complete button → compact confirmation sheet), the row's status pill updates to `Completed`, the action button updates to the disabled-checkmark state, and the row stays in place. Other rows reorder if their relative `scheduledTime` ordering changed.
+
+**Edit mode:** Tap on the Today's Plan widget is suppressed while the home is in Widget Edit Mode (§ Standard Patterns → Home Widget Tap-to-Open).
+
+**Accessibility:** Sheet title announced first. Each row announces as `{template name}, {status}, {meta row}`. Complete button on planned rows announces as `Complete workout, button`.
+
+### Training Load Detail Sheet
+
+Opened by tapping the Training Load widget. Component: `FortiFitTrainingLoadDetailSheet.swift` in `Design/Components/`.
+
+**Presentation:** iOS modal sheet, `.large` detent, swipe-down dismiss, drag indicator visible, Card Surface bg.
+
+**Header:** Centered title `Training Load Insights`. Close button top-right (`xmark`, Muted Text). ID `trainingLoadDetailSheet_closeButton`.
+
+**Body — scrollable, top-to-bottom:**
+
+1. **Hero block.** Larger version of the Training Load gradient bar (`#10b981` → `#C4F648` → `#B7FF00` → `#ef4444` per CONSTANTS § Training Load Zones), zone label (e.g., `Moderate`), and numeric score below the bar in the format `{score} / 100`. Score color matches the zone. ID `trainingLoadDetailSheet_hero`.
+
+2. **14-day daily score chart.** Swift Charts line chart of daily Training Load score over the last 14 calendar days (today inclusive). Reuses the visual treatment of the existing `trainingLoadTrend` Trends chart but at sheet-block scale — gradient backdrop per CONSTANTS § Trends Chart Visual Tokens → Gradient Anchor (`#3b82f6`), inner plot hairline, smoothed line (`.catmullRom`), latest-point highlight on today's point. **Range is fixed at 14 days — no toggle.** Daily point color matches its zone (low/moderate/high/peak). Y-axis 0–100. ID `trainingLoadDetailSheet_dailyChart`. **Tap-to-select + drag-to-scrub:** the chart supports the same selection interaction as `FortiFitChartDetailView` (Trends chart detail view) — tapping or dragging anywhere over the chart selects the closest data point by date, light haptic on selection change, dimmed non-selected line/points (line 55% opacity, non-selected points 35% opacity), selected point upsized (~96pt symbol), and a vertical `RuleMark` at the selected x. A selection annotation below the chart reads `{score} / 100 · {zone}` (left, zone-colored) and the date (right, Muted). Cleared when the user taps another point or the chart is re-rendered after a cascade. IDs `trainingLoadDetailSheet_chartDataPoint_{index}` per point and `trainingLoadDetailSheet_chartSelectionAnnotation` for the readout.
+
+3. **Contributing workouts block.** Header: `Contributing this week`. List of workouts from the last 7 days that contributed to the current score, sorted by descending stress-load contribution. Each row: workout name (Primary Text 15/700) + date (Muted Text 13px) + percent share of the last-7-day stress-load total (`{percent}%`, Muted Text 13px) + inline horizontal share bar (~56×4pt, Primary Accent Blue fill on Elevated Surface track, capsule shape, filled to `{percent}%`). The absolute stress-load value per row is intentionally suppressed — it created a false expectation that rows sum to the hero score and rendered confusingly as "0 stress load · 5%" after integer rounding. Tap a row → dismiss sheet, navigate to that workout's Workout Detail. Max 5 rows; "See all in Trends →" link at the bottom navigates to Trends → Training Load Trend chart detail. ID `trainingLoadDetailSheet_contributingWorkouts`. Note: user-facing unit is **stress load** (Phase 8.8 rename from "TSS"); internal field is still `tssContribution`.
+
+4. **Week-over-week comparison band.** Single-line `FortiFitCard`: `Stress load · {arrow} {abs(deltaPct)}% vs last week`. `arrow` is `↑` when up, `↓` when down, `—` when flat — matches the directional indicator convention used by the Power Level widget. Delta colored Positive Green when down (less stress), Alert Red when up (more stress) — counter-intuitive but matches recovery framing. The absolute current-week total is intentionally suppressed for consistency with the contributing-workouts rows (which dropped their absolute values for the same reason). ID `trainingLoadDetailSheet_weekComparison`.
+
+5. **Recovery readiness callout.** Larger format of the existing zone advisory copy (CONSTANTS § Training Load Zones → Advisory Text). Renders the readiness variant when no workout has been logged today; the post-training variant otherwise. ID `trainingLoadDetailSheet_recoveryCallout`.
+
+**Footer:** Side-by-side `See Info` · `Configure Settings` per § Standard Patterns → Home Widget Tap-to-Open → Footer button block. IDs `trainingLoadDetailSheet_seeInfoButton`, `trainingLoadDetailSheet_configureSettingsButton`. `See Info` opens the Widget Info Modal (INFO_COPY § Training Load); `Configure Settings` opens the Training Load Settings Modal.
+
+**Per-block empty states (Phase 8.8 — partial data still feels rewarding):**
+
+| Block | Empty trigger | Empty copy |
+|---|---|---|
+| Hero | Score = 0 (Resting) | Renders the bar at zero with `Resting` label and `0 / 100` value (not technically empty — uses the existing Resting state). |
+| 14-day chart | Fewer than 3 days with ≥ 1 workout in the last 14 days | *"Not enough data yet to chart your daily training load. Keep logging."* (matches `trainingLoadTrend` chart threshold copy.) |
+| Contributing workouts | No workouts in the last 7 days | *"No workouts in the last 7 days."* |
+| Week comparison | Either current or previous week has 0 stress load | Hide block entirely (no comparison meaningful). |
+| Recovery callout | Always renders — uses Resting copy if score = 0. |
+
+**Whole-sheet empty state (cold-start):** When the user has fewer than 3 workouts logged in the last 14 days **AND** their training load score is 0, the per-block empty states above render together producing a quiet sheet. No separate hero replacement. Empty copy when literally no workouts have ever been logged: *"Log a few more workouts with exercises to see your training load breakdown."* (per Phase 8.8 requirements — replaces the chart-style empty message in the chart block only; the rest of the sheet uses the per-block table above). ID `trainingLoadDetailSheet_emptyState_coldStart`.
+
+### Weekly Streak Insights Sheet
+
+Opened by tapping the Weekly Streak widget. Component: `FortiFitWeeklyStreakDetailSheet.swift` in `Design/Components/`. **The animated flame is intentionally not rendered in this sheet** — it lives on the widget card. The sheet uses typographic, data, and badge treatments instead.
+
+**Presentation:** iOS modal sheet, `.large` detent, swipe-down dismiss, drag indicator visible, Card Surface bg.
+
+**Header:** Centered title `Streak Insights`. Close button top-right (`xmark`, Muted Text). ID `weeklyStreakDetailSheet_closeButton`.
+
+**Body — scrollable, top-to-bottom:**
+
+1. **Typographic hero.** Massive streak count (Primary Text, ~96pt / 900 weight, optional gradient fill Primary Accent Blue `#3b82f6` → `#93c5fd` per CONSTANTS § Weekly Streak Insights → Hero). Count-up animation on sheet open (0 → currentStreak over 0.6s, ease-out; skipped when `UIAccessibility.isReduceMotionEnabled == true`). Below: `WEEK STREAK` label (Primary Accent Blue, uppercase, 13px / 800, 2px letter spacing). ID `weeklyStreakDetailSheet_hero`.
+
+2. **Stat row.** Three-column `FortiFitCard` row: `Current Streak` (left) · `All-Time Best` (middle, sourced from `StreakService.longestStreak`) · `Total Weeks Logged` (right, total count of historical weeks where target was met). Each column: large value (Primary Text 22/800) + small uppercase label (Muted Text 11/700, 2px letter spacing). ID `weeklyStreakDetailSheet_statRow`.
+
+3. **This Week's Progress arc.** Single concentric progress ring (Primary Accent Blue, ~120pt outer diameter, ~12pt thickness, ~2pt inner gap). Filled arc reflects `current week workouts / targetWorkoutsPerWeek`. Center: `{count} / {target}` stacked over `WORKOUTS THIS WEEK` (Muted Text 11/700, 2px letter spacing). Below the ring: a single Muted Text 13px line: `{days remaining} day(s) left this week` (computed from the current calendar week's Sunday end-of-day). Reuses the Activity Rings ring rendering approach (no new ring primitive). ID `weeklyStreakDetailSheet_thisWeekRing`.
+
+4. **History heatmap.** Calendar-style grid of the last **26 weeks** (fixed — no toggle). 4 columns × ~7 rows (oldest week top-left, dates ascend left-to-right then top-to-bottom; current in-progress week is bottom-right). Each cell ~32×32pt with a 4pt gap. Color ramp per CONSTANTS § Weekly Streak Insights → Heatmap Color Ramp:
+   - Untracked / pre-app week → Card Surface + 1px border (`#404040`)
+   - Below target (1 ≤ workouts < target) → Primary Accent Blue 25% opacity
+   - Target met (workouts ≥ target) → Primary Accent Blue 100% opacity
+   - Current week (in-progress) → outlined cell (1px Primary Accent Blue) with fill matching its current count band
+   Cell number: day-of-Monday-start (Primary Text 10/600, centered). Tap any cell → `FortiFitTooltip` shows `{n} of {target} workouts · week of {Mon date}` (anchored above the cell, dismisses on outside tap). ID `weeklyStreakDetailSheet_heatmap`. Cell IDs `weeklyStreakDetailSheet_heatmap_cell_{0..25}` align with visual position (0 = top-left = oldest week; 25 = bottom-right = current in-progress week). Note: this is independent of the `StreakService.fetchHeatmap` data contract, which still returns index 0 = most-recent week — the view reverses for rendering.
+
+5. **Milestone shelf.** Horizontal row of 5 SF Symbol badges at tier marks 1 / 4 / 12 / 26 / 52 weeks (per CONSTANTS § Weekly Streak Insights → Milestone Marks). Each badge: `trophy.fill` SF Symbol, ~36pt. Unlocked badges fill Primary Accent Blue; locked badges render outlined `trophy` in Muted Text. The **next-unlocked** badge (lowest tier ≥ `currentStreak`) gets a subtle 1px Primary Accent Blue ring + 6% blue card-surface wash as the visual anchor. Below each badge: small uppercase label (`1 WK`, `4 WKS`, `12 WKS`, `26 WKS`, `52 WKS`, Muted Text 10/700). Tapping a badge does nothing in v1 (passive). ID `weeklyStreakDetailSheet_milestoneShelf`. Per-badge IDs `weeklyStreakDetailSheet_milestone_{1|4|12|26|52}`.
+
+**Footer:** `Configure Settings` text button (centered, alone — Weekly Streak widget has no See Info Modal). Tap → dismiss sheet, open Weekly Streak Settings Modal. ID `weeklyStreakDetailSheet_configureSettingsButton`.
+
+**Per-block empty states (Phase 8.8):**
+
+| Block | Empty trigger | Empty copy |
+|---|---|---|
+| Hero | `currentStreak == 0` | Render `0` count + flatter messaging beneath: `Hit your weekly target to start a streak.` (sourced from CONSTANTS § Streak Motivational Messages → tier 0; existing copy reused). |
+| Stat row | All values 0 | Render zeros — block is informational, never hidden. |
+| This Week's Progress | `targetWorkoutsPerWeek == 0` | Hide block entirely. Show inline note in its place: *"Set a weekly workout target in Configure Settings to see this week's progress."* |
+| History heatmap | Fewer than 1 week of any workouts | Render the grid with all 26 cells in `Untracked` style + caption *"Log a workout to start your streak history."* |
+| Milestone shelf | All locked | Renders normally — locked-only shelf is intentional motivation. |
+
+**Whole-sheet cold-start:** When the user has logged zero workouts ever, the hero shows `0`, the stat row shows `0 / 0 / 0`, This Week's Progress and History heatmap show their per-block empty states, and the milestone shelf is fully locked.
+
+### Power Level Breakdown Sheet
+
+Opened by tapping the Power Level widget. Component: `FortiFitPowerLevelDetailSheet.swift` in `Design/Components/`.
+
+**Presentation:** iOS modal sheet, `.large` detent, swipe-down dismiss, drag indicator visible, Card Surface bg.
+
+**Header:** Centered title `Power Level Insights`. Close button top-right (`xmark`, Muted Text). ID `powerLevelDetailSheet_closeButton`.
+
+**Body — scrollable, top-to-bottom:**
+
+1. **Hero block.** Status label (`Deloading` / `Steady` / `Rising`, status-colored per CONSTANTS § Power Level Statuses) + large directional indicator (`↓` / `—` / `↑`, status-colored, ~48pt) + numeric `{current30dAvg} avg volume` line beneath in the user's weight unit (kg / lbs per `UserSettings.useMiles` adjacency — actually unit is kg under the hood, displayed via `UnitConversion.displayWeight(kg:)`). ID `powerLevelDetailSheet_hero`.
+
+2. **30-day rolling volume chart.** Swift Charts line chart of daily volume sums (Strength + HIIT only) over the last 30 days. Reuses the `workoutVolume` Trends chart visual treatment at sheet-block scale (gradient anchor `#4B2893` Chart Purple per CONSTANTS § Trends Chart Visual Tokens, smoothed line, latest-point highlight). **Range fixed at 30 days — no toggle (matches the algorithm window).** Empty days render no point (gap in line). ID `powerLevelDetailSheet_volumeChart`.
+
+3. **Top exercises driving the trend.** Header: `Driving your trend`. Up to 3 rows, one per top exercise by 30-day volume contribution, with the **≥ 3 in-window sessions filter applied** (per SERVICES § Power Level Algorithm → Top Contributing Exercises). Each row: exercise name (Primary Text 15/700) + `{deltaSign}{deltaPct}% volume vs previous 30d` (status-colored, right-aligned) + inline 30-day sparkline (~80×24pt, Primary Accent Blue, no marks). Tap a row → dismiss sheet, navigate to Trends → Strength Tracker chart detail pre-filtered to that exercise. **No-baseline rendering:** when `PowerLevelTopExercise.previousWindowVolume == 0`, the delta column renders an em-dash (`—`, Muted Text) instead of "+0%" — pairs with the `noBaseline` nudge copy (INFO_COPY § Power Level Nudge Copy → No Baseline) so the row and the message agree that no comparison is yet possible. ID `powerLevelDetailSheet_topExercises`. Per-row IDs `powerLevelDetailSheet_topExerciseRow_{0..2}`.
+
+4. **Window comparison band.** Single-line `FortiFitCard`: `Current 30d: {currentAvg} · Previous 30d: {prevAvg} ({deltaSign}{deltaPct}%)`. Status-colored delta. ID `powerLevelDetailSheet_windowComparison`.
+
+5. **Contextual nudge.** Single-line muted message generated by `PowerLevelService.computeNudge()` (SERVICES § Power Level Algorithm → Nudge Computation). Five archetypes (Deloading / Steady / Rising / ColdStart / NoBaseline) drive the copy; copy templates live in INFO_COPY § Power Level Nudge Copy. Italic Muted Text 14px. ID `powerLevelDetailSheet_nudge`.
+
+**Footer:** `See Info` text button (centered, alone — Power Level widget has no Configure Settings Modal). Tap → dismiss sheet, open Widget Info Modal (INFO_COPY § Power Level). ID `powerLevelDetailSheet_seeInfoButton`.
+
+**Per-block empty states (Phase 8.8):**
+
+| Block | Empty trigger | Empty copy |
+|---|---|---|
+| Hero | Fewer than 3 Strength/HIIT workouts in the last 30 days | Render the status as `Steady` with `—` indicator + replace numeric line with *"Log a few more Strength or HIIT workouts to see your power level."* |
+| Volume chart | Fewer than 2 Strength/HIIT workouts in 30d window | *"Log more Strength or HIIT workouts to display volume trends."* (matches `workoutVolume` chart threshold copy from CONSTANTS § Chart Data Thresholds.) |
+| Top exercises | Fewer than 3 sessions on any single exercise in window | *"Log a few more sessions on the same exercises to surface your top drivers."* |
+| Window comparison | Either window has 0 qualifying workouts | Hide block entirely. |
+| Nudge | < 3 Strength/HIIT workouts in 30d window (cold-start) | *"Log a few more Strength or HIIT workouts to unlock personalized suggestions."* (per Phase 8.8 calculated-nudge fallback.) |
+
+**Whole-sheet cold-start:** When the user has zero Strength or HIIT workouts ever, the sheet renders the hero + per-block empty states inline. No separate hero replacement. Whole-sheet message — same as the hero empty copy.
+
 ### States
 | State | What the User Sees |
 |-------|-------------------|
-| Empty | All widgets at default/empty: Training Load 0% "Resting", Streak 0 dormant flame, Power Level "No data" message, Today's Plan "No workout planned for today.", Activity Rings shows the appropriate State 1 or State 2 message based on HealthKit + Watch availability. |
-| Populated | Full dashboard with live data |
-| Edit Mode | All widgets show "x" buttons; cards draggable; tap outside exits |
+| Empty | All widgets at default/empty: Training Load 0% "Resting", Streak 0 dormant flame, Power Level "No data" message, Today's Plan "No workout planned for today.", Activity Rings shows the appropriate State 1 or State 2 message based on HealthKit + Watch availability. Tapping any widget still opens its detail sheet (which renders its own per-block empty state). |
+| Populated | Full dashboard with live data. Tapping any widget opens its detail sheet. |
+| Edit Mode | All widgets show "x" buttons; cards draggable; tap outside exits. **Tap-to-open is suppressed** — taps reach only the delete-and-drag chrome. |
 | All Widgets Removed | Centered muted message: "Tap the menu to add widgets to your Home screen." Ellipsis, Log Workout, and Recent Workouts remain accessible. |
 
 ---
@@ -585,6 +747,8 @@ One option: **"View Workout Templates"** (`doc.on.doc`) → SavedTemplatesListVi
 
 Below the calendar. One card per scheduled or logged workout on the selected day (inclusion rules in § Logged-Only Workout Surfacing). Cards stack vertically.
 
+**Stack order:** Planned and skipped scheduled cards render first, followed by completed scheduled cards and logged-only cards (both treated as "done"). This keeps upcoming work anchored at the top of the day's stack regardless of `scheduledTime`. Sort key implemented in `PlanService.fetchPlanSurface` (SERVICES.md § PlanService → Retrieval).
+
 **Card variants:**
 
 | Variant | Visual | Trailing affordance | Action |
@@ -626,7 +790,7 @@ Plan empty state fires only when **no** `ScheduledWorkout` records exist AND no 
 3. **Scheduled Time toggle** — when on, exposes a time-of-day picker. When off, no scheduled time. Default off. Independent of the Push to Apple Watch toggle — time is optional regardless of push state.
 4. **Recurrence (optional)** — None (default) / Weekly / Biweekly. Selecting auto-generates `ScheduledWorkout`s for the next 12 weeks, all sharing the same `recurrenceGroupId`.
 5. **Push to Apple Watch toggle (Phase 8.7.1+)** — see § Push to Apple Watch Toggle below for full behavior. Position: directly under the Recurrence segmented control, above the "Plan Workout" CTA.
-6. **"Plan Workout" button** — full-width primary action at bottom. Saves the `ScheduledWorkout` (and its recurrence siblings, if any), and if Push is on, registers the plan with the Watch via `WatchScheduleService.schedule(_:)`.
+6. **"Plan Workout" button** — full-width primary action at bottom. Saves the `ScheduledWorkout` (and its recurrence siblings, if any), and if Push is on, registers the plan with the Watch via `WatchScheduleService.schedule(_:)`. On success the sheet dismisses and a "Workout Planned" toast (~2s, top-anchored Capsule, primaryAccent fill, white `bodySmall` text; fade + slide via opacity/offset matching the Removed from Plan toast) appears on the host screen — Plan or Workout Templates List, depending on entry point.
 
 Validation: template required; date today or future. Multiple workouts per day allowed.
 
@@ -1023,7 +1187,7 @@ Every chart card on the Trends screen renders a left-chevron-style expand button
 
 ### Entry & Navigation
 
-Pushed onto the navigation stack by the chart card's expand button (§ Trends → Expand Affordance). Standard iOS right-to-left push transition. Back navigation via the Back Navigation Chevron (§ Standard Patterns) at top-leading; iOS edge-swipe-back also works.
+Pushed onto the navigation stack by the chart card's expand button (§ Trends → Expand Affordance). Standard iOS right-to-left push transition. Back navigation via the Back Navigation Chevron (§ Standard Patterns) at top-leading. Edge-swipe-back is **not** wired up on this screen — horizontal swipes are reserved for the paging `TabView` that cycles between charts in `sortOrder` (see § Swipe Paging), and the two gestures would conflict.
 
 ### Layout (top-to-bottom)
 
@@ -1076,6 +1240,8 @@ Push focuses the chart title first (announces title + summary together as a sing
 
 ### Layout
 Left: blue ellipsis icon (functional — opens Goals ellipsis menu). Right: "+" button. ✦ divider. "Your Targets" header.
+
+**Card stack order:** In-progress goals (progress < 100%) render before completed goals (progress >= 100%) — completed goals sink to the bottom of the list. Within each group, manual `sortOrder` from Reorder Edit Mode is preserved. Mirrors the completed-card sink convention used on the Plan tab and the Today's Plan Detail Sheet.
 
 ### Goal Card Design
 
@@ -1134,7 +1300,7 @@ Completed (100%) ring still surfaces the tooltip — value is "100%". Dual-arc c
 **Accessibility:** overall progress percentage is in each card's accessibility label so VoiceOver users hear it without discovering the tap. Dual-arc cards' accessibility label also describes the Distance/Duration color mapping.
 
 **Completed state treatment** (goal at 100%):
-- Blue border, faint Primary Accent wash (3% opacity) across card surface.
+- Positive Green border, faint Positive Green wash (3% opacity) across card surface — matches the completed-card convention used on the Plan tab and the Today's Plan Detail Sheet.
 - "COMPLETED [Formal Date]" micro-label centered at top (Secondary Text, 11/700, 2px spacing, uppercase). Date from `Goal.lastCelebratedDate` (e.g., "COMPLETED APR 17, 2026").
 - Ring fully filled.
 - Silhouette tinted Primary Accent Blue at 85–100% opacity ("lit up"). Applies to all goal-type silhouettes.
@@ -1188,7 +1354,7 @@ Per § Standard Patterns: Standard Reorder Edit Mode. Persists to `Goal.sortOrde
 |-------|-------------------|
 | Empty | "Set your first goal to start tracking." + ADD button |
 | Populated | Full goal list with three-section left columns and large right-justified progress rings |
-| Goal Completed | Blue border, faint blue wash (3% opacity), "COMPLETED [Date]" micro-label at top center, ring fully filled with silhouette tinted Primary Accent Blue at 85–100% opacity (crossfades in over 0.2–0.3s) |
+| Goal Completed | Positive Green border, faint green wash (3% opacity), "COMPLETED [Date]" micro-label at top center, ring fully filled with silhouette tinted Primary Accent Blue at 85–100% opacity (crossfades in over 0.2–0.3s) |
 | Completion Pulse | Brief glow/pulse animation on ring when user navigates to Goals screen with a goal whose `lastCelebratedDate` = today (once per visit) |
 | Ring Tap Tooltip | Overlay below ring, surfaced on ring tap. Single-ring goals show overall progress percentage; dual-arc Speed and Distance shows percentage headline + Distance/Duration legend. Dismissed by re-tap or outside tap. |
 | Card Expanded | "LAST 30 DAYS" header above sparkline chart area. Populated goals show real line chart with "Goal progress over the last 30 days" footer note. Brand-new goals show a flat dashed skeleton line with "Log a workout to start tracking progress" footer note |
@@ -1210,7 +1376,7 @@ Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Create Goal"
 |---|---|---|
 | Strength PR | Exercise dropdown (Bench Press, Barbell Squats, Deadlifts, Overhead Press, Barbell Rows, Incline Bench Press, Custom) — Custom uses autocomplete name input. Current weight / Target weight side by side. | Exercise + target weight > 0 |
 | Repetitions PR | Same exercise dropdown + Custom + autocomplete. Current reps / Target reps side by side. | Exercise + target reps > 0 |
-| Speed and Distance | Goal name input. Optional Current/Target distance (km or mi per `useMiles`). Optional Current/Target duration (minutes). Both targets = speed target (completion requires both); duration alone = endurance (higher = better). Distance stored as km. | Name + ≥1 target > 0 |
+| Speed and Distance | Goal name input. Workout Type dropdown restricted to **Cardio** and **HIIT** only (the only types meaningful for speed/distance/duration tracking — Strength Training, Yoga, Pilates, Other are excluded). Optional Current/Target distance (km or mi per `useMiles`). Optional Current/Target duration (minutes). Both targets = speed target (completion requires both); duration alone = endurance (higher = better). Distance stored as km. | Name + ≥1 target > 0 |
 | Number of Weekly Workouts | Target shown read-only from `targetWorkoutsPerWeek` (UserSettings). Muted italic note below: *"This goal tracks your weekly workout target. To change the target, long-press the Weekly Streak widget on the Home screen and tap Configure Settings."* No editable fields — target controlled via Weekly Streak Settings Modal. Auto-updates from current week's workout count (Mon–Sun). | Always valid; save enabled immediately |
 
 "Save Goal" button at bottom. **Singleton constraint:** only one Weekly Workouts goal can exist; if one already exists, that option in the Goal Type selector is grayed out with a muted "Already added" label.

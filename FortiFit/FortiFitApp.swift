@@ -18,6 +18,7 @@ struct FortiFitApp: App {
     @State private var appleActivityService: AppleActivityService
     @State private var watchScheduleService: WatchScheduleService
     @State private var currentPendingMatch: PendingMatch?
+    @State private var showLaunchSplash = true
     @Environment(\.scenePhase) private var scenePhase
 
     var sharedModelContainer: ModelContainer = {
@@ -87,6 +88,7 @@ struct FortiFitApp: App {
 
     var body: some Scene {
         WindowGroup {
+            ZStack {
             if isUITesting {
                 ContentView()
                     .environment(healthKitSyncService)
@@ -252,6 +254,23 @@ struct FortiFitApp: App {
                             }
                         }
                     }
+            }
+
+            if showLaunchSplash {
+                LaunchSplashView()
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+            }
+            .task {
+                if isUITesting {
+                    showLaunchSplash = false
+                    return
+                }
+                try? await Task.sleep(for: .seconds(LaunchSplashView.displayDuration))
+                withAnimation(.easeOut(duration: LaunchSplashView.fadeDuration)) {
+                    showLaunchSplash = false
+                }
             }
         }
         .modelContainer(sharedModelContainer)

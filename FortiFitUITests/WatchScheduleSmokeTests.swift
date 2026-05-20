@@ -39,8 +39,8 @@ final class WatchScheduleSmokeTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Push planned workouts")).firstMatch.exists,
-            "Apple Watch toggle label should use 'Push' wording"
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Sync to Apple Watch")).firstMatch.exists,
+            "Apple Watch toggle label should use 'Sync to Apple Watch' wording"
         )
     }
 

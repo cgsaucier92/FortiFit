@@ -37,7 +37,8 @@ A holistic health app that helps users track and understand the interaction betw
 
 ### Interaction Style
 - **Animations:** Subtle and functional. Progress bars: 0.4s width transitions. Toggles: 0.2s ease. Save buttons: 0.2s disabled↔enabled. Delete "x": 0.15s opacity fade-in. No playful bounces.
-- **Navigation:** Bottom tab bar (HOME, WORKOUTS, PLAN, TRENDS, GOALS). Settings via gear icon on Home. Drill-down screens use a blue left-pointing chevron button (`chevron.left` SF Symbol, Primary Accent Blue, 24×24pt circular tap target) at the top-leading edge — see SCREENS.md § Standard Patterns → Back Navigation Chevron.
+- **Navigation:** Bottom tab bar (HOME, WORKOUTS, PLAN, TRENDS, GOALS). Settings via gear icon on Home. Drill-down screens use a blue left-pointing chevron button (`chevron.left` SF Symbol, Primary Accent Blue, 24×24pt circular tap target) at the top-leading edge, and also accept a left-to-right edge-swipe-back gesture as an equivalent way to pop — see SCREENS.md § Standard Patterns → Back Navigation Chevron.
+- **Home widget tap-to-open (Phase 8.8):** Every Home widget card opens a per-widget detail sheet on tap — Today's Plan Detail Sheet, Training Load Detail Sheet, Weekly Streak Insights Sheet, Power Level Breakdown Sheet, and the existing Activity Detail Sheet. Tap-to-open is suppressed while the home is in Widget Edit Mode. Long-press context menus remain the entry point for `See Info`, `Configure Settings`, `Complete Workout`, `Reorder Widgets`, and `Delete Widget` on every widget, in every mode. See SCREENS.md § Standard Patterns → Home Widget Tap-to-Open.
 - **Feedback:** Color state changes. Completed goals: blue border, faint 3% blue card-surface wash, and "COMPLETED [date]" micro-label (Secondary Text, uppercase) at top center of goal card. Save buttons visually disabled until valid. Light haptic feedback (UIImpactFeedbackGenerator, .light) on primary action buttons: "+ Log Workout" (Home), "+" (Plan). Completion pulse: when user navigates to Goals with a goal whose `lastCelebratedDate` is today, the ring briefly glows/pulses once per visit.
 
 ### Accessibility
@@ -123,6 +124,10 @@ FortiFit/
 │   └── Settings/                      # SettingsView, SettingsViewModel
 ├── Design/
 │   ├── Components/                    # FortiFit-prefixed reusable components — see CLAUDE.md Phases 1, 4, 6, 7, 8 for full inventory
+│   │                                  # Phase 8.8 adds: FortiFitTodaysPlanDetailSheet.swift,
+│   │                                  #                FortiFitTrainingLoadDetailSheet.swift,
+│   │                                  #                FortiFitWeeklyStreakDetailSheet.swift,
+│   │                                  #                FortiFitPowerLevelDetailSheet.swift
 │   ├── Theme/                         # Colors.swift, Typography.swift, Spacing.swift
 │   └── Assets.xcassets
 └── Tests/
@@ -149,6 +154,10 @@ Home → Training Load Settings Modal (long-press Training Load widget → "Conf
 Home → Weekly Streak Settings Modal (long-press Weekly Streak widget → "Configure Settings")
 Home → Widget Info Modal (long-press Training Load or Power Level widget → "See Info")
 Home → Complete Planned Workout (Today's Plan widget → compact confirmation sheet)
+Home → Today's Plan Detail Sheet (tap Today's Plan widget — Phase 8.8)
+Home → Training Load Detail Sheet (tap Training Load widget — Phase 8.8)
+Home → Weekly Streak Insights Sheet (tap Weekly Streak widget — Phase 8.8)
+Home → Power Level Breakdown Sheet (tap Power Level widget — Phase 8.8)
 Home → Activity Detail Sheet (tap Activity Rings widget → 7/30-day breakdown)
 Home → Activity Rings Settings Modal (long-press Activity Rings widget → "Configure Settings")
 Home → Activity Rings See Info Modal (long-press Activity Rings widget → "See Info")
@@ -415,6 +424,10 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 | Settings | Unit preferences + Apple Health section |
 | Match Prompt Sheet | Resolve ambiguous HK-to-FitNavi workout matches (HEALTHKIT § 13) |
 | Edit Planned Workout | Edit a scheduled workout's exercises, name, date, time, duration, and Apple Watch push intent (WORKOUTKIT § 13; SCREENS § Edit Planned Workout) |
+| Today's Plan Detail Sheet (Phase 8.8) | Tap-to-open detail of today's planned workouts with per-row Complete action (SCREENS § Today's Plan Detail Sheet) |
+| Training Load Detail Sheet (Phase 8.8) | Tap-to-open breakdown of training load with 14-day chart, contributing workouts, week comparison, recovery callout (SCREENS § Training Load Detail Sheet) |
+| Weekly Streak Insights Sheet (Phase 8.8) | Tap-to-open streak insights with typographic hero, stat row, this-week ring, 26-week heatmap, milestone shelf — no flame (SCREENS § Weekly Streak Insights Sheet) |
+| Power Level Breakdown Sheet (Phase 8.8) | Tap-to-open breakdown with 30-day volume chart, top exercises driving trend, window comparison, calculated nudge (SCREENS § Power Level Breakdown Sheet) |
 
 ---
 

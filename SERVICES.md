@@ -120,6 +120,55 @@ The `× 150` multiplier makes today's sessions count 1.5× for floor purposes. C
 ### Step 10 — Zone Classification
 See `CONSTANTS.md` for zone ranges, colors, and advisory text tables.
 
+### Detail Sheet Helpers (Phase 8.8)
+
+Three pure-read helpers used exclusively by the Training Load Detail Sheet (SCREENS.md § Training Load Detail Sheet). All synchronous reads against the existing 14-day-ish workout set.
+
+```swift
+struct TrainingLoadDailyScore: Hashable {
+    let date: Date            // calendar-local day boundary (midnight)
+    let score: Int            // 0–100, computed via the standard algorithm using that day's window
+    let zone: TrainingLoadZone
+}
+
+func fourteenDayDailyScores() -> [TrainingLoadDailyScore]
+```
+
+- Returns exactly 14 entries (today inclusive), oldest first → most recent last.
+- Each entry's score is the algorithm output evaluated as if `today = entry.date`. Effectively a daily replay over the 14-day window.
+- Drives the 14-day chart (SCREENS.md § Training Load Detail Sheet → block 2). **Fixed 14-day range — no toggle.**
+
+```swift
+struct TrainingLoadContributor: Hashable {
+    let workoutId: PersistentIdentifier
+    let workoutName: String
+    let date: Date
+    let tssContribution: Double         // the time-decayed per-session stress this workout adds to today's score
+    let percentOfWeeklyLoad: Double     // tssContribution / sum(last7DaysTssContributions) × 100, 0 when divisor is 0
+}
+
+func contributingWorkouts(daysBack: Int = 7, limit: Int = 5) -> [TrainingLoadContributor]
+```
+
+- Returns up to 5 entries sorted by `tssContribution` descending, ties broken by `date` descending (most recent first).
+- Drives the Contributing Workouts block (SCREENS.md § Training Load Detail Sheet → block 3).
+- The stress-load (`tssContribution`) per workout is the per-session stress × time-decay factor already computed in `§ Step 5 — Time-Decayed Contribution`. The helper surfaces those intermediates rather than recomputing. Internal field name retains `tss` for code-level continuity; user-facing copy says "stress load" (Phase 8.8 rename).
+
+```swift
+struct TrainingLoadWeekComparison {
+    let currentWeekTss: Int             // sum of tssContribution across the current Mon–Sun (calendar-local), today inclusive
+    let previousWeekTss: Int            // sum across the prior Mon–Sun
+    let deltaPct: Int                   // (current - previous) / previous × 100, rounded; 0 when previous == 0
+}
+
+func weekOverWeekComparison() -> TrainingLoadWeekComparison
+```
+
+- Drives the Week-over-Week Comparison band (SCREENS.md § Training Load Detail Sheet → block 4).
+- Uses the same Mon–Sun week definition as `StreakService` (consistency).
+
+**Cache invalidation:** All three helpers are pure reads. The sheet's ViewModel computes them on appear and re-computes when the Workout Cascade fires while the sheet is presented.
+
 ### Settings Change Behavior
 Always uses current `experienceLevel` at calculation time. Changing experience recalculates immediately using new τ and stress capacity for all workouts in the 10-day window. No per-workout versioning.
 
@@ -144,6 +193,56 @@ Always uses current `experienceLevel` at calculation time. Changing experience r
 **Settings change:** Changing target recalculates retroactively for all historical weeks.
 
 **Flame tiers and motivational messages:** See `CONSTANTS.md`.
+
+### Weekly Streak Insights Helpers (Phase 8.8)
+
+Three pure-read helpers used exclusively by the Weekly Streak Insights Sheet (SCREENS.md § Weekly Streak Insights Sheet). All synchronous — they query the existing in-memory workout set; no new persistence.
+
+```swift
+struct StreakHeatmapCell: Hashable {
+    let weekStartDate: Date     // Monday 00:00:00 (local) of the week
+    let workoutCount: Int       // count for that Mon–Sun range
+    let target: Int             // snapshot of UserSettings.targetWorkoutsPerWeek at compute time
+    var status: Status { /* untracked | belowTarget | targetMet | inProgress (current week only) */ }
+}
+
+func fetchHeatmap(weeks: Int = 26) -> [StreakHeatmapCell]
+```
+
+- Returns exactly `weeks` cells (default 26 — fixed per SCREENS.md § Weekly Streak Insights Sheet).
+- Index 0 = most recent week (the current in-progress week); subsequent indices walk backward in time.
+- `status == .untracked` when the week predates the first logged workout (the cell renders as a Card Surface outline per CONSTANTS § Weekly Streak Heatmap → Color Ramp).
+- `status == .inProgress` only for index 0; downstream UI applies its outlined treatment.
+
+```swift
+struct ThisWeekProgress {
+    let currentCount: Int
+    let target: Int
+    let daysRemainingThisWeek: Int   // 0–6, computed as days until Sunday 23:59 local
+}
+
+func thisWeekProgress() -> ThisWeekProgress
+```
+
+- Used by the This Week's Progress arc (SCREENS.md § Weekly Streak Insights Sheet → block 3).
+- `target` reads live from `UserSettings.targetWorkoutsPerWeek`.
+
+```swift
+struct StreakHistorySummary {
+    let currentStreak: Int           // mirrors existing currentStreak
+    let longestStreakAllTime: Int    // mirrors existing longestStreak
+    let totalWeeksLogged: Int        // count of historical weeks where workoutCount >= target (using the target in effect now)
+    let unlockedMilestones: [Int]    // subset of CONSTANTS § Weekly Streak Insights → Milestone Marks where currentStreak >= mark
+    let nextUnlockedMilestone: Int?  // lowest mark > currentStreak; nil if all unlocked
+}
+
+func historySummary() -> StreakHistorySummary
+```
+
+- Drives the Stat Row and Milestone Shelf (SCREENS.md § Weekly Streak Insights Sheet → blocks 2 and 5).
+- `totalWeeksLogged` walks all historical weeks under the **current** `targetWorkoutsPerWeek` (not historical-target-aware). Intentional simplification — matches how the streak itself is recomputed retroactively on target change.
+
+**Cache invalidation:** All three helpers are pure reads against the workout set; no caching at the service level. The sheet's ViewModel computes them on appear and re-computes when the Workout Cascade fires (§ Workout Cascade).
 
 ---
 
@@ -201,6 +300,91 @@ Else: pct_change = ((current_avg - baseline_avg) / baseline_avg) × 100
 **Edge cases:** < 31 days history → baseline empty → Steady. Zero qualifying workouts in both → "No data" message. Recalculates on workout log/edit/delete.
 
 **No dependency on UserSettings.** Purely data-driven.
+
+### Top Contributing Exercises (Phase 8.8)
+
+Used exclusively by the Power Level Breakdown Sheet (SCREENS.md § Power Level Breakdown Sheet → block 3).
+
+```swift
+struct PowerLevelTopExercise: Hashable {
+    let exerciseName: String          // case-insensitive normalized; display uses the most recent capitalization observed
+    let currentWindowVolume: Double   // sum of workout_volume contributions in the current 30d window for this exercise
+    let previousWindowVolume: Double  // same for the previous 30d window
+    let deltaPct: Double              // (current - previous) / previous × 100; nil-coalesced to 0 when previous == 0
+    let sessionCountInWindow: Int     // number of distinct in-scope workouts containing this exercise in the current 30d window
+    let sparkline30d: [Double]        // 30 entries (today inclusive), one per calendar day; days with no session = 0
+}
+
+func topContributingExercises(limit: Int = 3) -> [PowerLevelTopExercise]
+```
+
+**Rules:**
+- Scope: Strength Training + HIIT only (same scope as Power Level itself).
+- **≥ 3-session filter:** Exercises with `sessionCountInWindow < 3` are excluded. This prevents single-session outliers from dominating the "what's driving the trend" surface (per Phase 8.8 product decision).
+- Returns 0–3 entries. Fewer than 3 surviving the filter is acceptable (UI handles the empty-block state).
+- Exercise-name matching is case-insensitive (mirrors the Strength PR auto-update rule, § Strength PR Goals).
+- Sort order: descending `currentWindowVolume`, ties broken by descending `sessionCountInWindow`, then by exercise name ascending.
+
+### Window Comparison Computation (Phase 8.8)
+
+Used by the Window Comparison band (SCREENS.md § Power Level Breakdown Sheet → block 4).
+
+```swift
+struct PowerLevelWindowComparison {
+    let current30dAvg: Double         // current_avg from § Step 1
+    let previous30dAvg: Double        // baseline_avg from § Step 2
+    let deltaPct: Double              // pct_change from § Step 3 (0 when baseline_avg == 0)
+}
+
+func windowComparison() -> PowerLevelWindowComparison
+```
+
+Surfaces the same three intermediates the algorithm already computes. The UI hides the block entirely when `current30dAvg == 0` OR `previous30dAvg == 0`.
+
+### Nudge Computation (Phase 8.8)
+
+Calculated, data-driven recommendation surfaced as a single muted line on the Power Level Breakdown Sheet (SCREENS.md § Power Level Breakdown Sheet → block 5). Copy templates live in INFO_COPY § Power Level Nudge Copy — never hardcoded in the service.
+
+```swift
+enum PowerLevelNudgeArchetype: String {
+    case deloading       // status == .deloading
+    case steady          // status == .steady
+    case rising          // status == .rising
+    case coldStart       // < 3 Strength/HIIT workouts in the current 30d window
+    case noBaseline      // ≥ 3 in the current 30d window, but 0 in the prior 30d window
+}
+
+struct PowerLevelNudge {
+    let archetype: PowerLevelNudgeArchetype
+    let inputs: NudgeInputs        // values for the copy template's placeholders (see below)
+    var messageKey: String { archetype.rawValue }  // INFO_COPY lookup key
+}
+
+struct NudgeInputs {
+    // Deloading
+    let currentSessionCount30d: Int?   // count of Strength/HIIT workouts in current 30d window
+    let previousSessionCount30d: Int?  // same for previous 30d window
+    // Steady
+    let topExerciseName: String?       // from topContributingExercises().first when present; nil-fallback
+    // Rising
+    let avgSessionsPerWeek30d: Double? // currentSessionCount30d / (30/7), 1-decimal rounded
+}
+
+func computeNudge() -> PowerLevelNudge
+```
+
+**Resolution order (cold-start guard runs first, no-baseline guard second):**
+
+1. If `qualifyingWorkoutsInCurrentWindow.count < 3` → `coldStart`. Inputs are all nil. The UI substitutes the cold-start copy verbatim.
+2. Else if `qualifyingWorkoutsInPreviousWindow.isEmpty` → `noBaseline`. Populate `currentSessionCount30d` only. Trend percentages can't be computed against an empty baseline, so the sheet must surface the 60-day comparison window limitation explicitly instead of falling into the steady "flat" copy. The corresponding per-exercise rows render an em-dash (`—`) in place of "+0%" whenever `PowerLevelTopExercise.previousWindowVolume == 0`.
+3. Else, branch on `status`:
+   - `.deloading` → archetype `.deloading`. Populate `currentSessionCount30d` and `previousSessionCount30d`.
+   - `.steady` → archetype `.steady`. Populate `topExerciseName` from `topContributingExercises(limit: 1).first?.exerciseName`. **Per-exercise baseline check:** if the cited top exercise's `previousWindowVolume == 0` (i.e., it's brand-new in the current window even though the broader prior window has other workouts), degrade to `noBaseline` so the "Volume on {top} is flat" copy doesn't lie about an exercise that has no comparable prior data. If no exercise passes the ≥ 3-session filter at all, the UI falls back to the cold-start copy with the steady archetype's key — i.e., the message gracefully degrades to *"Log a few more sessions on the same exercises to surface your top drivers."*
+   - `.rising` → archetype `.rising`. Populate `avgSessionsPerWeek30d` and `topExerciseName` (best-effort). **Per-exercise baseline check:** if the cited top exercise's `previousWindowVolume == 0`, suppress `topExerciseName` so the copy falls back to `risingNoTop` — calling a brand-new exercise the "biggest gainer" would be inaccurate.
+
+**Triggers:** Recomputed on demand by the sheet (not cached at service level). The Workout Cascade does not need to pre-emptively recompute the nudge — sheet ViewModel handles it on appear and after each cascade fire while the sheet is presented.
+
+**Localization:** Copy templates use `{placeholder}` syntax matched by `String(format:locale:)` or SwiftUI's `LocalizedStringResource` interpolation. All counts and percentages are integers in v1 (no fractional sessions surfaced).
 
 ---
 
@@ -304,6 +488,7 @@ Any time a workout is logged, edited, deleted, or batch-deleted via workout type
 - **Power Level** — recalculate if Strength Training or HIIT was involved.
 - **Workout Type card** — update count. If last workout of a type is gone, remove the card and delete the WorkoutTypeOrder record.
 - **Scheduled workout linkage** — if the deleted workout's ID matches any `ScheduledWorkout.completedWorkoutId`, null that field and revert status to "planned". If the reverted `ScheduledWorkout` had `syncToAppleWatch == true` and gates still pass, `WatchScheduleService.schedule(_:)` is called to re-register the plan on Watch (the user will probably want to redo the session).
+- **Widget Detail Sheet derived data (Phase 8.8)** — when any of the four new detail sheets (Today's Plan, Training Load, Weekly Streak, Power Level) is currently presented, its ViewModel re-fetches its helpers (`StreakService.fetchHeatmap`, `StreakService.thisWeekProgress`, `StreakService.historySummary`, `ExerciseLoadService.fourteenDayDailyScores`, `ExerciseLoadService.contributingWorkouts`, `ExerciseLoadService.weekOverWeekComparison`, `PowerLevelService.topContributingExercises`, `PowerLevelService.windowComparison`, `PowerLevelService.computeNudge`, `PlanService.fetchTodaysScheduledWorkouts`) and re-renders. No caching at the service level; ViewModels recompute on each cascade fire while presented. Sheets that are not presented do nothing — no global recompute.
 
 ### Workout Deletion
 Apply the Workout Cascade to remaining data.
@@ -681,11 +866,14 @@ When a user schedules a template, the exercise data (names, sets, reps, weights,
 - **Fetch for date range:** Return all `ScheduledWorkout` records within a given date range, sorted by `scheduledDate` then `scheduledTime`.
 - **Fetch for date:** Return all records for a specific calendar day.
 - **Fetch today's planned:** Return the first `ScheduledWorkout` for today with status "planned" (used by Today's Plan widget left column).
-- **Fetch Plan surface for date range:** Unified fetch used by the Plan screen calendar dots and Day Detail Area. Returns a merged, date-sorted collection of:
+- **Fetch today's scheduled workouts (Phase 8.8):** Return **all** `ScheduledWorkout` records where `scheduledDate == today` (calendar-local), regardless of status (`planned`, `completed`, `skipped`). Sort: planned/skipped rows first, completed rows last (mirrors the Plan tab day-detail stack order); within each group, ordered by `scheduledTime` ascending (nil times sort last), then by `dateCreated`. Used by the Today's Plan Detail Sheet (SCREENS.md § Today's Plan Detail Sheet). The "completed rows stay visible only on the day they were completed" behavior is enforced by this date filter — no separate completion-window logic.
+- **Fetch Plan surface for date range:** Unified fetch used by the Plan screen calendar dots and Day Detail Area. Returns a merged collection of:
   1. All `ScheduledWorkout` records in the range (all statuses).
   2. All `Workout` records in the range **where** no `ScheduledWorkout` has `completedWorkoutId == workout.id` AND `workout.hiddenFromPlan == false`.
   
   The filter on condition (1) prevents duplicate representation of completed scheduled workouts (once as their `ScheduledWorkout`, once as the linked `Workout`). Callers distinguish the two record types and render logged-only cards vs. scheduled cards accordingly (see SCREENS.md § Plan → Day Detail Area).
+
+  **Sort order:** Primary key is date ascending. Secondary key is `dayOrderPriority` so within a single day, planned/skipped scheduled workouts (priority 0) sort before completed scheduled workouts and logged-only workouts (priority 1) — finished work sinks to the bottom of the day's stack so upcoming items stay visually anchored on top.
 - **Fetch Plan surface for date:** Same logic scoped to a single calendar day. Used by Day Detail Area and by the Today's Plan widget calendar square (for green dot presence on today).
 
 ### Completion
@@ -886,6 +1074,34 @@ This is a destructive migration — there is no replacement widget. If a user pr
 
 ### Today's Plan — Complete Workout from context menu
 The Today's Plan widget exposes a "Complete Workout" item in its long-press context menu (see SCREENS.md § Home Screen → Widget Context Menu). Visibility rule: the item is rendered if and only if `PlanService.fetchTodaysPlanned()` returns a non-nil `ScheduledWorkout` (i.e., at least one uncompleted plan for today). The action delegates to the same compact confirmation sheet used by the Plan tab (`PlanService.completeScheduled(workoutId:)` flow). On confirm, the widget refresh (see Workout Cascade above) repopulates the left column with the next planned workout for today, or falls back to the "All planned workouts completed." state when no more remain.
+
+### Widget Tap Routing (Phase 8.8)
+
+Every Home widget card opens a per-widget detail sheet on tap (SCREENS.md § Standard Patterns → Home Widget Tap-to-Open). Tap routing is owned by the home view layer (`HomeViewModel`), not the service — `HomeWidgetService` is a SwiftData CRUD shop and stays that way. This section documents the contract the view layer is expected to honor.
+
+```swift
+enum WidgetDetailRoute {
+    case todaysPlan
+    case trainingLoad
+    case weeklyStreak
+    case powerLevel
+    case appleActivityLive          // existing — opens Activity Detail Sheet
+    case appleActivityConnectHK     // existing — navigates to Settings → Apple Health
+    case appleActivityPairWatch     // existing — no-op
+    case suppressed                 // home is in Widget Edit Mode
+}
+
+func tapRoute(for widget: HomeWidget, isEditMode: Bool) -> WidgetDetailRoute
+```
+
+**Rules:**
+- `isEditMode == true` → always returns `.suppressed`. The view layer's tap handler short-circuits and does nothing (taps still reach the existing delete-and-drag chrome inside the card).
+- `widgetType == "appleActivity"` → returns the existing three-state branch (`.appleActivityLive` / `.appleActivityConnectHK` / `.appleActivityPairWatch`) per the existing Activity Rings widget state table (SCREENS.md § Home Screen → Activity Rings widget).
+- All other widget types map 1:1 to their new detail-sheet route value.
+
+**Detail-sheet lifecycle:** Sheets are presented via SwiftUI `.sheet(item:)` from `HomeView`. Sheet ViewModels subscribe to the same Workout Cascade publishers the widget cards already use — when the cascade fires while a sheet is presented, the sheet re-fetches its helpers (StreakService.fetchHeatmap, etc.) and re-renders in place. Sheet dismissal does NOT clear that subscription — it is owned by the sheet's ViewModel lifecycle.
+
+**Footer routing:** When a detail sheet's footer button (`See Info` or `Configure Settings`) is tapped, the sheet dismisses first via its `presentationMode` binding, and the corresponding modal opens after a 0.2s delay (matches the iOS sheet-dismiss animation). Never stacked sheet-on-sheet. Implementation in `HomeViewModel` — sheet ViewModels emit a `RequestFollowupModal` enum event.
 
 ---
 

@@ -44,6 +44,7 @@ final class PlanViewModel {
     // MARK: - Toast
     var showCompletedToast = false
     var showRemovedFromPlanToast = false
+    var showPlannedToast = false
     /// Snapshot for undo of planned/skipped removal (nil for flag-flip variants)
     var removedPlanSnapshot: RemovedPlanSnapshot?
     /// Workout to undo hiddenFromPlan (for logged-only and completed-scheduled variants)
@@ -310,6 +311,12 @@ final class PlanViewModel {
         showScheduleSheet = false
         preSelectedTemplate = nil
         loadWorkoutsForCurrentView(context: context)
+
+        showPlannedToast = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.showPlannedToast = false
+        }
+
         return created
     }
 

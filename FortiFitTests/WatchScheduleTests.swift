@@ -613,10 +613,9 @@ struct RecurrenceRegenerationSyncInheritanceTests {
 @Suite("Phase871CopyRename")
 struct Phase871CopyRenameTests {
 
-    @Test("Settings toggle label uses 'Push' not 'Sync'")
+    @Test("Settings toggle label uses 'Sync to Apple Watch'")
     func settingsToggleLabel_usesPush() {
-        #expect(AppConstants.AppleWatch.settingsToggleLabel.contains("Push"))
-        #expect(!AppConstants.AppleWatch.settingsToggleLabel.contains("Sync"))
+        #expect(AppConstants.AppleWatch.settingsToggleLabel == "Sync to Apple Watch")
     }
 
     @Test("Edit Planned Workout toggle label uses 'Push' not 'Sync'")

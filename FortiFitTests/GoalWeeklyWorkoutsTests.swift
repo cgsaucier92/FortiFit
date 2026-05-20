@@ -177,6 +177,59 @@ struct GoalWeeklyWorkoutsTests {
         #expect(streakAfter.streak == streakBefore.streak)
     }
 
+    // WEEK-011 — Regression for BUG-042: ensureWeeklyGoalCelebration preserves the
+    // first-completion date within the same ISO week instead of overwriting it to today.
+    @Test func ensureCelebration_preservesFirstCompletionDateWithinSameWeek() throws {
+        let context = try makeGoalContext()
+        UserSettings.shared.targetWorkoutsPerWeek = 1
+
+        GoalService.createWeeklyWorkoutsGoal(context: context)
+        let goal = GoalService.fetchAll(context: context).first { $0.goalType == "weeklyWorkouts" }!
+
+        // Log a workout this week so progress.isComplete is true.
+        let monday = Date().startOfWeek
+        let w = Workout(name: "W", date: monday, workoutType: "Strength Training")
+        context.insert(w)
+
+        // Simulate: the goal was already celebrated earlier this week (on Monday).
+        // Use startOfWeek so the date is guaranteed to fall in the current ISO week
+        // regardless of when this test runs.
+        let mondayStart = Calendar.current.startOfDay(for: monday)
+        goal.lastCelebratedDate = mondayStart
+        try context.save()
+
+        GoalService.ensureWeeklyGoalCelebration(context: context)
+
+        let refreshed = GoalService.fetchAll(context: context).first { $0.goalType == "weeklyWorkouts" }!
+        #expect(refreshed.lastCelebratedDate == mondayStart)
+    }
+
+    // WEEK-012 — Regression for BUG-042: ensureWeeklyGoalCelebration DOES advance
+    // lastCelebratedDate when the prior celebration falls in a previous ISO week.
+    @Test func ensureCelebration_advancesAcrossWeekBoundary() throws {
+        let context = try makeGoalContext()
+        UserSettings.shared.targetWorkoutsPerWeek = 1
+
+        GoalService.createWeeklyWorkoutsGoal(context: context)
+        let goal = GoalService.fetchAll(context: context).first { $0.goalType == "weeklyWorkouts" }!
+
+        // Workout this week → progress.isComplete is true.
+        let thisMonday = Date().startOfWeek
+        let w = Workout(name: "W", date: thisMonday, workoutType: "Strength Training")
+        context.insert(w)
+
+        // Prior celebration sits in last week.
+        let lastWeekMonday = Calendar.current.date(byAdding: .day, value: -7, to: thisMonday)!
+        goal.lastCelebratedDate = lastWeekMonday
+        try context.save()
+
+        GoalService.ensureWeeklyGoalCelebration(context: context)
+
+        let refreshed = GoalService.fetchAll(context: context).first { $0.goalType == "weeklyWorkouts" }!
+        let today = Calendar.current.startOfDay(for: Date())
+        #expect(refreshed.lastCelebratedDate == today)
+    }
+
     // WEEK-010 — Recalculates on workout save, edit, AND delete (same triggers as Streak)
     @Test func recalculatesOnSaveEditDelete() throws {
         let context = try makeGoalContext()

@@ -119,6 +119,10 @@ struct FortiFitGoalProgressRing: View {
                 )
                 .rotationEffect(.degrees(-90))
         }
+        // Inset by half the stroke-width delta vs dual-arc (9pt vs 7pt → 1pt) so
+        // the visible outer edge sits at the same radius as the dual-arc ring,
+        // letting the tooltip arrow land identically on both ring types.
+        .padding(6)
     }
 
     private var singleArcColor: Color {

@@ -52,6 +52,15 @@ enum PlanCardItem: Identifiable {
         case .loggedOnly(let w): return w.date
         }
     }
+
+    /// Sort priority within a single day: planned/skipped (0) precede completed/logged (1)
+    /// so finished work sinks to the bottom of the stack and upcoming work stays on top.
+    var dayOrderPriority: Int {
+        switch self {
+        case .scheduled(let sw): return sw.status == "completed" ? 1 : 0
+        case .loggedOnly: return 1
+        }
+    }
 }
 
 // MARK: - Recurrence Scope
@@ -265,7 +274,9 @@ struct PlanService {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    /// Returns all ScheduledWorkouts for today, sorted by scheduledTime then dateCreated.
+    /// Returns all ScheduledWorkouts for today, sorted by status (planned/skipped first,
+    /// completed last — mirrors the Plan tab's day-detail stack order), then within each
+    /// group by scheduledTime ascending and dateCreated.
     static func fetchTodaysScheduledWorkouts(context: ModelContext) -> [ScheduledWorkout] {
         let today = Calendar.current.startOfDay(for: Date())
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
@@ -280,7 +291,15 @@ struct PlanService {
                 SortDescriptor(\.dateCreated, order: .forward)
             ]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        let rows = (try? context.fetch(descriptor)) ?? []
+        // Stable partition: completed rows sink to the bottom; relative scheduledTime/
+        // dateCreated order within each group is preserved by Swift's stable sort.
+        return rows.sorted { lhs, rhs in
+            let lhsCompleted = lhs.status == "completed"
+            let rhsCompleted = rhs.status == "completed"
+            if lhsCompleted == rhsCompleted { return false }
+            return !lhsCompleted
+        }
     }
 
     static func fetchTodaysPlanned(context: ModelContext) -> ScheduledWorkout? {
@@ -335,10 +354,14 @@ struct PlanService {
         let allWorkouts = (try? context.fetch(wDescriptor)) ?? []
         let loggedOnly = allWorkouts.filter { !completedIds.contains($0.id) }
 
-        // 3. Merge and sort by date
+        // 3. Merge and sort by date, then by status priority so completed/logged
+        // items always render after planned/skipped within the same day.
         var items: [PlanCardItem] = scheduledWorkouts.map { .scheduled($0) }
         items.append(contentsOf: loggedOnly.map { .loggedOnly($0) })
-        items.sort { $0.date < $1.date }
+        items.sort { lhs, rhs in
+            if lhs.date != rhs.date { return lhs.date < rhs.date }
+            return lhs.dayOrderPriority < rhs.dayOrderPriority
+        }
 
         return items
     }

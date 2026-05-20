@@ -66,8 +66,7 @@ struct ScheduleWorkoutView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .top) {
+        ZStack(alignment: .top) {
             if templates.isEmpty {
                 VStack {
                     Spacer()
@@ -170,15 +169,15 @@ struct ScheduleWorkoutView: View {
                     }
                 }
             }
-            }
-            .background(FortiFitColors.background)
-            #if os(iOS)
-            .toolbar(.hidden, for: .navigationBar)
-            #endif
-            .onAppear {
-                if pushEnabled {
-                    pushToAppleWatch = true
-                }
+        }
+        .background(FortiFitColors.background)
+        #if os(iOS)
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
+        .swipeToDismiss()
+        .onAppear {
+            if pushEnabled {
+                pushToAppleWatch = true
             }
         }
     }

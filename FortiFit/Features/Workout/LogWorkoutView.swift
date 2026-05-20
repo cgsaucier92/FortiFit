@@ -41,8 +41,8 @@ struct LogWorkoutView: View {
                     .labelsHidden()
                     .tint(FortiFitColors.primaryAccent)
                     .colorScheme(.dark)
-                    .disabled(viewModel.isHealthKitLinked)
-                    .opacity(viewModel.isHealthKitLinked ? 0.5 : 1)
+                    .disabled(viewModel.isHealthKitLinked || viewModel.isCompletingScheduled)
+                    .opacity((viewModel.isHealthKitLinked || viewModel.isCompletingScheduled) ? 0.5 : 1)
 
                     // Workout Type
                     FortiFitLabel("Workout Type", color: FortiFitColors.primaryText)
@@ -55,7 +55,7 @@ struct LogWorkoutView: View {
                     )
                     .frame(width: 220, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .disabled(viewModel.isEditMode)
+                    .disabled(viewModel.isEditMode || viewModel.isCompletingScheduled)
 
                     // RPE
                     HStack(spacing: FortiFitSpacing.elementSpacing) {
@@ -192,6 +192,7 @@ struct LogWorkoutView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .swipeToDismiss()
         .onAppear { viewModel.loadTemplates(context: modelContext) }
         .alert("Name Template", isPresented: $viewModel.showSaveAsTemplatePrompt) {
             TextField("Template name", text: $viewModel.saveAsTemplateName)

@@ -147,7 +147,7 @@ struct PlanView: View {
             .onChange(of: calendarModeString) { _, newValue in
                 viewModel.calendarMode = newValue == "Month" ? .month : .week
             }
-            .sheet(isPresented: $viewModel.showScheduleSheet) {
+            .navigationDestination(isPresented: $viewModel.showScheduleSheet) {
                 ScheduleWorkoutView(
                     preSelectedDate: viewModel.selectedDate,
                     preSelectedTemplate: viewModel.preSelectedTemplate,
@@ -291,6 +291,22 @@ struct PlanView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .allowsHitTesting(false)
             }
+
+            // Workout Planned toast
+            VStack {
+                Text("Workout Planned")
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, FortiFitSpacing.cardPadding)
+                    .padding(.vertical, FortiFitSpacing.elementSpacing)
+                    .background(Capsule().fill(FortiFitColors.primaryAccent))
+                    .padding(.top, FortiFitSpacing.screenTop)
+                Spacer()
+            }
+            .opacity(viewModel.showPlannedToast ? 1 : 0)
+            .offset(y: viewModel.showPlannedToast ? 0 : -60)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.2), value: viewModel.showPlannedToast)
 
             // Undo toast for Remove from Plan
             VStack {

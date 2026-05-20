@@ -188,6 +188,7 @@ struct WorkoutDetailView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .swipeToDismiss()
         .onAppear {
             noteText = workout.note ?? ""
         }
@@ -306,8 +307,10 @@ struct WorkoutDetailView: View {
             }
 
             if (workout.workoutType == "Strength Training" || workout.workoutType == "HIIT") && !workout.exerciseSets.isEmpty {
-                FortiFitDivider()
-                    .padding(.top, FortiFitSpacing.gapSmall)
+                if !cards.isEmpty {
+                    FortiFitDivider()
+                        .padding(.top, FortiFitSpacing.gapSmall)
+                }
 
                 FortiFitWidgetHeader(title: "Exercises")
                     .padding(.top, FortiFitSpacing.gapSmall)

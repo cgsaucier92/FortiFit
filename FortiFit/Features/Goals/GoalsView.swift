@@ -6,7 +6,6 @@ import UniformTypeIdentifiers
 struct GoalsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = GoalsViewModel()
-    @State private var draggingGoalID: UUID?
     @State private var goalIdsToPulse: Set<UUID> = []
     @State private var headerHeight: CGFloat = 0
     private var settings: UserSettings { UserSettings.shared }
@@ -48,20 +47,18 @@ struct GoalsView: View {
                                     }
                                 }
                                 .animation(.easeInOut(duration: 0.2), value: viewModel.isReorderMode)
-                                .opacity(draggingGoalID == goal.id ? 0.5 : 1.0)
                                 .contentShape(Rectangle())
-                                .onDrag {
-                                    guard viewModel.isReorderMode else {
-                                        return NSItemProvider()
-                                    }
-                                    draggingGoalID = goal.id
-                                    return NSItemProvider(object: goal.id.uuidString as NSString)
-                                }
-                                .onDrop(of: [.text], delegate: GoalDropDelegate(
+                                .modifier(GoalReorderModifier(
                                     goal: goal,
-                                    viewModel: viewModel,
-                                    draggingGoalID: $draggingGoalID,
-                                    modelContext: modelContext
+                                    isReorderMode: viewModel.isReorderMode,
+                                    goals: viewModel.goals,
+                                    onReorder: { from, to in
+                                        viewModel.goals.move(
+                                            fromOffsets: IndexSet(integer: from),
+                                            toOffset: to > from ? to + 1 : to
+                                        )
+                                        GoalService.reorder(goals: viewModel.goals, context: modelContext)
+                                    }
                                 ))
                                 .contextMenu {
                                     if !viewModel.isReorderMode {
@@ -144,11 +141,6 @@ struct GoalsView: View {
                     }
                 }
             }
-            // Catch-all: drops landing outside any goal clear the stale drag state
-            .onDrop(of: [.text], isTargeted: nil) { _, _ in
-                draggingGoalID = nil
-                return false
-            }
             .onAppear {
                 viewModel.loadGoals(context: modelContext)
                 // Trigger pulse for goals completed today
@@ -158,9 +150,6 @@ struct GoalsView: View {
             .onDisappear {
                 viewModel.isReorderMode = false
                 viewModel.clearPulsedGoalIds()
-            }
-            .onChange(of: viewModel.isReorderMode) { _, isOn in
-                if !isOn { draggingGoalID = nil }
             }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 4 else { return }
@@ -175,7 +164,6 @@ struct GoalsView: View {
                         viewModel.goalToDelete = nil
                         viewModel.goalToReset = nil
                         viewModel.dismissLegendTooltip()
-                        draggingGoalID = nil
                     }
                 }
             }
@@ -296,7 +284,7 @@ struct GoalsView: View {
         let shouldPulse = goalIdsToPulse.contains(goal.id)
 
         FortiFitCard(
-            borderColor: isComplete ? FortiFitColors.primaryAccent : FortiFitColors.border
+            borderColor: isComplete ? FortiFitColors.positive : FortiFitColors.border
         ) {
             VStack(spacing: FortiFitSpacing.gapSmall) {
                 // Completed label at top center
@@ -349,11 +337,11 @@ struct GoalsView: View {
             }
             .padding(.trailing, viewModel.isReorderMode ? 36 : 0)
         }
-        // 3% blue wash for completed goals
+        // 3% green wash for completed goals (paired with the Positive Green border)
         .overlay {
             if isComplete {
                 RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
-                    .fill(FortiFitColors.primaryAccent.opacity(0.03))
+                    .fill(FortiFitColors.positive.opacity(0.03))
                     .allowsHitTesting(false)
             }
         }
@@ -444,7 +432,8 @@ struct GoalsView: View {
             }
 
         case "weeklyWorkouts":
-            Text("\(viewModel.weeklyWorkoutsTarget) workouts / week")
+            let workoutUnit = viewModel.weeklyWorkoutsTarget == 1 ? "workout" : "workouts"
+            Text("\(viewModel.weeklyWorkoutsTarget) \(workoutUnit) / week")
                 .font(FortiFitTypography.body)
                 .foregroundStyle(FortiFitColors.primaryText)
 
@@ -510,7 +499,7 @@ struct GoalsView: View {
             return Int(clamped * 100)
         }()
 
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             FortiFitGoalProgressRing(
                 progress: progress,
                 goalType: goal.goalType,
@@ -633,41 +622,27 @@ struct GoalsView: View {
     }
 }
 
-// MARK: - Goal Drop Delegate
+// MARK: - Goal Reorder Modifier
 
-private struct GoalDropDelegate: DropDelegate {
+/// Applies reorder behavior only when in reorder mode, so the goal card's
+/// Button wrapper / context menu / pressable style remain intact outside it.
+private struct GoalReorderModifier: ViewModifier {
     let goal: Goal
-    let viewModel: GoalsViewModel
-    @Binding var draggingGoalID: UUID?
-    let modelContext: ModelContext
+    let isReorderMode: Bool
+    let goals: [Goal]
+    let onReorder: (Int, Int) -> Void
 
-    func performDrop(info: DropInfo) -> Bool {
-        draggingGoalID = nil
-        return true
-    }
-
-    func dropEntered(info: DropInfo) {
-        guard let draggingID = draggingGoalID,
-              draggingID != goal.id,
-              let fromIndex = viewModel.goals.firstIndex(where: { $0.id == draggingID }),
-              let toIndex = viewModel.goals.firstIndex(where: { $0.id == goal.id })
-        else { return }
-
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
-
-        withAnimation(.easeInOut(duration: 0.2)) {
-            viewModel.goals.move(
-                fromOffsets: IndexSet(integer: fromIndex),
-                toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
+    func body(content: Content) -> some View {
+        if isReorderMode {
+            content.reorderableCard(
+                payload: goal.id,
+                in: goals,
+                identifiedBy: \.id,
+                onReorder: onReorder
             )
-            GoalService.reorder(goals: viewModel.goals, context: modelContext)
+        } else {
+            content
         }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
     }
 }
 

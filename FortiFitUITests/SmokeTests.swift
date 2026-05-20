@@ -1822,7 +1822,7 @@ final class ActivityRingsWidgetSmokeTests: XCTestCase {
 
     // MARK: - Smoke AR-5: Configure Settings Modal
 
-    /// Opening Configure Settings from context menu shows sliders, Reset, and Import buttons.
+    /// Opening Configure Settings from context menu shows sliders, Import, and Done buttons (Phase 8.8: Reset removed).
     func test_activityRingsWidget_configureSettings_showsSlidersAndButtons() {
         app.tabBars.buttons["DASHBOARD"].tap()
 
@@ -1849,11 +1849,11 @@ final class ActivityRingsWidgetSmokeTests: XCTestCase {
         let standSlider = app.sliders["activityRingsSettings_standSlider"]
         XCTAssertTrue(standSlider.exists, "Stand slider should be present")
 
-        let resetButton = app.buttons["activityRingsSettings_resetButton"]
-        XCTAssertTrue(resetButton.exists, "Reset to defaults button should be present")
-
         let importButton = app.buttons["activityRingsSettings_importButton"]
         XCTAssertTrue(importButton.exists, "Import from Apple Health button should be present")
+
+        let doneButton = app.buttons["activityRingsSettings_doneButton"]
+        XCTAssertTrue(doneButton.exists, "Done button should be present (Phase 8.8 replaces Reset to defaults)")
     }
 
     // MARK: - Smoke AR-6: Delete Widget

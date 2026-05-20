@@ -77,17 +77,7 @@ struct ActivityRingsSettingsModal: View {
                     identifier: AccessibilityID.activityRingsSettings_standSlider
                 )
 
-                // Reset button
-                FortiFitButton(AppConstants.ActivityRings.settingsModalResetButton, style: .outline) {
-                    withAnimation {
-                        settings.targetMoveCalories = AppConstants.ActivityRings.moveDefault
-                        settings.targetExerciseMinutes = AppConstants.ActivityRings.exerciseDefault
-                        settings.targetStandHours = AppConstants.ActivityRings.standDefault
-                    }
-                }
-                .accessibilityIdentifier(AccessibilityID.activityRingsSettings_resetButton)
-
-                // Import button
+                // Phase 8.8: Import from Apple Health is now first action (directly below Stand slider)
                 VStack(spacing: FortiFitSpacing.elementSpacing) {
                     FortiFitButton(AppConstants.ActivityRings.settingsModalImportButton, style: .primary) {
                         Task {
@@ -104,6 +94,12 @@ struct ActivityRingsSettingsModal: View {
                             .foregroundStyle(FortiFitColors.mutedText)
                     }
                 }
+
+                // Phase 8.8: Done button (outlined) replaces the previous Reset to defaults button
+                FortiFitButton(AppConstants.SettingsModal.doneButtonLabel, style: .outline) {
+                    onDismiss()
+                }
+                .accessibilityIdentifier(AccessibilityID.activityRingsSettings_doneButton)
             }
             .padding(FortiFitSpacing.cardPadding)
             .background(

@@ -299,6 +299,49 @@ enum AppConstants {
 
     static let powerLevelStatuses = ["Deloading", "Steady", "Rising"]
 
+    enum PowerLevel {
+        /// Copy templates keyed by nudge archetype rawValue (plus `risingNoTop` fallback variant).
+        /// Templates use `{placeholder}` syntax interpolated at the view layer.
+        static let nudgeCopy: [String: String] = [
+            "deloading":  "You've logged {currentSessionCount30d} sessions in the last 30 days vs {previousSessionCount30d} in the prior 30. Adding 1 Strength or HIIT session this week can stabilize your volume.",
+            "steady":     "Volume on {topExerciseName} is flat over the last 30 days. Adding ~5% weight or 1\u{2013}2 reps could push you into Rising.",
+            "rising":     "Up {deltaPct}% this month \u{2014} hold your current {avgSessionsPerWeek30d} sessions/week to keep climbing. {topExerciseName} is your biggest gainer.",
+            "risingNoTop":"Up {deltaPct}% this month \u{2014} hold your current {avgSessionsPerWeek30d} sessions/week to keep climbing.",
+            "coldStart":  "Log a few more Strength or HIIT workouts to unlock personalized suggestions.",
+            "noBaseline": "Power Level trend comparisons use the prior 30 days as a baseline. Keep logging \u{2014} once you\u{2019}ve entered enough exercise data, you\u{2019}ll see personalized trend advice here."
+        ]
+    }
+
+    // MARK: - Settings Modal Done Button (Phase 8.8)
+
+    enum SettingsModal {
+        static let doneButtonLabel = "Done"
+    }
+
+    // MARK: - Widget Detail Sheet Empty States (Phase 8.8)
+
+    enum WidgetDetail {
+        enum EmptyState {
+            // Today's Plan
+            static let todaysPlanNoWorkouts = "No workouts planned for today."
+            // `todaysPlanScheduleChip` retired — the "+ Schedule another workout for today" chip
+            // was removed from the Today's Plan Detail Sheet (Phase 8.8 follow-up). Users schedule
+            // additional workouts via the Plan tab.
+            // Training Load
+            static let trainingLoadChart = "Not enough data yet to chart your daily training load. Keep logging."
+            static let trainingLoadContributingWorkouts = "No workouts in the last 7 days."
+            static let trainingLoadColdStart = "Log a few more workouts with exercises to see your training load breakdown."
+            // Weekly Streak
+            static let weeklyStreakThisWeekTargetZero = "Set a weekly workout target in Configure Settings to see this week's progress."
+            static let weeklyStreakHeatmap = "Log a workout to start your streak history."
+            static let weeklyStreakHeroSubline = "Hit your weekly target to start a streak."
+            // Power Level
+            static let powerLevelHero = "Log a few more Strength or HIIT workouts to see your power level."
+            static let powerLevelVolumeChart = "Log more Strength or HIIT workouts to display volume trends."
+            static let powerLevelTopExercises = "Log a few more sessions on the same exercises to surface your top drivers."
+        }
+    }
+
     // MARK: - Chart Types (Trends Screen)
 
     static let trendsChartTypes = [
@@ -610,8 +653,8 @@ enum AppConstants {
 
     enum AppleWatch {
         // Settings Section
-        static let settingsToggleLabel = "Push Planned Workouts to Apple Watch"
-        static let settingsDescription = "Permit FitNavi to snyc planned workouts to the Workout app on Apple Watch. Requires watchOS 11 or later."
+        static let settingsToggleLabel = "Sync to Apple Watch"
+        static let settingsDescription = "Permit FitNavi to push your planned workouts to the Workout app on Apple Watch. Requires watchOS 11 or later."
         static let settingsStatusConnected = "Connected"
         static let settingsStatusDenied = "Permission denied in iOS Settings"
         static let settingsStatusOff = "Off"
@@ -698,12 +741,12 @@ enum AppConstants {
         static let settingsModalMoveSliderLabel = "Move Goal (calories)"
         static let settingsModalExerciseSliderLabel = "Exercise Goal (minutes)"
         static let settingsModalStandSliderLabel = "Stand Goal (hours)"
-        static let settingsModalResetButton = "Reset to defaults"
+        // `settingsModalResetButton` retired in Phase 8.8 — Reset to defaults button removed entirely.
         static let settingsModalImportButton = "Import from Apple Health"
         static let settingsModalImportDisabledCaption = "Connect Apple Health to import your goals."
 
         // Activity Detail Sheet
-        static let detailSheetHeading = "Activity"
+        static let detailSheetHeading = "Activity Insights"
         static let detailSheetRangeToggle7d = "7 days"
         static let detailSheetRangeToggle30d = "30 days"
         static let detailSheetMoveSparklineLabel = "Move"

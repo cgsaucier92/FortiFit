@@ -2,12 +2,41 @@ import Foundation
 import Observation
 import SwiftData
 
+// MARK: - Widget Tap Routing (Phase 8.8)
+
+/// Result of resolving a widget tap. Returned by `HomeViewModel.tapRoute(for:isEditMode:)`.
+/// The view layer pattern-matches and presents the corresponding sheet or navigation.
+enum WidgetDetailRoute: String, Equatable, Identifiable {
+    case todaysPlan
+    case trainingLoad
+    case weeklyStreak
+    case powerLevel
+    case appleActivityLive
+    case appleActivityConnectHK
+    case appleActivityPairWatch
+    case suppressed
+
+    var id: String { rawValue }
+}
+
+/// Follow-up modal a detail sheet wants the host (HomeView) to open after the sheet dismisses.
+/// Used to avoid stacked sheet-on-sheet by routing via the 0.2s sheet-dismiss-then-modal handoff.
+enum WidgetFollowupModal: String, Equatable {
+    case trainingLoadSeeInfo
+    case trainingLoadSettings
+    case weeklyStreakSettings
+    case powerLevelSeeInfo
+    case activityRingsSeeInfo
+    case activityRingsSettings
+}
+
 @Observable
 final class HomeViewModel {
     // MARK: - Widget Data
     var activeWidgets: [HomeWidget] = []
     var isEditMode: Bool = false
     var showAddWidgetMenu: Bool = false
+    var presentedSheet: WidgetDetailRoute?
 
     // MARK: - Widget Content Data
     var loadResult = ExerciseLoadService.LoadResult(
@@ -102,5 +131,29 @@ final class HomeViewModel {
 
     func exitEditMode() {
         isEditMode = false
+    }
+
+    // MARK: - Widget Tap Routing (Phase 8.8)
+
+    /// Resolves the route to take when a widget card is tapped. Returns `.suppressed` in edit mode.
+    /// Activity Rings branches on its live/HK-off/Watch-missing state, decided by the caller.
+    func tapRoute(for widget: HomeWidget, isEditMode: Bool, appleActivityLive: Bool = false, healthKitEnabled: Bool = false) -> WidgetDetailRoute {
+        if isEditMode { return .suppressed }
+        switch widget.widgetType {
+        case "todaysPlan":
+            return .todaysPlan
+        case "trainingLoad":
+            return .trainingLoad
+        case "weekStreak":
+            return .weeklyStreak
+        case "powerLevel":
+            return .powerLevel
+        case "appleActivity":
+            if appleActivityLive { return .appleActivityLive }
+            if !healthKitEnabled { return .appleActivityConnectHK }
+            return .appleActivityPairWatch
+        default:
+            return .suppressed
+        }
     }
 }

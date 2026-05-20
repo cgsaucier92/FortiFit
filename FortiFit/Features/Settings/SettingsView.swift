@@ -99,6 +99,7 @@ struct SettingsView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .swipeToDismiss()
     }
 
     // MARK: - Apple Watch Section
@@ -198,7 +199,7 @@ struct SettingsView: View {
                     .tint(FortiFitColors.primaryAccent)
                     .accessibilityIdentifier(AccessibilityID.settingsAppleHealthToggle)
 
-                    Text("Import workouts from Apple Watch and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk.")
+                    Text("Import workouts from Apple Fitness and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk.")
                         .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
 

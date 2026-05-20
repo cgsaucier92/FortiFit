@@ -743,7 +743,7 @@ struct TrendsChartService {
             guard let maxWeight = matchingSets.compactMap(\.weightKg).max() else { continue }
             let displayWeight = useLbs ? maxWeight * UnitConversion.kgToLbsFactor : maxWeight
             let unit = useLbs ? "lbs" : "kg"
-            points.append(ChartDataPoint(x: calendar.startOfDay(for: workout.date), y: displayWeight, label: "\(Int(displayWeight.rounded())) \(unit)"))
+            points.append(ChartDataPoint(x: calendar.startOfDay(for: workout.date), y: displayWeight, label: "\(formattedInt(displayWeight)) \(unit)"))
         }
         return points
     }
@@ -769,7 +769,7 @@ struct TrendsChartService {
         return weekCounts.map { entry in
             let formatter = DateFormatter()
             formatter.dateFormat = "M/d"
-            return ChartDataPoint(x: entry.weekStart, y: Double(entry.count), label: "\(entry.count) sessions")
+            return ChartDataPoint(x: entry.weekStart, y: Double(entry.count), label: "\(formattedInt(Double(entry.count))) sessions")
         }
     }
 
@@ -790,7 +790,7 @@ struct TrendsChartService {
                 now: dayNow
             )
             let zone = ExerciseLoadService.classifyZone(score: result.score)
-            points.append(ChartDataPoint(x: day, y: result.score, label: "\(Int(result.score.rounded())) — \(zone.zone)"))
+            points.append(ChartDataPoint(x: day, y: result.score, label: "\(formattedInt(result.score)) — \(zone.zone)"))
         }
         return points
     }
@@ -806,7 +806,7 @@ struct TrendsChartService {
                   !workout.exerciseSets.isEmpty else { continue }
             var volume = PowerLevelService.workoutVolume(for: workout)
             if useLbs { volume *= UnitConversion.kgToLbsFactor }
-            points.append(ChartDataPoint(x: workout.date, y: volume, label: "\(Int(volume.rounded())) \(unit)"))
+            points.append(ChartDataPoint(x: workout.date, y: volume, label: "\(formattedInt(volume)) \(unit)"))
         }
         return points
     }
@@ -849,7 +849,7 @@ struct TrendsChartService {
             let durs = workouts.filter { $0.date >= weekStart && $0.date <= endOfWeek && $0.durationMinutes != nil }.compactMap(\.durationMinutes)
             if !durs.isEmpty {
                 let avg = Double(durs.reduce(0, +)) / Double(durs.count)
-                weekData.append(ChartDataPoint(x: weekStart, y: avg, label: "\(Int(avg.rounded())) min"))
+                weekData.append(ChartDataPoint(x: weekStart, y: avg, label: "\(formattedInt(avg)) min"))
             }
             guard let next = isoCalendar.date(byAdding: .weekOfYear, value: 1, to: weekStart) else { break }
             weekStart = next
@@ -858,6 +858,19 @@ struct TrendsChartService {
     }
 
     // MARK: - Private
+
+    private static let groupedIntFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.groupingSeparator = ","
+        f.maximumFractionDigits = 0
+        return f
+    }()
+
+    private static func formattedInt(_ value: Double) -> String {
+        let rounded = NSNumber(value: Int(value.rounded()))
+        return groupedIntFormatter.string(from: rounded) ?? "\(Int(value.rounded()))"
+    }
 
     private static func forEachCompletedWeek(_ body: (_ weekStart: Date, _ endOfWeek: Date) -> Void) {
         var calendar = Calendar(identifier: .iso8601)

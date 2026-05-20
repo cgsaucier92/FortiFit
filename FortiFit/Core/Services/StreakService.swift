@@ -107,4 +107,145 @@ struct StreakService {
             settings.longestStreak = streak
         }
     }
+
+    // MARK: - Weekly Streak Insights Helpers (Phase 8.8)
+
+    enum HeatmapCellStatus {
+        case untracked
+        case belowTarget
+        case targetMet
+        case inProgress
+    }
+
+    struct StreakHeatmapCell: Hashable {
+        let weekStartDate: Date
+        let workoutCount: Int
+        let target: Int
+        let isCurrentWeek: Bool
+        let isUntracked: Bool
+
+        var status: HeatmapCellStatus {
+            if isUntracked { return .untracked }
+            if isCurrentWeek { return .inProgress }
+            return workoutCount >= target ? .targetMet : .belowTarget
+        }
+    }
+
+    struct ThisWeekProgress {
+        let currentCount: Int
+        let target: Int
+        let daysRemainingThisWeek: Int
+    }
+
+    struct StreakHistorySummary {
+        let currentStreak: Int
+        let longestStreakAllTime: Int
+        let totalWeeksLogged: Int
+        let unlockedMilestones: [Int]
+        let nextUnlockedMilestone: Int?
+    }
+
+    /// Milestone marks (in weeks) for the Weekly Streak Insights Sheet milestone shelf.
+    static let milestoneMarks: [Int] = [1, 4, 12, 26, 52]
+
+    /// Returns `weeks` heatmap cells, oldest week last (index 0 = current/most-recent week).
+    static func fetchHeatmap(context: ModelContext, weeks: Int = 26, referenceDate: Date = Date(), target: Int? = nil) -> [StreakHeatmapCell] {
+        let target = target ?? UserSettings.shared.targetWorkoutsPerWeek
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.firstWeekday = 2
+
+        let allWorkouts = WorkoutService.fetchAll(context: context)
+        let firstWorkoutDate = allWorkouts.map(\.date).min()
+
+        let currentWeekStart = referenceDate.startOfWeek
+
+        var cells: [StreakHeatmapCell] = []
+        for index in 0..<weeks {
+            guard let weekStart = calendar.date(byAdding: .weekOfYear, value: -index, to: currentWeekStart) else {
+                continue
+            }
+            let weekEnd = endOfWeek(from: weekStart, calendar: calendar)
+            let count = allWorkouts.filter { $0.date >= weekStart && $0.date <= weekEnd }.count
+            let isCurrent = index == 0
+            let isUntracked: Bool
+            if let first = firstWorkoutDate {
+                let firstWeekStart = first.startOfWeek
+                isUntracked = weekStart < firstWeekStart
+            } else {
+                // No workouts logged ever — every cell is untracked except current week which renders in-progress
+                isUntracked = !isCurrent
+            }
+            cells.append(StreakHeatmapCell(
+                weekStartDate: weekStart,
+                workoutCount: count,
+                target: target,
+                isCurrentWeek: isCurrent,
+                isUntracked: isUntracked
+            ))
+        }
+        return cells
+    }
+
+    /// Returns the in-progress current-week count, target, and days remaining (0–6).
+    static func thisWeekProgress(context: ModelContext, referenceDate: Date = Date(), target: Int? = nil) -> ThisWeekProgress {
+        let target = target ?? UserSettings.shared.targetWorkoutsPerWeek
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.firstWeekday = 2
+
+        let weekStart = referenceDate.startOfWeek
+        let weekEnd = endOfWeek(from: weekStart, calendar: calendar)
+        let workouts = WorkoutService.fetchAll(context: context)
+        let count = workouts.filter { $0.date >= weekStart && $0.date <= weekEnd }.count
+
+        let endOfToday = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: referenceDate) ?? referenceDate
+        let interval = weekEnd.timeIntervalSince(endOfToday)
+        let daysRemaining: Int
+        if interval <= 0 {
+            daysRemaining = 0
+        } else {
+            daysRemaining = min(max(Int(round(interval / 86400.0)), 0), 6)
+        }
+
+        return ThisWeekProgress(currentCount: count, target: target, daysRemainingThisWeek: daysRemaining)
+    }
+
+    /// Aggregates current/longest streaks, total qualifying historical weeks, and milestone progress.
+    static func historySummary(context: ModelContext, referenceDate: Date = Date(), target: Int? = nil) -> StreakHistorySummary {
+        let settings = UserSettings.shared
+        let target = target ?? settings.targetWorkoutsPerWeek
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.firstWeekday = 2
+
+        let allWorkouts = WorkoutService.fetchAll(context: context)
+        let firstWorkoutDate = allWorkouts.map(\.date).min()
+        let currentWeekStart = referenceDate.startOfWeek
+
+        var totalWeeksLogged = 0
+        if target > 0, let first = firstWorkoutDate {
+            var weekStart = first.startOfWeek
+            while weekStart < currentWeekStart {
+                let weekEnd = endOfWeek(from: weekStart, calendar: calendar)
+                let count = allWorkouts.filter { $0.date >= weekStart && $0.date <= weekEnd }.count
+                if count >= target { totalWeeksLogged += 1 }
+                guard let next = calendar.date(byAdding: .weekOfYear, value: 1, to: weekStart) else { break }
+                weekStart = next
+            }
+            // Include current in-progress week if it already meets target
+            let currentEnd = endOfWeek(from: currentWeekStart, calendar: calendar)
+            let currentCount = allWorkouts.filter { $0.date >= currentWeekStart && $0.date <= currentEnd }.count
+            if currentCount >= target { totalWeeksLogged += 1 }
+        }
+
+        let current = settings.currentStreak
+        let unlocked = milestoneMarks.filter { $0 <= current }
+        let next = milestoneMarks.first { $0 > current }
+
+        return StreakHistorySummary(
+            currentStreak: current,
+            longestStreakAllTime: settings.longestStreak,
+            totalWeeksLogged: totalWeeksLogged,
+            unlockedMilestones: unlocked,
+            nextUnlockedMilestone: next
+        )
+    }
 }

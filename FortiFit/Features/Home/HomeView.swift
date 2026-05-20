@@ -7,7 +7,6 @@ struct HomeView: View {
     @State private var viewModel = HomeViewModel()
     @State private var workoutVM = WorkoutViewModel()
     @State private var showSettings = false
-    @State private var draggingWidgetType: String?
     @State private var seeInfoWidgetType: String?
     @State private var showTrainingLoadSettings = false
     @State private var showStreakSettings = false
@@ -22,6 +21,9 @@ struct HomeView: View {
     @State private var showPlanCompletion = false
     @State private var planCompletionRPE: Int? = nil
     @State private var planCompletionDuration: String = ""
+
+    // Phase 8.8 — Widget Detail Sheets
+    @State private var presentedDetailSheet: WidgetDetailRoute?
 
     private var loadColor: Color {
         Color(hex: viewModel.loadResult.zoneColor)
@@ -96,11 +98,6 @@ struct HomeView: View {
                                 viewModel.isEditMode = false
                             }
                         }
-                    }
-                    // Catch-all: drops landing outside any widget clear the stale drag state
-                    .onDrop(of: [.text], isTargeted: nil) { _, _ in
-                        draggingWidgetType = nil
-                        return false
                     }
 
                     // Header (floats on top of scroll content)
@@ -185,9 +182,6 @@ struct HomeView: View {
                 activityService.refreshWorkoutContributions(context: modelContext)
             }
             .onDisappear { viewModel.isEditMode = false }
-            .onChange(of: viewModel.isEditMode) { _, isOn in
-                if !isOn { draggingWidgetType = nil }
-            }
             .onChange(of: selectedTab) { oldValue, _ in
                 guard oldValue == 0 else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -204,6 +198,7 @@ struct HomeView: View {
                         showStreakSettings = false
                         showActivityRingsSettings = false
                         showActivityDetailSheet = false
+                        presentedDetailSheet = nil
                     }
                 }
             }
@@ -259,11 +254,122 @@ struct HomeView: View {
                 }
             }
             .sheet(isPresented: $showActivityDetailSheet) {
-                ActivityDetailSheet(activityService: activityService)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    .presentationBackground(FortiFitColors.cardSurface)
+                ActivityDetailSheet(
+                    activityService: activityService,
+                    onSeeInfo: {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            seeInfoWidgetType = "appleActivity"
+                        }
+                    },
+                    onConfigureSettings: {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            showActivityRingsSettings = true
+                        }
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(FortiFitColors.cardSurface)
             }
+            .sheet(item: $presentedDetailSheet) { route in
+                widgetDetailSheet(for: route)
+            }
+        }
+    }
+
+    // MARK: - Widget Detail Sheet Routing (Phase 8.8)
+
+    private func handleWidgetTap(_ widget: HomeWidget) {
+        let route = viewModel.tapRoute(
+            for: widget,
+            isEditMode: viewModel.isEditMode,
+            appleActivityLive: activityService.widgetState == .liveRings,
+            healthKitEnabled: settings.healthKitEnabled
+        )
+        switch route {
+        case .suppressed:
+            return
+        case .appleActivityLive:
+            showActivityDetailSheet = true
+        case .appleActivityConnectHK:
+            showSettings = true
+        case .appleActivityPairWatch:
+            return
+        case .todaysPlan, .trainingLoad, .weeklyStreak, .powerLevel:
+            presentedDetailSheet = route
+        }
+    }
+
+    @ViewBuilder
+    private func widgetDetailSheet(for route: WidgetDetailRoute) -> some View {
+        switch route {
+        case .todaysPlan:
+            FortiFitTodaysPlanDetailSheet(
+                onNavigateToCompletedWorkout: { workoutId in
+                    navigateToWorkout(workoutId: workoutId)
+                },
+                onModifyExercises: { scheduled in
+                    prepareLogWorkoutFromScheduled(scheduled)
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(FortiFitColors.cardSurface)
+        case .trainingLoad:
+            FortiFitTrainingLoadDetailSheet(
+                onSeeInfo: {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        seeInfoWidgetType = "trainingLoad"
+                    }
+                },
+                onConfigureSettings: {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        showTrainingLoadSettings = true
+                    }
+                },
+                onNavigateToWorkout: { workoutId in
+                    navigateToWorkout(workoutId: workoutId)
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(FortiFitColors.cardSurface)
+        case .weeklyStreak:
+            FortiFitWeeklyStreakDetailSheet(
+                onConfigureSettings: {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        showStreakSettings = true
+                    }
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(FortiFitColors.cardSurface)
+        case .powerLevel:
+            FortiFitPowerLevelDetailSheet(
+                onSeeInfo: {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        seeInfoWidgetType = "powerLevel"
+                    }
+                },
+                onNavigateToStrengthTracker: { _ in
+                    // Reserved: deep-link to Trends → Strength Tracker chart detail pre-filtered to that exercise.
+                    // No-op for now — exits to Home tab.
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(FortiFitColors.cardSurface)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func navigateToWorkout(workoutId: UUID) {
+        let predicate = #Predicate<Workout> { $0.id == workoutId }
+        let descriptor = FetchDescriptor<Workout>(predicate: predicate)
+        if let workout = (try? modelContext.fetch(descriptor))?.first {
+            workoutVM.selectedWorkout = workout
         }
     }
 
@@ -273,11 +379,19 @@ struct HomeView: View {
         Group {
             if viewModel.isEditMode {
                 widgetContent(for: widget)
+                    .reorderableCard(
+                        payload: widget.widgetType,
+                        in: viewModel.activeWidgets,
+                        identifiedBy: \.widgetType
+                    ) { fromIndex, toIndex in
+                        var types = viewModel.activeWidgets.map(\.widgetType)
+                        types.move(fromOffsets: IndexSet(integer: fromIndex),
+                                   toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+                        viewModel.reorderWidgets(orderedTypes: types, context: modelContext)
+                    }
             } else {
                 Button(action: {
-                    if widget.widgetType == "appleActivity" && activityService.widgetState == .liveRings {
-                        showActivityDetailSheet = true
-                    }
+                    handleWidgetTap(widget)
                 }) {
                     widgetContent(for: widget)
                 }
@@ -292,22 +406,8 @@ struct HomeView: View {
                     .padding(.trailing, FortiFitSpacing.cardPadding)
             }
         }
-        .opacity(draggingWidgetType == widget.widgetType ? 0.5 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isEditMode)
         .contentShape(Rectangle())
-        .onDrag {
-            guard viewModel.isEditMode else {
-                return NSItemProvider()
-            }
-            draggingWidgetType = widget.widgetType
-            return NSItemProvider(object: widget.widgetType as NSString)
-        }
-        .onDrop(of: [.text], delegate: WidgetDropDelegate(
-            widget: widget,
-            viewModel: viewModel,
-            draggingWidgetType: $draggingWidgetType,
-            modelContext: modelContext
-        ))
         .contextMenu {
             if !viewModel.isEditMode {
                 if widget.widgetType == "todaysPlan" && viewModel.currentPlannedWorkout != nil {
@@ -641,6 +741,12 @@ struct HomeView: View {
                     .foregroundStyle(FortiFitColors.mutedText)
                 }
             }
+
+            // Phase 8.8 — Done button
+            FortiFitButton(AppConstants.SettingsModal.doneButtonLabel, style: .outline) {
+                dismissTrainingLoadSettings()
+            }
+            .accessibilityIdentifier(AccessibilityID.trainingLoadSettings_doneButton)
         }
     }
 
@@ -683,6 +789,12 @@ struct HomeView: View {
                     .foregroundStyle(FortiFitColors.mutedText)
                 }
             }
+
+            // Phase 8.8 — Done button
+            FortiFitButton(AppConstants.SettingsModal.doneButtonLabel, style: .outline) {
+                dismissStreakSettings()
+            }
+            .accessibilityIdentifier(AccessibilityID.weeklyStreakSettings_doneButton)
         }
     }
 
@@ -794,42 +906,6 @@ struct HomeView: View {
 private struct SeeInfoWidgetID: Identifiable {
     let widgetType: String
     var id: String { widgetType }
-}
-
-// MARK: - Widget Drop Delegate
-
-private struct WidgetDropDelegate: DropDelegate {
-    let widget: HomeWidget
-    let viewModel: HomeViewModel
-    @Binding var draggingWidgetType: String?
-    let modelContext: ModelContext
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggingWidgetType = nil
-        return true
-    }
-
-    func dropEntered(info: DropInfo) {
-        guard let dragging = draggingWidgetType,
-              dragging != widget.widgetType,
-              let fromIndex = viewModel.activeWidgets.firstIndex(where: { $0.widgetType == dragging }),
-              let toIndex = viewModel.activeWidgets.firstIndex(where: { $0.widgetType == widget.widgetType })
-        else { return }
-
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
-
-        withAnimation(.easeInOut(duration: 0.2)) {
-            var types = viewModel.activeWidgets.map(\.widgetType)
-            types.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-            viewModel.reorderWidgets(orderedTypes: types, context: modelContext)
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
 }
 
 // MARK: - Notification Names

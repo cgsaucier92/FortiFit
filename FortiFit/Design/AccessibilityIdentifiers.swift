@@ -178,8 +178,13 @@ enum AccessibilityID {
     static let activityRingsSettings_moveSlider = "activityRingsSettings_moveSlider"
     static let activityRingsSettings_exerciseSlider = "activityRingsSettings_exerciseSlider"
     static let activityRingsSettings_standSlider = "activityRingsSettings_standSlider"
-    static let activityRingsSettings_resetButton = "activityRingsSettings_resetButton"
     static let activityRingsSettings_importButton = "activityRingsSettings_importButton"
+    static let activityRingsSettings_doneButton = "activityRingsSettings_doneButton"
+
+    // MARK: - Settings Modal Done Buttons (Phase 8.8)
+
+    static let weeklyStreakSettings_doneButton = "weeklyStreakSettings_doneButton"
+    static let trainingLoadSettings_doneButton = "trainingLoadSettings_doneButton"
 
     // MARK: - Activity Detail Sheet
 
@@ -190,6 +195,75 @@ enum AccessibilityID {
     static let activityDetailSheet_exerciseSparkline = "activityDetailSheet_exerciseSparkline"
     static let activityDetailSheet_standSparkline = "activityDetailSheet_standSparkline"
     static let activityDetailSheet_closureHeatmap = "activityDetailSheet_closureHeatmap"
+    static let activityDetailSheet_seeInfoButton = "activityDetailSheet_seeInfoButton"
+    static let activityDetailSheet_configureSettingsButton = "activityDetailSheet_configureSettingsButton"
+
+    // MARK: - Today's Plan Detail Sheet (Phase 8.8)
+
+    static let todaysPlanDetailSheet_closeButton = "todaysPlanDetailSheet_closeButton"
+    static let todaysPlanDetailSheet_emptyState = "todaysPlanDetailSheet_emptyState"
+    // `todaysPlanDetailSheet_scheduleMoreButton` retired — chip removed from the Today's Plan
+    // Detail Sheet (Phase 8.8 follow-up).
+
+    static func todaysPlanDetailSheet_rowCompleteButton(scheduledWorkoutId: UUID) -> String {
+        "todaysPlanDetailSheet_row_\(scheduledWorkoutId.uuidString)_completeButton"
+    }
+
+    // MARK: - Training Load Detail Sheet (Phase 8.8)
+
+    static let trainingLoadDetailSheet_closeButton = "trainingLoadDetailSheet_closeButton"
+    static let trainingLoadDetailSheet_hero = "trainingLoadDetailSheet_hero"
+    static let trainingLoadDetailSheet_dailyChart = "trainingLoadDetailSheet_dailyChart"
+    static let trainingLoadDetailSheet_chartSelectionAnnotation = "trainingLoadDetailSheet_chartSelectionAnnotation"
+
+    static func trainingLoadDetailSheet_chartDataPoint(_ index: Int) -> String {
+        "trainingLoadDetailSheet_chartDataPoint_\(index)"
+    }
+
+    static let trainingLoadDetailSheet_contributingWorkouts = "trainingLoadDetailSheet_contributingWorkouts"
+    static let trainingLoadDetailSheet_weekComparison = "trainingLoadDetailSheet_weekComparison"
+    static let trainingLoadDetailSheet_recoveryCallout = "trainingLoadDetailSheet_recoveryCallout"
+    static let trainingLoadDetailSheet_seeInfoButton = "trainingLoadDetailSheet_seeInfoButton"
+    static let trainingLoadDetailSheet_configureSettingsButton = "trainingLoadDetailSheet_configureSettingsButton"
+    static let trainingLoadDetailSheet_emptyState_coldStart = "trainingLoadDetailSheet_emptyState_coldStart"
+
+    // MARK: - Weekly Streak Insights Sheet (Phase 8.8)
+
+    static let weeklyStreakDetailSheet_closeButton = "weeklyStreakDetailSheet_closeButton"
+    static let weeklyStreakDetailSheet_hero = "weeklyStreakDetailSheet_hero"
+    static let weeklyStreakDetailSheet_statRow = "weeklyStreakDetailSheet_statRow"
+    static let weeklyStreakDetailSheet_thisWeekRing = "weeklyStreakDetailSheet_thisWeekRing"
+    static let weeklyStreakDetailSheet_heatmap = "weeklyStreakDetailSheet_heatmap"
+    static let weeklyStreakDetailSheet_milestoneShelf = "weeklyStreakDetailSheet_milestoneShelf"
+    static let weeklyStreakDetailSheet_configureSettingsButton = "weeklyStreakDetailSheet_configureSettingsButton"
+
+    static func weeklyStreakDetailSheet_heatmapCell(_ index: Int) -> String {
+        "weeklyStreakDetailSheet_heatmap_cell_\(index)"
+    }
+
+    static func weeklyStreakDetailSheet_milestone(_ mark: Int) -> String {
+        "weeklyStreakDetailSheet_milestone_\(mark)"
+    }
+
+    // MARK: - Power Level Breakdown Sheet (Phase 8.8)
+
+    static let powerLevelDetailSheet_closeButton = "powerLevelDetailSheet_closeButton"
+    static let powerLevelDetailSheet_hero = "powerLevelDetailSheet_hero"
+    static let powerLevelDetailSheet_volumeChart = "powerLevelDetailSheet_volumeChart"
+    static let powerLevelDetailSheet_topExercises = "powerLevelDetailSheet_topExercises"
+    static let powerLevelDetailSheet_windowComparison = "powerLevelDetailSheet_windowComparison"
+    static let powerLevelDetailSheet_nudge = "powerLevelDetailSheet_nudge"
+    static let powerLevelDetailSheet_seeInfoButton = "powerLevelDetailSheet_seeInfoButton"
+
+    static func powerLevelDetailSheet_topExerciseRow(_ index: Int) -> String {
+        "powerLevelDetailSheet_topExerciseRow_\(index)"
+    }
+
+    static let powerLevelDetailSheet_chartSelectionAnnotation = "powerLevelDetailSheet_chartSelectionAnnotation"
+
+    static func powerLevelDetailSheet_chartDataPoint(_ index: Int) -> String {
+        "powerLevelDetailSheet_chartDataPoint_\(index)"
+    }
 
     // MARK: - Trends
 

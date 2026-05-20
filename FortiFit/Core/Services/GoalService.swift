@@ -357,7 +357,7 @@ struct GoalService {
             GoalSnapshotService.recomputeSnapshot(goal: weeklyGoal, date: Date(), context: context)
             let progress = weeklyWorkoutsProgress(context: context)
             if progress.isComplete {
-                checkAndFireCompletion(goal: weeklyGoal)
+                checkAndFireWeeklyCompletion(goal: weeklyGoal)
                 try? context.save()
             }
         }
@@ -392,9 +392,8 @@ struct GoalService {
 
     // MARK: - Goal Completion Date Tracking
 
-    /// Sets lastCelebratedDate when a goal crosses 100%.
-    /// Only updates if lastCelebratedDate is nil or the current date is strictly after the existing value.
-    /// Ensures `lastCelebratedDate` is set to today for a completed weekly workouts goal.
+    /// Ensures `lastCelebratedDate` is set to the first day the weekly workouts goal
+    /// was satisfied within the current ISO week.
     /// Called from GoalsViewModel.loadGoals to handle cases where the goal was already
     /// complete before the Goals screen was visited (e.g. completed earlier in the week).
     static func ensureWeeklyGoalCelebration(context: ModelContext) {
@@ -402,10 +401,13 @@ struct GoalService {
         guard let weeklyGoal = goals.first(where: { $0.goalType == "weeklyWorkouts" }) else { return }
         let progress = weeklyWorkoutsProgress(context: context)
         guard progress.isComplete else { return }
-        checkAndFireCompletion(goal: weeklyGoal)
+        checkAndFireWeeklyCompletion(goal: weeklyGoal)
         try? context.save()
     }
 
+    /// Sets lastCelebratedDate for non-weekly goals when they cross 100%.
+    /// Only updates if lastCelebratedDate is nil or the current date is strictly after the existing value.
+    /// Call sites must gate on the 0→100% transition so the stored date reflects the day of completion.
     private static func checkAndFireCompletion(goal: Goal) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -413,6 +415,22 @@ struct GoalService {
         if let lastCelebrated = goal.lastCelebratedDate {
             let lastCelebratedDay = calendar.startOfDay(for: lastCelebrated)
             guard today > lastCelebratedDay else { return }
+        }
+
+        goal.lastCelebratedDate = today
+    }
+
+    /// Week-aware celebration for the weekly workouts goal.
+    /// Preserves the first day the goal was satisfied within the current ISO week and only
+    /// advances `lastCelebratedDate` when crossing into a new week (or on first-ever celebration).
+    /// See BUG-042: without this, repeated invocations within the same week (e.g. every
+    /// `GoalsView.onAppear` or every workout cascade) overwrote the celebrated date to today.
+    private static func checkAndFireWeeklyCompletion(goal: Goal) {
+        let today = Calendar.current.startOfDay(for: Date())
+
+        if let lastCelebrated = goal.lastCelebratedDate,
+           lastCelebrated.isSameWeek(as: today) {
+            return
         }
 
         goal.lastCelebratedDate = today

@@ -241,6 +241,7 @@ struct EditScheduledWorkoutView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .swipeToDismiss()
         .onAppear {
             viewModel.load(from: scheduledWorkout)
         }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 struct ExerciseLoadService {
 
@@ -208,5 +209,159 @@ struct ExerciseLoadService {
                     : "High physical stress. Rest or very light activity recommended."
             )
         }
+    }
+
+    // MARK: - Detail Sheet Helpers (Phase 8.8)
+
+    struct TrainingLoadDailyScore: Hashable {
+        let date: Date
+        let score: Int
+        let zone: String
+        let zoneColor: String
+    }
+
+    struct TrainingLoadContributor: Hashable, Identifiable {
+        let workoutId: UUID
+        let workoutName: String
+        let date: Date
+        let tssContribution: Double
+        let percentOfWeeklyLoad: Int
+
+        var id: UUID { workoutId }
+    }
+
+    struct TrainingLoadWeekComparison {
+        let currentWeekTss: Int
+        let previousWeekTss: Int
+        let deltaPct: Int
+    }
+
+    /// Returns 14 daily training-load scores, oldest first → most recent last (today inclusive).
+    static func fourteenDayDailyScores(context: ModelContext, now: Date = Date()) -> [TrainingLoadDailyScore] {
+        let settings = UserSettings.shared
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+
+        var results: [TrainingLoadDailyScore] = []
+        for offset in (0..<14).reversed() {
+            guard let dayStart = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+            // Historical buckets reference end-of-day so the chart reads as "score at end of that day".
+            // The latest bucket must use real `now` so its score matches the hero, which also uses `now`
+            // (BUG-045 — morning sheet opens showed Peak hero vs. Moderate latest point).
+            let referenceTime: Date = offset == 0
+                ? now
+                : (calendar.date(byAdding: .second, value: -1, to: dayEnd) ?? dayStart)
+            let lookbackStart = calendar.date(byAdding: .day, value: -10, to: dayStart) ?? dayStart
+            let windowWorkouts = WorkoutService.fetchWorkouts(from: lookbackStart, to: dayEnd, context: context)
+                .filter { $0.date <= referenceTime }
+            let result = calculateLoad(
+                workouts: windowWorkouts,
+                experienceLevel: settings.experienceLevel,
+                targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
+                now: referenceTime
+            )
+            results.append(TrainingLoadDailyScore(
+                date: dayStart,
+                score: Int(result.score.rounded()),
+                zone: result.zone,
+                zoneColor: result.zoneColor
+            ))
+        }
+        return results
+    }
+
+    /// Returns up to `limit` workouts from the last `daysBack` days that contribute to today's score,
+    /// sorted by descending stress-load contribution (rendered as "stress load" in user-facing copy).
+    static func contributingWorkouts(
+        context: ModelContext,
+        now: Date = Date(),
+        daysBack: Int = 7,
+        limit: Int = 5
+    ) -> [TrainingLoadContributor] {
+        let settings = UserSettings.shared
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        guard let windowStart = calendar.date(byAdding: .day, value: -daysBack, to: today) else { return [] }
+
+        // Use the 10-day window for the algorithm; filter by the configurable lookback for contributor display.
+        let lookbackStart = calendar.date(byAdding: .day, value: -10, to: now) ?? now
+        let windowWorkouts = WorkoutService.fetchWorkouts(from: lookbackStart, to: now, context: context)
+            .filter { !isEmptyWorkout($0) }
+
+        let tau = decayConstant(for: settings.experienceLevel)
+
+        // Per-workout decayed contribution (matches Step 5 of algorithm)
+        let contributions: [(Workout, Double)] = windowWorkouts.map { workout in
+            let stress = sessionStress(for: workout, targetMinutesPerWorkout: settings.targetMinutesPerWorkout)
+            let daysAgo = now.timeIntervalSince(workout.date) / 86400.0
+            let decayed = stress * exp(-daysAgo / tau)
+            return (workout, decayed)
+        }
+
+        // For "Contributing this week" we surface only workouts within the daysBack lookback.
+        let recentContributions = contributions.filter { $0.0.date >= windowStart }
+        let weeklyTotal = recentContributions.reduce(0.0) { $0 + $1.1 }
+
+        let sorted = recentContributions.sorted { lhs, rhs in
+            if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+            return lhs.0.date > rhs.0.date
+        }
+
+        return sorted.prefix(limit).map { workout, tss in
+            let percent = weeklyTotal > 0 ? Int((tss / weeklyTotal * 100).rounded()) : 0
+            return TrainingLoadContributor(
+                workoutId: workout.id,
+                workoutName: workout.name,
+                date: workout.date,
+                tssContribution: tss,
+                percentOfWeeklyLoad: percent
+            )
+        }
+    }
+
+    /// Compares current ISO Mon–Sun week stress-load sum to the prior week's, returning rounded values and delta percent.
+    static func weekOverWeekComparison(context: ModelContext, now: Date = Date()) -> TrainingLoadWeekComparison {
+        let settings = UserSettings.shared
+        let tau = decayConstant(for: settings.experienceLevel)
+        let calendar = Calendar.current
+
+        let currentWeekStart = now.startOfWeek
+        let currentWeekEnd = now.endOfWeek
+
+        guard let prevWeekStart = Calendar(identifier: .iso8601).date(byAdding: .weekOfYear, value: -1, to: currentWeekStart),
+              let prevWeekEnd = Calendar(identifier: .iso8601).date(byAdding: .weekOfYear, value: -1, to: currentWeekEnd) else {
+            return TrainingLoadWeekComparison(currentWeekTss: 0, previousWeekTss: 0, deltaPct: 0)
+        }
+
+        let totalLookbackStart = calendar.date(byAdding: .day, value: -10, to: prevWeekStart) ?? prevWeekStart
+        let workouts = WorkoutService.fetchWorkouts(from: totalLookbackStart, to: now, context: context)
+            .filter { !isEmptyWorkout($0) }
+
+        func decayedSum(in range: ClosedRange<Date>) -> Double {
+            workouts
+                .filter { range.contains($0.date) }
+                .reduce(0.0) { sum, workout in
+                    let stress = sessionStress(for: workout, targetMinutesPerWorkout: settings.targetMinutesPerWorkout)
+                    let daysAgo = now.timeIntervalSince(workout.date) / 86400.0
+                    return sum + stress * exp(-daysAgo / tau)
+                }
+        }
+
+        let currentTss = decayedSum(in: currentWeekStart...currentWeekEnd)
+        let previousTss = decayedSum(in: prevWeekStart...prevWeekEnd)
+
+        let deltaPct: Int
+        if previousTss > 0 {
+            deltaPct = Int(((currentTss - previousTss) / previousTss * 100).rounded())
+        } else {
+            deltaPct = 0
+        }
+
+        return TrainingLoadWeekComparison(
+            currentWeekTss: Int(currentTss.rounded()),
+            previousWeekTss: Int(previousTss.rounded()),
+            deltaPct: deltaPct
+        )
     }
 }

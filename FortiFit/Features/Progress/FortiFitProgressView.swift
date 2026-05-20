@@ -17,7 +17,6 @@ private struct DashedLine: Shape {
 struct FortiFitProgressView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = ProgressViewModel()
-    @State private var draggingChartType: String?
     @State private var deleteTarget: TrendsChart?
     @State private var showDeleteConfirm = false
     @State private var infoChartType: String?
@@ -28,39 +27,39 @@ struct FortiFitProgressView: View {
 
     var body: some View {
         NavigationStack {
-        ZStack {
             ZStack(alignment: .top) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
-                        if viewModel.charts.isEmpty {
+                if viewModel.charts.isEmpty {
+                    VStack {
+                        Spacer()
+                        VStack(spacing: FortiFitSpacing.gapMedium) {
                             Text("Tap the menu to add charts to your Trends screen.")
-                                .font(FortiFitTypography.note)
+                                .font(FortiFitTypography.body)
                                 .foregroundStyle(FortiFitColors.mutedText)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, FortiFitSpacing.gapXLarge)
-                        } else {
+                        }
+                        .padding(.horizontal, FortiFitSpacing.screenHorizontal)
+                        Spacer()
+                    }
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
                             ForEach(viewModel.charts) { chart in
                                 chartCard(for: chart)
                             }
                             .animation(.easeInOut(duration: 0.2), value: viewModel.charts.map(\.chartType))
                         }
+                        .padding(.horizontal, FortiFitSpacing.screenHorizontal)
+                        .padding(.top, headerHeight)
+                        .padding(.bottom, FortiFitSpacing.gapXLarge)
                     }
-                    .padding(.horizontal, FortiFitSpacing.screenHorizontal)
-                    .padding(.top, headerHeight)
-                    .padding(.bottom, FortiFitSpacing.gapXLarge)
-                }
-                .scrollClipDisabled()
-                .onTapGesture {
-                    if viewModel.isReorderMode {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewModel.isReorderMode = false
+                    .scrollClipDisabled()
+                    .onTapGesture {
+                        if viewModel.isReorderMode {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                viewModel.isReorderMode = false
+                            }
                         }
                     }
-                }
-                // Catch-all: drops landing outside any chart clear the stale drag state
-                .onDrop(of: [.text], isTargeted: nil) { _, _ in
-                    draggingChartType = nil
-                    return false
                 }
 
                 FortiFitFixedHeader(headerHeight: $headerHeight) {
@@ -73,29 +72,24 @@ struct FortiFitProgressView: View {
                         .accessibilityIdentifier(AccessibilityID.trendsEllipsisMenu)
                         Spacer()
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .background(FortiFitColors.background)
-
-            // Add Chart Menu Overlay
-            if viewModel.showAddChartMenu {
-                FortiFitAddChartMenu(
-                    isPresented: $viewModel.showAddChartMenu,
-                    addedChartTypes: viewModel.addedChartTypes,
-                    onAdd: { chartType in
-                        viewModel.addChart(chartType: chartType, context: modelContext)
-                    }
-                )
-                .transition(.opacity)
+            .overlay {
+                if viewModel.showAddChartMenu {
+                    FortiFitAddChartMenu(
+                        isPresented: $viewModel.showAddChartMenu,
+                        addedChartTypes: viewModel.addedChartTypes,
+                        onAdd: { chartType in
+                            viewModel.addChart(chartType: chartType, context: modelContext)
+                        }
+                    )
+                    .transition(.opacity)
+                }
             }
-        }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.showAddChartMenu)
+            .animation(.easeInOut(duration: 0.2), value: viewModel.showAddChartMenu)
         .onAppear { viewModel.loadData(context: modelContext) }
         .onDisappear { viewModel.isReorderMode = false }
-        .onChange(of: viewModel.isReorderMode) { _, isOn in
-            if !isOn { draggingChartType = nil }
-        }
         .onChange(of: selectedTab) { oldValue, _ in
             guard oldValue == 3 else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -173,21 +167,18 @@ struct FortiFitProgressView: View {
                     .padding(.trailing, FortiFitSpacing.cardPadding)
             }
         }
-        .opacity(draggingChartType == chart.chartType ? 0.5 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isReorderMode)
         .contentShape(Rectangle())
-        .onDrag {
-            guard viewModel.isReorderMode else {
-                return NSItemProvider()
-            }
-            draggingChartType = chart.chartType
-            return NSItemProvider(object: chart.chartType as NSString)
-        }
-        .onDrop(of: [.text], delegate: ChartDropDelegate(
+        .modifier(ChartReorderModifier(
             chart: chart,
-            viewModel: viewModel,
-            draggingChartType: $draggingChartType,
-            modelContext: modelContext
+            isReorderMode: viewModel.isReorderMode,
+            charts: viewModel.charts,
+            onReorder: { from, to in
+                var types = viewModel.charts.map(\.chartType)
+                types.move(fromOffsets: IndexSet(integer: from),
+                           toOffset: to > from ? to + 1 : to)
+                viewModel.reorderCharts(orderedTypes: types, context: modelContext)
+            }
         ))
         .contextMenu {
             if !viewModel.isReorderMode {
@@ -779,28 +770,31 @@ struct FortiFitProgressView: View {
                         }
                     }
                 }
-                .chartBackground { proxy in
-                    GeometryReader { geo in
-                        if let plotFrame = proxy.plotFrame {
-                            let frame = geo[plotFrame]
-                            VStack(spacing: 2) {
-                                Text("\(total)")
-                                    .font(.system(size: 24, weight: .black))
-                                    .foregroundStyle(FortiFitColors.primaryText)
-                                Text(AppConstants.Trends.captionWorkouts)
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(FortiFitColors.mutedText)
-                                    .kerning(2)
-                            }
-                            .position(x: frame.midX, y: frame.midY)
-                            .accessibilityIdentifier(AccessibilityID.trendsChart_workoutTypeBreakdown_centerLabel)
-                        }
+                .aspectRatio(1, contentMode: .fit)
+                .frame(maxHeight: 200)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .overlay {
+                    VStack(spacing: 2) {
+                        Text("\(total)")
+                            .font(.system(size: 24, weight: .black))
+                            .foregroundStyle(FortiFitColors.primaryText)
+                        Text(AppConstants.Trends.captionWorkouts)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(FortiFitColors.mutedText)
+                            .kerning(2)
                     }
+                    .accessibilityIdentifier(AccessibilityID.trendsChart_workoutTypeBreakdown_centerLabel)
+                    .allowsHitTesting(false)
                 }
-                .frame(height: 200)
             },
             footer: {
-                FlowLayout(spacing: FortiFitSpacing.gapSmall) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.adaptive(minimum: 150), spacing: FortiFitSpacing.gapSmall, alignment: .leading)
+                    ],
+                    alignment: .leading,
+                    spacing: FortiFitSpacing.gapSmall
+                ) {
                     ForEach(viewModel.typeBreakdownData) { entry in
                         HStack(spacing: 4) {
                             Circle()
@@ -809,6 +803,8 @@ struct FortiFitProgressView: View {
                             Text("\(entry.workoutType) (\(entry.count))")
                                 .font(FortiFitTypography.bodySmall)
                                 .foregroundStyle(FortiFitColors.mutedText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                         }
                     }
                 }
@@ -983,7 +979,17 @@ private struct FlowLayout: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        return layout(sizes: sizes, containerWidth: proposal.width ?? .infinity).size
+        // When SwiftUI proposes nil width (asking for an ideal/intrinsic size),
+        // return a bounded "single-column stack" size — NOT the unbounded
+        // "everything on one infinite row" size. Reporting the unbounded width
+        // up the layout tree shifts ancestor layouts (e.g. the floating header).
+        guard let containerWidth = proposal.width, containerWidth.isFinite else {
+            let maxItemWidth = sizes.map(\.width).max() ?? 0
+            let stackedHeight = sizes.reduce(0) { $0 + $1.height }
+                + spacing * CGFloat(max(0, sizes.count - 1))
+            return CGSize(width: maxItemWidth, height: stackedHeight)
+        }
+        return layout(sizes: sizes, containerWidth: containerWidth).size
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
@@ -1028,39 +1034,28 @@ private struct InfoChartID: Identifiable {
     var id: String { chartType }
 }
 
-// MARK: - Chart Drop Delegate
+// MARK: - Chart Reorder Modifier
 
-private struct ChartDropDelegate: DropDelegate {
+/// Applies reorder behavior only when in reorder mode. When inactive, the view
+/// is unchanged (no draggable/drop destination), so taps and context menus
+/// behave normally on the chart card.
+private struct ChartReorderModifier: ViewModifier {
     let chart: TrendsChart
-    let viewModel: ProgressViewModel
-    @Binding var draggingChartType: String?
-    let modelContext: ModelContext
+    let isReorderMode: Bool
+    let charts: [TrendsChart]
+    let onReorder: (Int, Int) -> Void
 
-    func performDrop(info: DropInfo) -> Bool {
-        draggingChartType = nil
-        return true
-    }
-
-    func dropEntered(info: DropInfo) {
-        guard let dragging = draggingChartType,
-              dragging != chart.chartType,
-              let fromIndex = viewModel.charts.firstIndex(where: { $0.chartType == dragging }),
-              let toIndex = viewModel.charts.firstIndex(where: { $0.chartType == chart.chartType })
-        else { return }
-
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
-
-        withAnimation(.easeInOut(duration: 0.2)) {
-            var types = viewModel.charts.map(\.chartType)
-            types.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-            viewModel.reorderCharts(orderedTypes: types, context: modelContext)
+    func body(content: Content) -> some View {
+        if isReorderMode {
+            content.reorderableCard(
+                payload: chart.chartType,
+                in: charts,
+                identifiedBy: \.chartType,
+                onReorder: onReorder
+            )
+        } else {
+            content
         }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
     }
 }
 

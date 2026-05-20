@@ -9,7 +9,6 @@ struct WorkoutListView: View {
     @State private var rpeFilterWorkoutType: String?
     @State private var rpeMin: Int = 1
     @State private var rpeMax: Int = 10
-    @State private var draggedType: String?
     @State private var activeSwipeWorkoutID: UUID?
     @State private var headerHeight: CGFloat = 0
     var selectedTab: Int = 1
@@ -70,9 +69,6 @@ struct WorkoutListView: View {
             #endif
             .onAppear { viewModel.loadWorkouts(context: modelContext) }
             .onDisappear { viewModel.exitReorderMode() }
-            .onChange(of: viewModel.isReorderMode) { _, isOn in
-                if !isOn { draggedType = nil }
-            }
             .onChange(of: selectedTab, initial: false) { oldValue, _ in
                 guard oldValue == 1 else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -219,17 +215,16 @@ struct WorkoutListView: View {
                         isReorderMode: true,
                         onTap: { }
                     )
-                    .opacity(draggedType == wType ? 0.5 : 1.0)
-                    .onDrag {
-                        draggedType = wType
-                        return NSItemProvider(object: wType as NSString)
+                    .reorderableCard(
+                        payload: wType,
+                        in: viewModel.typeOrders,
+                        identifiedBy: \.workoutType
+                    ) { fromIndex, toIndex in
+                        var types = viewModel.typeOrders.map(\.workoutType)
+                        types.move(fromOffsets: IndexSet(integer: fromIndex),
+                                   toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+                        viewModel.reorderTypes(orderedTypes: types, context: modelContext)
                     }
-                    .onDrop(of: [UTType.text], delegate: WorkoutTypeReorderDelegate(
-                        targetType: wType,
-                        viewModel: viewModel,
-                        draggedType: $draggedType,
-                        modelContext: modelContext
-                    ))
                 }
 
                 // Bottom area extends the tappable region beyond the last card
@@ -240,18 +235,12 @@ struct WorkoutListView: View {
             .padding(.top, headerHeight)
             .contentShape(Rectangle())
             .onTapGesture {
-                draggedType = nil
                 withAnimation(.easeInOut(duration: 0.2)) {
                     viewModel.exitReorderMode()
                 }
             }
         }
         .scrollClipDisabled()
-        // Catch-all: drops landing outside any card clear the stale drag state
-        .onDrop(of: [UTType.text], isTargeted: nil) { _, _ in
-            draggedType = nil
-            return false
-        }
     }
 
     // MARK: - Workout Type Section (Normal Mode)
@@ -806,49 +795,6 @@ struct WorkoutListView: View {
             }
         }
         .presentationDetents([.medium])
-    }
-}
-
-// MARK: - Reorder Drop Delegate
-
-/// Custom DropDelegate that handles real-time reordering of workout type cards
-/// during a drag operation using the onDrag/onDrop API.
-struct WorkoutTypeReorderDelegate: DropDelegate {
-    let targetType: String
-    let viewModel: WorkoutViewModel
-    @Binding var draggedType: String?
-    let modelContext: ModelContext
-
-    func dropEntered(info: DropInfo) {
-        guard let dragged = draggedType,
-              dragged != targetType else { return }
-
-        var types = viewModel.typeOrders.map(\.workoutType)
-        guard let fromIndex = types.firstIndex(of: dragged),
-              let toIndex = types.firstIndex(of: targetType) else { return }
-
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
-
-        withAnimation(.easeInOut(duration: 0.2)) {
-            types.move(fromOffsets: IndexSet(integer: fromIndex),
-                       toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-            viewModel.reorderTypes(orderedTypes: types, context: modelContext)
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggedType = nil
-        return true
-    }
-
-    func dropExited(info: DropInfo) {
-        // No action needed — reorder happens in dropEntered
     }
 }
 

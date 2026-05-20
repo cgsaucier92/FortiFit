@@ -123,6 +123,7 @@ struct CreateTemplateView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .swipeToDismiss()
         .onAppear {
             viewModel.loadTemplates(context: modelContext)
             if let template = editingTemplate {

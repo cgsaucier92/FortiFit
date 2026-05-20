@@ -53,9 +53,8 @@ struct FortiFitStreakWidget: View {
 private struct FlameView: View {
     let tier: StreakService.Tier
 
-    // Speeds for the sin() wave (radians per second)
+    // Speed for the sin() wave (radians per second)
     private let outerSpeed: Double = 2.6   // ~1.2s full cycle
-    private let innerSpeed: Double = 3.5   // ~0.9s full cycle
 
     private var flameGradient: LinearGradient {
         switch tier {
@@ -105,7 +104,6 @@ private struct FlameView: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: nil, paused: tier == .dormant)) { context in
             let outerWave = wave(context.date, speed: outerSpeed)
-            let innerWave = wave(context.date, speed: innerSpeed)
 
             ZStack {
                 // Glow
@@ -121,19 +119,6 @@ private struct FlameView: View {
                     .fill(flameGradient)
                     .scaleEffect(1.0 + outerWave * 0.12)
                     .offset(y: -outerWave * 3)
-
-                // Inner flame (brighter core for elite)
-                if tier == .elite {
-                    FlameShape()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "fca5a5"), .white.opacity(0.9)],
-                                startPoint: .bottom,
-                                endPoint: .top
-                            )
-                        )
-                        .scaleEffect(0.5 + innerWave * 0.1)
-                }
             }
         }
     }

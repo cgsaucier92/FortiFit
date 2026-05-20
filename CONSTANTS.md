@@ -361,9 +361,11 @@ Renders below the rings (or as an overline above, depending on layout — see SC
 | `settingsModalMoveSliderLabel` | "Move (calories)" |
 | `settingsModalExerciseSliderLabel` | "Exercise (minutes)" |
 | `settingsModalStandSliderLabel` | "Stand (hours)" |
-| `settingsModalResetButton` | "Reset to defaults" |
 | `settingsModalImportButton` | "Import from Apple Health" |
 | `settingsModalImportDisabledCaption` | "Connect Apple Health to import your goals." |
+| `settingsModalDoneButton` | See § Settings Modal Done Button below — shared constant `AppConstants.SettingsModal.doneButtonLabel = "Done"`. |
+
+> **Phase 8.8 changes:** The previous `settingsModalResetButton` constant ("Reset to defaults") has been removed entirely. The previous accessibility identifier `activityRingsSettings_resetButton` is retired and must not be reused. Button order in the modal is now Import (first) → Done (second), top-to-bottom, both full-width. See SCREENS.md § Activity Rings Settings Modal for the full layout.
 
 ### Activity Detail Sheet Strings
 
@@ -1055,7 +1057,7 @@ If user has NOT logged a workout today → readiness variant. If user HAS → po
 | 0 | Dormant | Gray silhouette (#404040), 35% opacity, small scale | Default (#404040) |
 | 1–3 | Building | Small, #1e40af → #3b82f6 → #93c5fd gradient, subtle glow | Default (#404040) |
 | 4–7 | Committed | Medium, #1e3a8a → #3b82f6 → #bfdbfe gradient, stronger glow | Blue (#3b82f6) |
-| 8+ | Elite | Large, #1e3a8a → #60a5fa → #eff6ff gradient, white-hot core, strongest glow | Light Blue (#60a5fa) |
+| 8+ | Elite | Large, #1e3a8a → #60a5fa → #eff6ff gradient, strongest glow | Light Blue (#60a5fa) |
 
 ### Streak Motivational Messages
 
@@ -1220,3 +1222,294 @@ All in-app toast notifications use a unified capsule style.
 | Position | Top of screen, `FortiFitSpacing.screenTop` inset | Aligned to top edge |
 | Auto-dismiss | 2–4 seconds | 2s for informational, 4s for toasts with undo action |
 | Animation | `.easeInOut(duration: 0.2)` | Entrance and exit |
+
+---
+
+## Settings Modal Done Button (Phase 8.8)
+
+Shared style + copy for the `Done` button added to the Weekly Streak, Training Load, and Activity Rings Settings Modals (SCREENS.md § Home Screen → Widget Definitions and § Activity Rings Settings Modal).
+
+| Property | Value |
+|----------|-------|
+| Style | Outlined Primary Accent Blue (`#3b82f6` border + label, transparent fill) — distinct from blue-filled CTAs used for primary commits |
+| Copy | `Done` (`AppConstants.SettingsModal.doneButtonLabel`) |
+| Width | Full-width within the modal's inner padding |
+| Height | 44pt minimum (Apple HIG tap target) |
+| Corner radius | 12pt |
+| Border width | 1.5pt |
+| Font | `FortiFitTypography.bodySmall`, 700 weight |
+| Position | Last action in the modal (bottom-most), beneath any other action buttons |
+| Action | Dismisses the modal — identical behavior to the top-right close X. No commit step (sliders already apply changes immediately). |
+| Accessibility | VoiceOver label: `Done, button` |
+| Identifier convention | `{modalId}_doneButton` — current modals: `weeklyStreakSettings_doneButton`, `trainingLoadSettings_doneButton`, `activityRingsSettings_doneButton` |
+
+> **Rationale for outlined (not filled):** Sliders auto-apply on change, so Done is a dismiss, not a submit. Outlined styling distinguishes it from the filled "primary commit" CTAs used elsewhere (Save Workout, Save Goal, Import from Apple Health). It also visually defers to other actions in modals that have a filled CTA above it (Activity Rings → Import from Apple Health).
+
+---
+
+## Widget Tap Behavior (Phase 8.8)
+
+Reference table for the new tap routing introduced in Phase 8.8 (see SCREENS.md § Standard Patterns → Home Widget Tap-to-Open and SERVICES.md § HomeWidgetService → Widget Tap Routing).
+
+| Widget | Tap result | Suppressed in Edit Mode? | Long-press still available? |
+|---|---|---|---|
+| `todaysPlan` | Opens Today's Plan Detail Sheet | Yes | Yes |
+| `trainingLoad` | Opens Training Load Detail Sheet | Yes | Yes (See Info / Configure Settings) |
+| `weekStreak` | Opens Weekly Streak Insights Sheet | Yes | Yes (Configure Settings) |
+| `powerLevel` | Opens Power Level Breakdown Sheet | Yes | Yes (See Info) |
+| `appleActivity` (live state) | Opens Activity Detail Sheet (existing) | Yes | Yes (See Info / Configure Settings) |
+| `appleActivity` (connect HK state) | Navigates to Settings → Apple Health (existing) | Yes | Yes |
+| `appleActivity` (pair Watch state) | No-op (existing) | Yes | Yes |
+
+---
+
+## Widget Detail Sheet Visual Tokens (Phase 8.8)
+
+Shared visual treatment for the four new detail sheets (Today's Plan, Training Load, Weekly Streak Insights, Power Level Breakdown) and the Activity Detail Sheet retrofit.
+
+### Sheet Presentation
+
+| Property | Value |
+|---|---|
+| Presentation | iOS modal sheet, `.large` detent |
+| Dismissal | Swipe-down + tap close X (top-right) |
+| Drag indicator | Visible (Apple default) |
+| Background | Card Surface (`#1a1a1a`) |
+| Top inset | Standard sheet header area (~24pt) |
+
+### Header
+
+| Element | Treatment |
+|---|---|
+| Title | Centered, Primary Text, 20px / 800 weight |
+| Close button | Top-right 24×24pt circular, Elevated Surface bg + Border, muted `xmark`. Identifier `{sheetId}_closeButton` |
+
+### Hero Block
+
+Per-sheet hero hero treatment:
+
+| Sheet | Hero |
+|---|---|
+| Today's Plan Detail Sheet | No standalone hero — the mini-card list is the body |
+| Training Load Detail Sheet | Larger gradient bar (~280pt wide) + zone label (Primary Text, 22px / 800) + `{score} / 100` value beneath (zone-colored, 28px / 900) |
+| Weekly Streak Insights Sheet | Massive streak count typography per § Weekly Streak Insights → Hero |
+| Power Level Breakdown Sheet | Status label + directional indicator (48pt) + numeric average volume line |
+| Activity Detail Sheet | No standalone hero — three sparkline blocks (existing) |
+
+### Body Block Spacing
+
+| Property | Value |
+|---|---|
+| Inter-block vertical gap | `FortiFitSpacing.cardPadding` (16pt) |
+| Block internal padding | `FortiFitSpacing.cardPadding` (16pt) |
+| Block container | `FortiFitCard` (consistent with home widget cards) |
+
+### Footer Button Block
+
+| Property | Value |
+|---|---|
+| Layout | Side-by-side text buttons, separated by `·` (Muted Text 13px). When a single entry applies, centered alone. |
+| Color | Primary Accent Blue `#3b82f6` |
+| Font | 13px / 600 weight |
+| Tap target | 44pt vertical minimum per button |
+| Spacing from last body block | 24pt |
+| Identifier convention | `{sheetId}_seeInfoButton`, `{sheetId}_configureSettingsButton` |
+
+### Per-Sheet Footer Variants
+
+| Sheet | See Info? | Configure Settings? |
+|---|---|---|
+| Today's Plan Detail Sheet | — | — |
+| Training Load Detail Sheet | ✓ | ✓ |
+| Weekly Streak Insights Sheet | — | ✓ |
+| Power Level Breakdown Sheet | ✓ | — |
+| Activity Detail Sheet | ✓ | ✓ |
+
+---
+
+## Weekly Streak Insights (Phase 8.8)
+
+Visual + content constants specific to the Weekly Streak Insights Sheet (SCREENS.md § Weekly Streak Insights Sheet).
+
+### Hero
+
+| Property | Value |
+|---|---|
+| Number font | System, ~96–120pt, 900 weight |
+| Number color | Optional linear gradient `#3b82f6` → `#93c5fd`, vertical top-to-bottom; falls back to Primary Accent Blue solid when gradient mode is disabled |
+| Number animation | Count-up from 0 → `currentStreak` over 0.6s, ease-out, on sheet appear. Skip animation when `UIAccessibility.isReduceMotionEnabled == true` (render final value directly). |
+| Sub-label | `WEEK STREAK`, Primary Accent Blue, uppercase, 13px / 800, 2px letter spacing |
+| Identifier | `weeklyStreakDetailSheet_hero` |
+
+### Heatmap Color Ramp
+
+| State | Fill | Border |
+|---|---|---|
+| Untracked / pre-app | Card Surface (`#1a1a1a`) | 1px `#404040` |
+| Below target (1 ≤ workouts < target) | Primary Accent Blue at 25% opacity | None |
+| Target met (workouts ≥ target) | Primary Accent Blue at 100% opacity | None |
+| Current in-progress week (index 0) | Fill per its current count band | 1px Primary Accent Blue ring |
+
+### Heatmap Geometry
+
+| Property | Value |
+|---|---|
+| Total weeks rendered | 26 (fixed — no toggle in v1) |
+| Grid | 4 columns × ~7 rows; oldest week top-left, dates ascend left-to-right then top-to-bottom; current in-progress week is bottom-right |
+| Cell size | ~32×32pt |
+| Cell gap | 4pt |
+| Day-of-Monday label | Primary Text 10/600, centered within cell |
+| Tooltip on tap | `FortiFitTooltip`, copy `{n} of {target} workouts · week of {Mon date}`, anchored above the cell |
+
+### Milestone Marks
+
+```swift
+[1, 4, 12, 26, 52]   // weeks
+```
+
+| Badge style | SF Symbol | Size |
+|---|---|---|
+| Unlocked | `trophy.fill`, Primary Accent Blue | 36pt |
+| Locked | `trophy`, Muted Text | 36pt |
+| Next-unlocked highlight | 1px Primary Accent Blue ring + 6% blue card-surface wash behind the locked badge | — |
+| Below-badge label | Uppercase `1 WK` / `4 WKS` / `12 WKS` / `26 WKS` / `52 WKS`, Muted Text 10/700 | — |
+
+### Stat Row Labels
+
+| Position | Label (uppercase) | Source |
+|---|---|---|
+| Left | `CURRENT STREAK` | `StreakService.currentStreak` |
+| Middle | `ALL-TIME BEST` | `StreakService.longestStreak` |
+| Right | `TOTAL WEEKS LOGGED` | `StreakService.historySummary().totalWeeksLogged` |
+
+---
+
+## Training Load Detail Sheet (Phase 8.8)
+
+Visual + content constants specific to the Training Load Detail Sheet (SCREENS.md § Training Load Detail Sheet).
+
+### Hero
+
+| Property | Value |
+|---|---|
+| Gradient bar | Reuses § Training Load Zones color stops, ~280pt wide, ~14pt tall |
+| Zone label font | Primary Text 22/800 |
+| Score value font | Zone color, 28px / 900 |
+| Score format | `{score} / 100` |
+
+### 14-Day Chart
+
+| Property | Value |
+|---|---|
+| Range | Fixed 14 days (today inclusive) — no toggle |
+| Mark type | Smoothed line + per-day filled circle (~3pt); today's point ~6pt Primary Accent Blue (matches `trainingLoadTrend` Trends chart) |
+| Line interpolation | `.catmullRom` (matches CONSTANTS § Trends Chart Visual Tokens → Line Interpolation) |
+| Per-point color | Zone color for that day |
+| Y-axis | 0–100, gridlines at 30 / 55 / 80 (zone thresholds) |
+| Gradient anchor | `#3b82f6` Primary Accent Blue (single-color vertical fade) |
+| Selection — interaction | Tap to select; drag to scrub. Matches `FortiFitChartDetailView` (Trends chart detail) behavior |
+| Selection — visual | Selected point upsized to ~96pt; non-selected points dim to 35% opacity; line dims to 55% opacity; vertical `RuleMark` at selected x in Primary Accent Blue 60% opacity |
+| Selection — haptic | Light impact on selection change (iOS only) |
+| Selection — annotation | `{score} / 100 · {zone}` (left, zone-colored) and `{date.shortFormatted}` (right, Muted Text) rendered as a row below the chart |
+| Identifiers | Per-point: `trainingLoadDetailSheet_chartDataPoint_{index}`. Annotation: `trainingLoadDetailSheet_chartSelectionAnnotation` |
+
+### Contributing Workouts Block
+
+| Property | Value |
+|---|---|
+| Max rows | 5 |
+| Lookback | 7 days |
+| Row format | `{name}` (Primary Text 15/700) · `{date}` (Muted 13px) · `{pct}%` (Muted 13px, monospaced digit) · inline horizontal share bar (~56×4pt capsule, Primary Accent Blue fill on Elevated Surface track, filled to `pct/100`). Absolute stress-load value is intentionally not displayed — created additivity confusion vs the hero score and read as "0 stress load · 5%" after integer rounding. |
+| Footer link | `See all in Trends →` (Primary Accent Blue 13/600) — navigates to Trends → Training Load Trend chart detail |
+
+### Week Comparison Band
+
+| Property | Value |
+|---|---|
+| Copy template | `Stress load · {arrow} {abs(deltaPct)}% vs last week` where `arrow` ∈ `↑` (up) / `↓` (down) / `—` (flat) — matches the directional indicator convention used by the Power Level widget |
+| Delta color when current ≤ previous | Positive Green `#10b981` |
+| Delta color when current > previous | Alert Red `#ef4444` |
+| Hidden when | Either current or previous week has 0 stress load |
+| Absolute total | Intentionally not displayed — consistency with contributing-workouts rows (no per-row absolute either) and avoids the additivity-vs-hero confusion |
+
+---
+
+## Power Level Detail Sheet (Phase 8.8)
+
+Visual + content constants specific to the Power Level Breakdown Sheet (SCREENS.md § Power Level Breakdown Sheet).
+
+### Hero
+
+| Property | Value |
+|---|---|
+| Status label color | Per § Power Level Statuses |
+| Directional indicator size | 48pt, status-colored |
+| Numeric line | `{currentAvgVolume} avg volume` (Primary Text 20/700 + Muted unit) |
+
+### 30-Day Volume Chart
+
+| Property | Value |
+|---|---|
+| Range | Fixed 30 days (today inclusive) — no toggle |
+| Mark type | Smoothed line, today's point highlighted |
+| Line interpolation | `.catmullRom` |
+| Gradient anchor | `#4B2893` Chart Purple (matches `workoutVolume` Trends chart) |
+| Empty-day handling | No point (gap in line) — do not interpolate across missing days |
+
+### Top Exercises Block
+
+| Property | Value |
+|---|---|
+| Max rows | 3 |
+| Filter | `sessionCountInWindow >= 3` (≥ 3-session filter per Phase 8.8) |
+| Row layout | Exercise name (Primary Text 15/700) · `{sign}{deltaPct}% volume vs previous 30d` (status-colored, right-aligned) · 30-day sparkline (~80×24pt, Primary Accent Blue, no marks) |
+| Sort | Descending current-window volume; ties broken by descending session count, then exercise name ascending |
+
+### Nudge Archetypes
+
+```swift
+["deloading", "steady", "rising", "coldStart"]
+```
+
+| Archetype | Inputs surfaced in copy | Trigger |
+|---|---|---|
+| `deloading` | `currentSessionCount30d`, `previousSessionCount30d` | `status == .deloading` AND ≥ 3 in-window workouts |
+| `steady` | `topExerciseName` (gracefully degrades when nil) | `status == .steady` AND ≥ 3 in-window workouts |
+| `rising` | `avgSessionsPerWeek30d`, optional `topExerciseName` | `status == .rising` AND ≥ 3 in-window workouts |
+| `coldStart` | (none) | Fewer than 3 Strength/HIIT workouts in the current 30d window |
+
+Copy templates live in INFO_COPY § Power Level Nudge Copy. Stored in `AppConstants.PowerLevel.nudgeCopy` as a dictionary keyed by archetype rawValue.
+
+---
+
+## Today's Plan Detail Sheet (Phase 8.8)
+
+Visual + content constants specific to the Today's Plan Detail Sheet (SCREENS.md § Today's Plan Detail Sheet).
+
+### Mini-Card Layout
+
+| Slot | Value |
+|---|---|
+| Top row | Workout-type SF Symbol (18pt) + template name (Primary Text 17/700) + status pill (right-aligned) |
+| Meta row | `{time} · {duration} · {watchSyncGlyph}` (Muted 13px, `·`-separated) |
+| Exercise list | Per-exercise grouped list. Exercise name header (`FortiFitTypography.labelSmall` = 13px/600, Primary Text). One line per `SnapshotExercise` set group below (`FortiFitTypography.labelSmall`, Muted Text), format: `{sets} × {reps} reps[ · {weight} kg/lbs][ · rest {restSeconds}s]`. Time-based exercises render `{sets} × {reps}s`. `displayAsTime` resolution: explicit snapshot value wins → else `ExerciseSuggestionService.isIsometric(exerciseName)` (alias map → isometric set → ambiguous defaults → reps fallback). Weight suppressed for bodyweight. Unit follows `UserSettings.useLbs`. Replaces the previous "`{n} exercises · {m} sets`" summary row. |
+| Action row | Full-width `Complete Workout` button (blue-filled, primary CTA) on Planned rows. **Hidden on Completed and Skipped rows** — the status pill is the sole signal (Phase 8.8 update). |
+
+### Status Pills
+
+| Status | Background | Border | Label color |
+|---|---|---|---|
+| Planned | Transparent | 1px Primary Accent Blue | Primary Accent Blue |
+| Completed | Positive Green `#10b981` (filled) | None | White |
+| Skipped | Transparent | 1px Muted Text | Muted Text |
+
+### `+ Schedule another workout for today` Chip — RETIRED (Phase 8.8 follow-up)
+
+The chip was removed from the Today's Plan Detail Sheet entirely. Users schedule additional workouts via the Plan tab. Identifier `todaysPlanDetailSheet_scheduleMoreButton` is retired and must not be reused.
+
+### Empty State
+
+| Property | Value |
+|---|---|
+| Copy | `No workouts planned for today.` (Muted Text, centered) |
+| Identifier | `todaysPlanDetailSheet_emptyState` |

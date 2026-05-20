@@ -208,6 +208,12 @@ final class WorkoutViewModel {
         editingWorkout?.isHealthKitLinked == true
     }
 
+    /// True when LogWorkoutView is presented via the Plan → Complete Workout → Modify Exercises flow.
+    /// In that flow, date and workout type are locked to the scheduled slot's values.
+    var isCompletingScheduled: Bool {
+        scheduledWorkoutId != nil
+    }
+
     // MARK: - Actions
 
     func loadWorkouts(context: ModelContext) {

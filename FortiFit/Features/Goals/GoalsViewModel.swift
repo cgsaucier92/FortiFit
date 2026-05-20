@@ -28,13 +28,22 @@ final class GoalsViewModel {
     var activeFilter: GoalFilter = .all
 
     var filteredGoals: [Goal] {
+        let base: [Goal]
         switch activeFilter {
         case .all:
-            return goals
+            base = goals
         case .active:
-            return goals.filter { goalProgress(for: $0) < 100 }
+            base = goals.filter { goalProgress(for: $0) < 100 }
         case .completed:
-            return goals.filter { goalProgress(for: $0) >= 100 }
+            base = goals.filter { goalProgress(for: $0) >= 100 }
+        }
+        // Stable secondary sort: in-progress goals (progress < 100) precede completed
+        // goals (progress >= 100). Manual sortOrder within each group is preserved.
+        return base.sorted { lhs, rhs in
+            let lhsComplete = goalProgress(for: lhs) >= 100
+            let rhsComplete = goalProgress(for: rhs) >= 100
+            if lhsComplete == rhsComplete { return false }
+            return !lhsComplete
         }
     }
 
