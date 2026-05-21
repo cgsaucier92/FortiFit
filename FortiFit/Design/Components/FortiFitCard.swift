@@ -2,13 +2,16 @@ import SwiftUI
 
 struct FortiFitCard<Content: View>: View {
     var borderColor: Color
+    var borderWidth: CGFloat
     let content: () -> Content
 
     init(
         borderColor: Color = FortiFitColors.border,
+        borderWidth: CGFloat = 1,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.borderColor = borderColor
+        self.borderWidth = borderWidth
         self.content = content
     }
 
@@ -19,7 +22,7 @@ struct FortiFitCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
                     .fill(FortiFitColors.cardSurface)
-                    .stroke(borderColor, lineWidth: 1)
+                    .stroke(borderColor, lineWidth: borderWidth)
             )
     }
 }

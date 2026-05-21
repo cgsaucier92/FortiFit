@@ -122,7 +122,9 @@ struct FortiFitTodaysPlanDetailSheet: View {
     // MARK: - Mini Card
 
     private func miniCard(for row: ScheduledWorkout) -> some View {
-        FortiFitCard(borderColor: cardBorderColor(for: row.status)) {
+        // 2pt outer border gives visual separation from the 1pt inner exercise cards
+        // listed in `exerciseBlock(...)`.
+        FortiFitCard(borderColor: cardBorderColor(for: row.status), borderWidth: 2) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 topRow(for: row)
                 metaRow(for: row)
@@ -231,22 +233,26 @@ struct FortiFitTodaysPlanDetailSheet: View {
             if groupsByName[ex.exerciseName] == nil { nameOrder.append(ex.exerciseName) }
             groupsByName[ex.exerciseName, default: []].append(ex)
         }
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
             ForEach(nameOrder, id: \.self) { name in
                 exerciseBlock(name: name, groups: groupsByName[name] ?? [])
             }
         }
     }
 
+    /// Each exercise renders in its own grey card to match the Workout Detail and
+    /// Log Workout exercise-card convention.
     private func exerciseBlock(name: String, groups: [SnapshotExercise]) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(name)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(FortiFitColors.primaryText)
-            ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
-                Text(setLine(group: group))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(FortiFitColors.mutedText)
+        FortiFitCard(borderColor: FortiFitColors.border) {
+            VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                Text(name)
+                    .font(FortiFitTypography.dataValue)
+                    .foregroundStyle(FortiFitColors.primaryText)
+                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                    Text(setLine(group: group))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.mutedText)
+                }
             }
         }
     }
