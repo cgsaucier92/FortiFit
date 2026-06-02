@@ -34,6 +34,10 @@ enum FortiFitTypography {
     static let sectionLabel = Font.system(size: 16, weight: .semibold)
     static let sectionLabelKerning: CGFloat = 2
 
+    // MARK: - Widget Detail / Insights Sheets
+    static let detailSheetItemTitle = Font.system(size: 18, weight: .regular)
+    static let detailSheetItemSubtext = Font.system(size: 15, weight: .semibold)
+
     // MARK: - Notes / Italic
     static let note = Font.system(size: 14, weight: .regular).italic()
 

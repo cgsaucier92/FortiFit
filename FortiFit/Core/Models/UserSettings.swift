@@ -27,6 +27,14 @@ final class UserSettings {
         static let targetStandHours = "targetStandHours"
         static let syncPlanToAppleWatchEnabled = "syncPlanToAppleWatchEnabled"
         static let hasResetAnchorForPhase87 = "hasResetAnchorForPhase87"
+        static let targetSleepHours = "targetSleepHours"
+        static let recoveryLoadManuallyUnlinked = "recoveryLoadManuallyUnlinked"
+        static let lastSleepCatchUpDate = "lastSleepCatchUpDate"
+        static let recoverySheetStressLoadExpanded = "recoverySheetStressLoadExpanded"
+        static let recoverySheetPersonalInsightsExpanded = "recoverySheetPersonalInsightsExpanded"
+        static let recoverySheetLast3NightsExpanded = "recoverySheetLast3NightsExpanded"
+        static let recoverySheetContributingExpanded = "recoverySheetContributingExpanded"
+        static let recoverySheetTimeSinceWorkoutExpanded = "recoverySheetTimeSinceWorkoutExpanded"
     }
 
     var useLbs: Bool {
@@ -127,6 +135,47 @@ final class UserSettings {
         didSet { defaults.set(hasResetAnchorForPhase87, forKey: Keys.hasResetAnchorForPhase87) }
     }
 
+    var targetSleepHours: Double {
+        didSet { defaults.set(targetSleepHours, forKey: Keys.targetSleepHours) }
+    }
+
+    var recoveryLoadManuallyUnlinked: Bool {
+        didSet { defaults.set(recoveryLoadManuallyUnlinked, forKey: Keys.recoveryLoadManuallyUnlinked) }
+    }
+
+    /// Wall-clock timestamp of the last 6pm-cutoff sleep catch-up. Guards the
+    /// catch-up trigger so it doesn't fire twice within the same 6pm window.
+    /// See HEALTHKIT.md § 21 → Refresh Triggers and SERVICES.md § HealthKitSyncService.
+    var lastSleepCatchUpDate: Date? {
+        didSet {
+            if let value = lastSleepCatchUpDate {
+                defaults.set(value, forKey: Keys.lastSleepCatchUpDate)
+            } else {
+                defaults.removeObject(forKey: Keys.lastSleepCatchUpDate)
+            }
+        }
+    }
+
+    var recoverySheetStressLoadExpanded: Bool {
+        didSet { defaults.set(recoverySheetStressLoadExpanded, forKey: Keys.recoverySheetStressLoadExpanded) }
+    }
+
+    var recoverySheetPersonalInsightsExpanded: Bool {
+        didSet { defaults.set(recoverySheetPersonalInsightsExpanded, forKey: Keys.recoverySheetPersonalInsightsExpanded) }
+    }
+
+    var recoverySheetLast3NightsExpanded: Bool {
+        didSet { defaults.set(recoverySheetLast3NightsExpanded, forKey: Keys.recoverySheetLast3NightsExpanded) }
+    }
+
+    var recoverySheetContributingExpanded: Bool {
+        didSet { defaults.set(recoverySheetContributingExpanded, forKey: Keys.recoverySheetContributingExpanded) }
+    }
+
+    var recoverySheetTimeSinceWorkoutExpanded: Bool {
+        didSet { defaults.set(recoverySheetTimeSinceWorkoutExpanded, forKey: Keys.recoverySheetTimeSinceWorkoutExpanded) }
+    }
+
     private init() {
         // Register defaults for first launch
         defaults.register(defaults: [
@@ -143,7 +192,14 @@ final class UserSettings {
             Keys.healthKitAuthorizationRequested: false,
             Keys.hasMigratedWorkoutInfoRemoval: false,
             Keys.hasSeededDefaultHomeWidgets: false,
-            Keys.syncPlanToAppleWatchEnabled: false
+            Keys.syncPlanToAppleWatchEnabled: false,
+            Keys.targetSleepHours: 7.0,
+            Keys.recoveryLoadManuallyUnlinked: false,
+            Keys.recoverySheetStressLoadExpanded: false,
+            Keys.recoverySheetPersonalInsightsExpanded: false,
+            Keys.recoverySheetLast3NightsExpanded: false,
+            Keys.recoverySheetContributingExpanded: false,
+            Keys.recoverySheetTimeSinceWorkoutExpanded: false
         ])
 
         self.useLbs = defaults.bool(forKey: Keys.useLbs)
@@ -166,5 +222,13 @@ final class UserSettings {
         self.targetMoveCalories = defaults.object(forKey: Keys.targetMoveCalories) as? Int
         self.targetExerciseMinutes = defaults.object(forKey: Keys.targetExerciseMinutes) as? Int
         self.targetStandHours = defaults.object(forKey: Keys.targetStandHours) as? Int
+        self.targetSleepHours = defaults.double(forKey: Keys.targetSleepHours)
+        self.recoveryLoadManuallyUnlinked = defaults.bool(forKey: Keys.recoveryLoadManuallyUnlinked)
+        self.lastSleepCatchUpDate = defaults.object(forKey: Keys.lastSleepCatchUpDate) as? Date
+        self.recoverySheetStressLoadExpanded = defaults.bool(forKey: Keys.recoverySheetStressLoadExpanded)
+        self.recoverySheetPersonalInsightsExpanded = defaults.bool(forKey: Keys.recoverySheetPersonalInsightsExpanded)
+        self.recoverySheetLast3NightsExpanded = defaults.bool(forKey: Keys.recoverySheetLast3NightsExpanded)
+        self.recoverySheetContributingExpanded = defaults.bool(forKey: Keys.recoverySheetContributingExpanded)
+        self.recoverySheetTimeSinceWorkoutExpanded = defaults.bool(forKey: Keys.recoverySheetTimeSinceWorkoutExpanded)
     }
 }

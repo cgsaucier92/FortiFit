@@ -56,6 +56,39 @@ struct ActivitySummarySnapshot {
     let standGoal: Int
 }
 
+// MARK: - Sleep (Phase 11)
+
+/// Stage values for sleep-analysis category samples. Mirrors
+/// `HKCategoryValueSleepAnalysis` cases consumed by FitNavi, keeping the HealthKit
+/// framework out of consumer code.
+enum HKSleepStage {
+    case asleepDeep
+    case asleepREM
+    case asleepCore
+    case asleepUnspecified
+    case awake
+    case inBed
+}
+
+/// Plain Swift struct returned by `HealthKitClient.fetchSleepSamples(from:to:)`.
+/// Mirrors `HealthKitWorkoutSnapshot`'s protocol-boundary pattern.
+/// See SERVICES.md § HealthKitClient → HKSleepSampleSnapshot.
+struct HKSleepSampleSnapshot {
+    let uuid: UUID
+    let stage: HKSleepStage
+    let startDate: Date
+    let endDate: Date
+    let sourceBundleID: String
+
+    /// Raw, un-rounded duration in seconds. Aggregation must sum these and round
+    /// once at the very end (BUG-052) — per-sample rounding to minutes drifts by
+    /// several minutes across a night's worth of stage-transition samples vs.
+    /// Apple Health's `TIME ASLEEP`.
+    var durationSeconds: TimeInterval {
+        max(endDate.timeIntervalSince(startDate), 0)
+    }
+}
+
 protocol HealthKitClient: Sendable {
     func requestAuthorization() async throws
     func authorizationStatus() -> HealthKitAuthorizationStatus
@@ -70,6 +103,12 @@ protocol HealthKitClient: Sendable {
     func fetchActivitySummaries(from start: Date, to end: Date) async throws -> [ActivitySummarySnapshot]
     func observeActivitySummaryChanges(handler: @escaping @Sendable () -> Void)
     func hasAppleWatchData(within days: Int) async throws -> Bool
+
+    // Sleep (Phase 11)
+    func fetchSleepSamples(from start: Date, to end: Date) async throws -> [HKSleepSampleSnapshot]
+    func observeSleepChanges(handler: @escaping @Sendable () -> Void)
+    func fetchSleepDurationGoal() async throws -> TimeInterval?
+    func hasRecentSleepData(within days: Int) async throws -> Bool
 }
 
 final class NoOpHealthKitClient: HealthKitClient, @unchecked Sendable {
@@ -84,4 +123,8 @@ final class NoOpHealthKitClient: HealthKitClient, @unchecked Sendable {
     func fetchActivitySummaries(from start: Date, to end: Date) async throws -> [ActivitySummarySnapshot] { [] }
     func observeActivitySummaryChanges(handler: @escaping @Sendable () -> Void) {}
     func hasAppleWatchData(within days: Int) async throws -> Bool { false }
+    func fetchSleepSamples(from start: Date, to end: Date) async throws -> [HKSleepSampleSnapshot] { [] }
+    func observeSleepChanges(handler: @escaping @Sendable () -> Void) {}
+    func fetchSleepDurationGoal() async throws -> TimeInterval? { nil }
+    func hasRecentSleepData(within days: Int) async throws -> Bool { false }
 }

@@ -88,7 +88,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
 
             if history.currentStreak == 0 {
                 Text(AppConstants.WidgetDetail.EmptyState.weeklyStreakHeroSubline)
-                    .font(FortiFitTypography.note)
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -105,11 +105,11 @@ struct FortiFitWeeklyStreakDetailSheet: View {
     private var statRowBlock: some View {
         FortiFitCard {
             HStack(spacing: 0) {
-                statColumn(value: history.currentStreak, label: "CURRENT STREAK")
+                statColumn(value: history.currentStreak, label: "Current Streak")
                 Divider().background(FortiFitColors.border).frame(width: 1)
-                statColumn(value: history.longestStreakAllTime, label: "ALL-TIME BEST")
+                statColumn(value: history.longestStreakAllTime, label: "All-Time-Best")
                 Divider().background(FortiFitColors.border).frame(width: 1)
-                statColumn(value: history.totalWeeksLogged, label: "TOTAL WEEKS LOGGED")
+                statColumn(value: history.totalWeeksLogged, label: "Total Weeks Logged")
             }
         }
         .accessibilityIdentifier(AccessibilityID.weeklyStreakDetailSheet_statRow)
@@ -121,8 +121,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
                 .font(.system(size: 22, weight: .heavy))
                 .foregroundStyle(FortiFitColors.primaryText)
             Text(label)
-                .font(.system(size: 11, weight: .bold))
-                .kerning(2)
+                .font(FortiFitTypography.bodySmall)
                 .foregroundStyle(FortiFitColors.mutedText)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -137,7 +136,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
         if thisWeek.target == 0 {
             FortiFitCard {
                 Text(AppConstants.WidgetDetail.EmptyState.weeklyStreakThisWeekTargetZero)
-                    .font(FortiFitTypography.note)
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
@@ -147,7 +146,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
                 VStack(spacing: FortiFitSpacing.gapSmall) {
                     thisWeekRing
                     Text("\(thisWeek.daysRemainingThisWeek) day\(thisWeek.daysRemainingThisWeek == 1 ? "" : "s") left this week")
-                        .font(FortiFitTypography.labelSmall)
+                        .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
                 }
                 .frame(maxWidth: .infinity)
@@ -171,9 +170,8 @@ struct FortiFitWeeklyStreakDetailSheet: View {
                 Text("\(thisWeek.currentCount) / \(thisWeek.target)")
                     .font(.system(size: 20, weight: .heavy))
                     .foregroundStyle(FortiFitColors.primaryText)
-                Text("WORKOUTS\nTHIS WEEK")
-                    .font(.system(size: 9, weight: .bold))
-                    .kerning(2)
+                Text("Workouts\nThis Week")
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
                     .multilineTextAlignment(.center)
             }
@@ -191,13 +189,12 @@ struct FortiFitWeeklyStreakDetailSheet: View {
         return FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Last 26 weeks")
-                    .font(FortiFitTypography.labelSmall)
-                    .kerning(FortiFitTypography.labelKerning)
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
 
                 if heatmap.allSatisfy({ $0.isUntracked }) {
                     Text(AppConstants.WidgetDetail.EmptyState.weeklyStreakHeatmap)
-                        .font(FortiFitTypography.note)
+                        .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
                         .padding(.vertical, FortiFitSpacing.gapSmall)
                 }
@@ -286,8 +283,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Milestones")
-                    .font(FortiFitTypography.labelSmall)
-                    .kerning(FortiFitTypography.labelKerning)
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
 
                 HStack(spacing: FortiFitSpacing.gapSmall) {
@@ -319,7 +315,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
                     .foregroundStyle(isUnlocked ? FortiFitColors.primaryAccent : FortiFitColors.mutedText)
             }
             Text(mark == 1 ? "1 WK" : "\(mark) WKS")
-                .font(.system(size: 10, weight: .bold))
+                .font(FortiFitTypography.bodySmall)
                 .foregroundStyle(FortiFitColors.mutedText)
         }
         .frame(maxWidth: .infinity)

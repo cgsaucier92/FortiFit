@@ -198,6 +198,22 @@ enum AccessibilityID {
     static let activityDetailSheet_seeInfoButton = "activityDetailSheet_seeInfoButton"
     static let activityDetailSheet_configureSettingsButton = "activityDetailSheet_configureSettingsButton"
 
+    static let activityDetailSheet_moveChartSelectionAnnotation = "activityDetailSheet_moveChartSelectionAnnotation"
+    static let activityDetailSheet_exerciseChartSelectionAnnotation = "activityDetailSheet_exerciseChartSelectionAnnotation"
+    static let activityDetailSheet_standChartSelectionAnnotation = "activityDetailSheet_standChartSelectionAnnotation"
+
+    static func activityDetailSheet_moveChartDataPoint(_ index: Int) -> String {
+        "activityDetailSheet_moveChartDataPoint_\(index)"
+    }
+
+    static func activityDetailSheet_exerciseChartDataPoint(_ index: Int) -> String {
+        "activityDetailSheet_exerciseChartDataPoint_\(index)"
+    }
+
+    static func activityDetailSheet_standChartDataPoint(_ index: Int) -> String {
+        "activityDetailSheet_standChartDataPoint_\(index)"
+    }
+
     // MARK: - Today's Plan Detail Sheet (Phase 8.8)
 
     static let todaysPlanDetailSheet_closeButton = "todaysPlanDetailSheet_closeButton"
@@ -222,6 +238,7 @@ enum AccessibilityID {
 
     static let trainingLoadDetailSheet_contributingWorkouts = "trainingLoadDetailSheet_contributingWorkouts"
     static let trainingLoadDetailSheet_weekComparison = "trainingLoadDetailSheet_weekComparison"
+    static let trainingLoadDetailSheet_weekComparisonCaption = "trainingLoadDetailSheet_weekComparisonCaption"
     static let trainingLoadDetailSheet_recoveryCallout = "trainingLoadDetailSheet_recoveryCallout"
     static let trainingLoadDetailSheet_seeInfoButton = "trainingLoadDetailSheet_seeInfoButton"
     static let trainingLoadDetailSheet_configureSettingsButton = "trainingLoadDetailSheet_configureSettingsButton"
@@ -263,6 +280,123 @@ enum AccessibilityID {
 
     static func powerLevelDetailSheet_chartDataPoint(_ index: Int) -> String {
         "powerLevelDetailSheet_chartDataPoint_\(index)"
+    }
+
+    // MARK: - Recovery Status Widget (Phase 11)
+
+    static let homeWidget_recoveryStatus_card = "homeWidget_recoveryStatus_card"
+    static let homeWidget_recoveryStatus_state_connectAppleHealth = "homeWidget_recoveryStatus_state_connectAppleHealth"
+    static let homeWidget_recoveryStatus_state_sleepAccessDenied = "homeWidget_recoveryStatus_state_sleepAccessDenied"
+    static let homeWidget_recoveryStatus_state_noSleepTracker = "homeWidget_recoveryStatus_state_noSleepTracker"
+    static let homeWidget_recoveryStatus_state_live = "homeWidget_recoveryStatus_state_live"
+    static let homeWidget_recoveryStatus_connectButton = "homeWidget_recoveryStatus_connectButton"
+    static let homeWidget_recoveryStatus_openIOSSettingsButton = "homeWidget_recoveryStatus_openIOSSettingsButton"
+    static let homeWidget_recoveryStatus_sleepHero = "homeWidget_recoveryStatus_sleepHero"
+    static let homeWidget_recoveryStatus_sleepValue = "homeWidget_recoveryStatus_sleepValue"
+    static let homeWidget_recoveryStatus_deepSleepCaption = "homeWidget_recoveryStatus_deepSleepCaption"
+    static let homeWidget_recoveryStatus_lastWorkoutHero = "homeWidget_recoveryStatus_lastWorkoutHero"
+    static let homeWidget_recoveryStatus_lastWorkoutValue = "homeWidget_recoveryStatus_lastWorkoutValue"
+    static let homeWidget_recoveryStatus_watermark = "homeWidget_recoveryStatus_watermark"
+    static let homeWidget_recoveryStatus_seeInfo = "homeWidget_recoveryStatus_seeInfo"
+    static let homeWidget_recoveryStatus_configureSettings = "homeWidget_recoveryStatus_configureSettings"
+
+    // MARK: - Recovery Status Settings Modal (Phase 11)
+
+    static let recoveryStatusSettings_modal = "recoveryStatusSettings_modal"
+    static let recoveryStatusSettings_closeButton = "recoveryStatusSettings_closeButton"
+    static let recoveryStatusSettings_targetSleepHoursSlider = "recoveryStatusSettings_targetSleepHoursSlider"
+    static let recoveryStatusSettings_importButton = "recoveryStatusSettings_importButton"
+    static let recoveryStatusSettings_doneButton = "recoveryStatusSettings_doneButton"
+
+    // MARK: - Recovery Status Detail Sheet (Phase 11)
+
+    static let recoveryStatusDetailSheet_sheet = "recoveryStatusDetailSheet_sheet"
+    static let recoveryStatusDetailSheet_closeButton = "recoveryStatusDetailSheet_closeButton"
+    static let recoveryStatusDetailSheet_hero = "recoveryStatusDetailSheet_hero"
+    static let recoveryStatusDetailSheet_stagesBar = "recoveryStatusDetailSheet_stagesBar"
+    static let recoveryStatusDetailSheet_stagesLegend = "recoveryStatusDetailSheet_stagesLegend"
+    static let recoveryStatusDetailSheet_sleepEfficiencyCaption = "recoveryStatusDetailSheet_sleepEfficiencyCaption"
+    static let recoveryStatusDetailSheet_sleepSparkline = "recoveryStatusDetailSheet_sleepSparkline"
+    static let recoveryStatusDetailSheet_chartSelectionAnnotation = "recoveryStatusDetailSheet_chartSelectionAnnotation"
+
+    static func recoveryStatusDetailSheet_chartDataPoint(_ index: Int) -> String {
+        "recoveryStatusDetailSheet_chartDataPoint_\(index)"
+    }
+
+    static let recoveryStatusDetailSheet_last7NightsStatRow = "recoveryStatusDetailSheet_last7NightsStatRow"
+    static let recoveryStatusDetailSheet_timeSinceWorkout = "recoveryStatusDetailSheet_timeSinceWorkout"
+    static let recoveryStatusDetailSheet_timeSinceWorkout_headline = "recoveryStatusDetailSheet_timeSinceWorkout_headline"
+    static let recoveryStatusDetailSheet_emptyState_coldStart = "recoveryStatusDetailSheet_emptyState_coldStart"
+    static let recoveryStatusDetailSheet_seeInfoButton = "recoveryStatusDetailSheet_seeInfoButton"
+    static let recoveryStatusDetailSheet_configureSettingsButton = "recoveryStatusDetailSheet_configureSettingsButton"
+
+    static func recoveryStatusDetailSheet_timeSinceWorkout_typeRow(_ type: String) -> String {
+        "recoveryStatusDetailSheet_timeSinceWorkout_typeRow_\(type.replacingOccurrences(of: " ", with: "_"))"
+    }
+
+    // MARK: - Linked Recovery & Load Composite (Phase 11)
+
+    static let homeWidget_linkedRecoveryLoad_composite = "homeWidget_linkedRecoveryLoad_composite"
+    static let homeWidget_linkedRecoveryLoad_unlinkMenuItem = "homeWidget_linkedRecoveryLoad_unlinkMenuItem"
+    static let homeWidget_trainingLoad_sleepImpactChip = "homeWidget_trainingLoad_sleepImpactChip"
+
+    // MARK: - Linked Recovery & Load Settings Modal (Phase 11)
+
+    static let linkedRecoveryLoadSettings_modal = "linkedRecoveryLoadSettings_modal"
+    static let linkedRecoveryLoadSettings_closeButton = "linkedRecoveryLoadSettings_closeButton"
+    static let linkedRecoveryLoadSettings_experienceLevelSlider = "linkedRecoveryLoadSettings_experienceLevelSlider"
+    static let linkedRecoveryLoadSettings_targetWorkoutDurationSlider = "linkedRecoveryLoadSettings_targetWorkoutDurationSlider"
+    static let linkedRecoveryLoadSettings_targetSleepHoursSlider = "linkedRecoveryLoadSettings_targetSleepHoursSlider"
+    static let linkedRecoveryLoadSettings_importButton = "linkedRecoveryLoadSettings_importButton"
+    static let linkedRecoveryLoadSettings_doneButton = "linkedRecoveryLoadSettings_doneButton"
+
+    // MARK: - Linked Recovery & Load Detail Sheet (Phase 11)
+
+    static let linkedRecoveryLoadDetailSheet_sheet = "linkedRecoveryLoadDetailSheet_sheet"
+    static let linkedRecoveryLoadDetailSheet_closeButton = "linkedRecoveryLoadDetailSheet_closeButton"
+    static let linkedRecoveryLoadDetailSheet_dualHero = "linkedRecoveryLoadDetailSheet_dualHero"
+    static let linkedRecoveryLoadDetailSheet_recoveryHero = "linkedRecoveryLoadDetailSheet_recoveryHero"
+    static let linkedRecoveryLoadDetailSheet_loadHero = "linkedRecoveryLoadDetailSheet_loadHero"
+    static let linkedRecoveryLoadDetailSheet_stagesBar = "linkedRecoveryLoadDetailSheet_stagesBar"
+    static let linkedRecoveryLoadDetailSheet_sleepEfficiencyCaption = "linkedRecoveryLoadDetailSheet_sleepEfficiencyCaption"
+    static let linkedRecoveryLoadDetailSheet_combinedChart = "linkedRecoveryLoadDetailSheet_combinedChart"
+    static let linkedRecoveryLoadDetailSheet_sleepSparkline = "linkedRecoveryLoadDetailSheet_sleepSparkline"
+    static let linkedRecoveryLoadDetailSheet_loadSparkline = "linkedRecoveryLoadDetailSheet_loadSparkline"
+    static let linkedRecoveryLoadDetailSheet_loadChartSelectionAnnotation = "linkedRecoveryLoadDetailSheet_loadChartSelectionAnnotation"
+    static let linkedRecoveryLoadDetailSheet_sleepChartSelectionAnnotation = "linkedRecoveryLoadDetailSheet_sleepChartSelectionAnnotation"
+
+    static func linkedRecoveryLoadDetailSheet_loadChartDataPoint(_ index: Int) -> String {
+        "linkedRecoveryLoadDetailSheet_loadChartDataPoint_\(index)"
+    }
+
+    static func linkedRecoveryLoadDetailSheet_sleepChartDataPoint(_ index: Int) -> String {
+        "linkedRecoveryLoadDetailSheet_sleepChartDataPoint_\(index)"
+    }
+
+    static let linkedRecoveryLoadDetailSheet_windowComparison = "linkedRecoveryLoadDetailSheet_windowComparison"
+    static let linkedRecoveryLoadDetailSheet_windowComparisonCaption = "linkedRecoveryLoadDetailSheet_windowComparisonCaption"
+    static let linkedRecoveryLoadDetailSheet_correlationCallout = "linkedRecoveryLoadDetailSheet_correlationCallout"
+    static let linkedRecoveryLoadDetailSheet_personalInsights = "linkedRecoveryLoadDetailSheet_personalInsights"
+    static let linkedRecoveryLoadDetailSheet_last3Nights = "linkedRecoveryLoadDetailSheet_last3Nights"
+    static let linkedRecoveryLoadDetailSheet_contributingWorkouts = "linkedRecoveryLoadDetailSheet_contributingWorkouts"
+    static let linkedRecoveryLoadDetailSheet_timeSinceWorkout = "linkedRecoveryLoadDetailSheet_timeSinceWorkout"
+    static let linkedRecoveryLoadDetailSheet_timeSinceWorkout_headline = "linkedRecoveryLoadDetailSheet_timeSinceWorkout_headline"
+    static let linkedRecoveryLoadDetailSheet_recoveryCallout = "linkedRecoveryLoadDetailSheet_recoveryCallout"
+    static let linkedRecoveryLoadDetailSheet_seeInfoButton = "linkedRecoveryLoadDetailSheet_seeInfoButton"
+    static let linkedRecoveryLoadDetailSheet_configureSettingsButton = "linkedRecoveryLoadDetailSheet_configureSettingsButton"
+
+    static let linkedRecoveryLoadDetailSheet_windowComparison_chevron = "linkedRecoveryLoadDetailSheet_windowComparison_chevron"
+    static let linkedRecoveryLoadDetailSheet_personalInsights_chevron = "linkedRecoveryLoadDetailSheet_personalInsights_chevron"
+    static let linkedRecoveryLoadDetailSheet_last3Nights_chevron = "linkedRecoveryLoadDetailSheet_last3Nights_chevron"
+    static let linkedRecoveryLoadDetailSheet_contributingWorkouts_chevron = "linkedRecoveryLoadDetailSheet_contributingWorkouts_chevron"
+    static let linkedRecoveryLoadDetailSheet_timeSinceWorkout_chevron = "linkedRecoveryLoadDetailSheet_timeSinceWorkout_chevron"
+
+    static func linkedRecoveryLoadDetailSheet_personalInsightsRow(_ index: Int) -> String {
+        "linkedRecoveryLoadDetailSheet_personalInsights_row_\(index)"
+    }
+
+    static func linkedRecoveryLoadDetailSheet_timeSinceWorkout_typeRow(_ type: String) -> String {
+        "linkedRecoveryLoadDetailSheet_timeSinceWorkout_typeRow_\(type.replacingOccurrences(of: " ", with: "_"))"
     }
 
     // MARK: - Trends

@@ -101,7 +101,12 @@ struct WorkoutListView: View {
                     .onDisappear { viewModel.loadWorkouts(context: modelContext) }
             }
             .navigationDestination(isPresented: $viewModel.showCreateTemplate) {
-                CreateTemplateView(editingTemplate: nil)
+                CreateTemplateView(editingTemplate: nil, onTemplateCreated: {
+                    viewModel.showCreateTemplate = false
+                    DispatchQueue.main.async {
+                        viewModel.showSavedTemplates = true
+                    }
+                })
             }
             .navigationDestination(isPresented: $viewModel.showSavedTemplates) {
                 SavedTemplatesListView()

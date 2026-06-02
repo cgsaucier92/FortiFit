@@ -12,9 +12,17 @@ struct FortiFitStreakWidget: View {
     var body: some View {
         FortiFitCard {
             HStack(spacing: FortiFitSpacing.gapMedium) {
-                // Flame
-                FlameView(tier: tier)
-                    .frame(width: flameSize, height: flameSize)
+                // Flame + rising embers
+                ZStack {
+                    EmberLayer(tier: tier)
+                        .frame(width: flameSize * 1.2, height: flameSize * 1.6)
+                        .offset(y: -flameSize * 0.3)
+                        .allowsHitTesting(false)
+
+                    FlameView(tier: tier)
+                        .frame(width: flameSize, height: flameSize)
+                }
+                .frame(width: flameSize, height: flameSize)
 
                 // Text content
                 VStack(alignment: .leading, spacing: 4) {
@@ -119,6 +127,77 @@ private struct FlameView: View {
                     .fill(flameGradient)
                     .scaleEffect(1.0 + outerWave * 0.12)
                     .offset(y: -outerWave * 3)
+            }
+        }
+    }
+}
+
+// MARK: - Ember Layer
+
+private struct EmberLayer: View {
+    let tier: StreakService.Tier
+
+    private var emberCount: Int {
+        switch tier {
+        case .dormant: return 0
+        case .building: return 4
+        case .committed: return 6
+        case .elite: return 8
+        }
+    }
+
+    private var emberColor: Color {
+        switch tier {
+        case .dormant: return .clear
+        case .building: return Color(hex: "ef4444")
+        case .committed: return Color(hex: "ef4444")
+        case .elite: return Color(hex: "f87171")
+        }
+    }
+
+    private var maxOpacity: Double {
+        switch tier {
+        case .dormant: return 0
+        case .building: return 0.35
+        case .committed: return 0.45
+        case .elite: return 0.55
+        }
+    }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: nil, paused: tier == .dormant)) { context in
+            Canvas { ctx, size in
+                let t = context.date.timeIntervalSinceReferenceDate
+                let count = emberCount
+                guard count > 0 else { return }
+
+                for i in 0..<count {
+                    let seed = Double(i)
+                    let cycleDuration = 2.4 + (seed.truncatingRemainder(dividingBy: 3.0)) * 0.5
+                    let phaseOffset = seed / Double(count)
+                    let progress = ((t / cycleDuration) + phaseOffset).truncatingRemainder(dividingBy: 1.0)
+
+                    let xBase = 0.2 + (seed * 0.137).truncatingRemainder(dividingBy: 0.6)
+                    let xDrift = sin((t + seed * 1.7) * 1.3) * 0.04
+                    let x = (xBase + xDrift) * size.width
+
+                    let yStart = size.height * 0.7
+                    let yEnd = size.height * 0.05
+                    let y = yStart + (yEnd - yStart) * progress
+
+                    let fadeIn = min(progress / 0.2, 1.0)
+                    let fadeOut = 1.0 - max((progress - 0.5) / 0.5, 0.0)
+                    let opacity = fadeIn * fadeOut * maxOpacity
+
+                    let emberSize: CGFloat = 2.5 + CGFloat((seed * 0.31).truncatingRemainder(dividingBy: 1.0))
+                    let rect = CGRect(
+                        x: x - emberSize / 2,
+                        y: y - emberSize / 2,
+                        width: emberSize,
+                        height: emberSize
+                    )
+                    ctx.fill(Path(ellipseIn: rect), with: .color(emberColor.opacity(opacity)))
+                }
             }
         }
     }

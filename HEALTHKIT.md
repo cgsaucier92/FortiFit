@@ -25,10 +25,16 @@ The product intent: a user records a workout on Apple Watch, opens FitNavi, and 
 - UI surfaces: Workout Detail source indicator + info sheet, peripheral glyphs, Log Workout read-only fields, Workout Detail Summary two-column grid (HK-linked), Settings "Apple Health" section
 - iOS 18+ `workoutEffortScore` import into `rpe` (nil-fill only)
 
+### In Scope (Phase 11)
+- **Sleep data import** — `.asleep*` and `.inBed` category samples from any HK source (Apple Watch, Oura, Whoop, AutoSleep, etc.), aggregated into `DailySleepSnapshot` records on a 6pm-to-6pm wake-up-date attribution window. See § 21 (Sleep Data).
+- Sleep observer query + `BGAppRefreshTask` registration for overnight refresh.
+- `UserSettings.targetSleepHours` (Double, default 7.0). Optional import from Apple Health's sleep duration goal characteristic via "Import from Apple Health" in the Recovery Status Settings Modal.
+- Sleep-adjusted Training Load decay path (only when the Recovery Status widget is linked to Training Load) — see SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay.
+- New UI surfaces: Recovery Status widget (four gating states), Recovery Status Settings Modal, Recovery Status Detail Sheet, Linked Recovery & Load composite + combined Settings / See Info / Detail Sheet, Settings → Apple Health "Sleep" status row.
+
 ### Explicitly Out of Scope (MVP)
-- **Write-back** (FitNavi → HealthKit). Deferred indefinitely. See § 21.
-- **Biometrics** (resting HR, HRV, body weight, VO₂ max, etc.). Deferred to Phase 3. See § 21.
-- **Sleep data**. Deferred to Phase 4. See § 21.
+- **Write-back** (FitNavi → HealthKit). Deferred indefinitely. See § 22.
+- **Biometrics** (resting HR, HRV, body weight, VO₂ max, etc.). Deferred to Phase 10. See § 22.
 - **GPS / route data**. Not loaded, not stored.
 - **User-configurable HK-to-FortiFit type mapping**. Static table only.
 - **`estimatedWorkoutEffortScore`**. Ignored entirely; only user-entered `workoutEffortScore` imports.
@@ -45,7 +51,9 @@ HealthKit integration is **Phase 8** in the FitNavi roadmap. The full feature in
 - **Phase 1 — Foundation + Workout Import.** Authorization, anchored catch-up queries on launch/foreground, auto-create flow, bidirectional matcher, all UI surfaces, Settings section, manual "Sync Now". After Phase 1 alone, workouts arrive on next foreground.
 - **Phase 2 — Background Delivery.** Adds `HKObserverQuery` with `enableBackgroundDelivery`, `BGAppRefreshTask` registration + handler, and `@MainActor` marshaling. Workouts arrive without user opening the app.
 
-Out of both phases: biometrics (future Phase 10), sleep (future Phase 11), write-back (future Phase 12+). See § 21.
+Out of both phases: biometrics (future Phase 10), write-back (deferred indefinitely). See § 22.
+
+**Phase 11 (Sleep Data + Recovery Status Widget)** ships on top of Phases 1+2. Phase 11 extends `HealthKitClient` with sleep sample reads, registers a sleep observer query, expands `BGAppRefreshTask` scope, and adds new authorization types (see § 17, § 21). The matcher and Workout Cascade are unchanged — sleep data flows through a separate service (`RecoveryStatusService` in SERVICES.md) and a separate cascade (Sleep Cascade). The CLAUDE.md § Phase 11 row indexes the full feature set.
 
 ---
 
@@ -75,6 +83,7 @@ The 10 new `Workout` fields and the `WorkoutMatchRejection` entity are defined i
 
 - All 10 new `Workout` fields are optional. `healthKitUUID == nil` means manual; non-nil means HK-imported or HK-linked.
 - `WorkoutMatchRejection` is standalone (UUID-pair lookup, no `@Relationship`). Orphan rejections after a `Workout` is deleted are retained — harmless, no cleanup in MVP.
+- **Phase 11 adds** `DailySleepSnapshot` (one record per wake-up date) and `DailyTrainingLoadSnapshot` (one record per day). Both standalone, no `@Relationship`. The sleep snapshot is the persistence layer for `RecoveryStatusService`'s 30-day cache (see § 21); the TL snapshot is captured at midnight rollover and on cascade events so the Trends `trainingLoadTrend` chart can render historical days without recomputing from raw HK inputs each open. Full field tables live in PRD.md § Data Model.
 
 Field ownership (HK-owned vs user-owned) is in § 7 below.
 
@@ -382,7 +391,7 @@ Separated from other Settings groups by FortiFitDivider. Section header: **Apple
 | Element | Behavior |
 |---|---|
 | Toggle: "Connect to Apple Health" | Controls app-level enable/disable. Flipping on triggers iOS authorization prompt (first time only). Flipping off stops all sync but retains existing linked workouts. |
-| Description (below toggle) | "Import workouts from Apple Watch and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk." |
+| Description (below toggle) | "Import Apple Fitness workouts and sleep data from Apple Health." |
 | Status line | Muted text below description. See states table below. |
 | "Sync Now" button | Visible only when toggle is on AND authorization is granted. Triggers immediate `importPendingWorkouts()`. |
 | "Open iOS Settings" button | Visible only when toggle is on AND authorization is denied. Deep-links via `UIApplication.openSettingsURLString`. |
@@ -409,7 +418,7 @@ Update `SCREENS.md § Settings` to include the Apple Health section layout.
 ## 17. Authorization
 
 ### Info.plist Requirements
-- `NSHealthShareUsageDescription` — required. Copy: TBD in SCREENS.md. Must be specific enough for App Store review and now must explicitly mention activity rings since Stand-hour and daily-summary access have been added to scope. Suggested: "FitNavi uses your Apple Health workout data to automatically log sessions recorded on Apple Watch or other connected apps, and reads your daily Move, Exercise, and Stand activity to display your activity rings inside FitNavi." Update before release.
+- `NSHealthShareUsageDescription` — required. Copy must be specific enough for App Store review and must mention activity rings (Stand-hour and daily-summary access) **and sleep** (Phase 11). Current copy: *"FitNavi reads your workouts, sleep, and activity data from Apple Health to give you context-aware recovery insights, training load scores, and activity rings visualization."* Update before release if scope expands.
 - `NSHealthUpdateUsageDescription` — NOT included. Not needed; write-back is out of scope.
 
 ### Entitlement
@@ -428,12 +437,17 @@ HealthKit capability added to the target.
 | `HKQuantityTypeIdentifierDistanceSwimming` | 17+ | Per-workout. |
 | `HKQuantityTypeIdentifierFlightsClimbed` | 17+ | Per-workout. |
 | `HKQuantityTypeIdentifierAppleExerciseTime` | 17+ | Used both per-workout (existing) and as a daily-summary source for the Activity Rings widget's Exercise ring. |
-| `HKCategoryTypeIdentifierAppleStandHour` | 17+ | **New.** Daily-summary source for the Activity Rings widget's Stand ring (see § 20). Stored as a category type, not a quantity type — count distinct hours where `value == .stood` for the day. |
+| `HKCategoryTypeIdentifierAppleStandHour` | 17+ | Daily-summary source for the Activity Rings widget's Stand ring (see § 20). Stored as a category type, not a quantity type — count distinct hours where `value == .stood` for the day. |
+| `HKCategoryTypeIdentifierSleepAnalysis` | 17+ | **Phase 11.** Sleep stage samples (`.asleepDeep`, `.asleepREM`, `.asleepCore`, `.asleepUnspecified`, `.awake`, `.inBed`). Read for any HK source (Apple Watch, Oura, Whoop, AutoSleep, etc.). Aggregated by `RecoveryStatusService` into `DailySleepSnapshot` records on the 6pm-to-6pm wake-up-date window (see § 21). |
 | `HKQuantityTypeIdentifierWorkoutEffortScore` | 18+ (gated) | Per-workout. |
+
+> **Removed (BUG-048):** earlier revisions of this section listed `HKCharacteristicTypeIdentifierSleepDurationGoal` as a Phase 11 read type. That characteristic does not exist in HealthKit's public API — the only characteristic identifiers Apple exposes are `activityMoveMode`, `biologicalSex`, `bloodType`, `dateOfBirth`, `fitzpatrickSkinType`, and `wheelchairUse`. Apple's "Sleep Schedule" feature stores sleep goals internally but is not reachable through HealthKit reads. The Import from Apple Health button in the Recovery Status Settings Modal therefore always emits the "No sleep goal set in Apple Health." toast in this build; see § 21 → Apple Health sleep goal import.
 
 `typesToShare` is an empty set. Only `typesToRead` is populated.
 
-**Auth scope expansion note:** Adding `HKCategoryTypeIdentifierAppleStandHour` plus broadening the read intent for `ActiveEnergyBurned` and `AppleExerciseTime` to daily-summary use means users who previously granted permission for the workout-only scope will be re-prompted on first launch of the build that ships the Activity Rings widget. Acceptable in a pre-launch product. Once the app ships, any future scope expansion will need a more careful migration plan (HK does not allow programmatic re-prompts; users must visit iOS Settings → Privacy → Health → FitNavi to grant new types).
+**Auth scope expansion note (Phase 8.6 Activity Rings):** Adding `HKCategoryTypeIdentifierAppleStandHour` plus broadening the read intent for `ActiveEnergyBurned` and `AppleExerciseTime` to daily-summary use means users who previously granted permission for the workout-only scope will be re-prompted on first launch of the build that ships the Activity Rings widget. Acceptable in a pre-launch product. Once the app ships, any future scope expansion will need a more careful migration plan (HK does not allow programmatic re-prompts; users must visit iOS Settings → Privacy → Health → FitNavi to grant new types).
+
+**Auth scope expansion note (Phase 11 Sleep):** Adding `HKCategoryTypeIdentifierSleepAnalysis` triggers a fresh iOS authorization prompt on the first launch of the build that ships the Recovery Status widget. Sleep is treated as an opt-in scope: if the user denies, the Recovery Status widget renders its Sleep Access Denied gating state (see SCREENS.md § Home Screen → Recovery Status → States) with an in-card CTA that deep-links to iOS Settings via `UIApplication.openSettingsURLString`. Same iOS constraint applies: any post-launch scope expansion requires a manual user visit to iOS Settings → Privacy → Health → FitNavi.
 
 ### Denial Handling
 HealthKit authorization is one-shot and opaque. FitNavi cannot re-prompt programmatically. Denial path surfaces via the Settings "Open iOS Settings" deep link.
@@ -536,23 +550,103 @@ Local midnight is the day boundary. At rollover, the widget refetches and render
 
 ---
 
-## 21. Future Phases (Scope-Only)
+## 21. Sleep Data (Phase 11)
 
-### Phase 3: Biometrics
+The Recovery Status widget (see SCREENS.md § Home Screen → Recovery Status widget, SERVICES.md § RecoveryStatusService) requires sleep stage samples and an aggregated daily snapshot on top of the workout and activity-summary reads that Phases 8 and 8.6 already do. This section documents the read patterns, the wake-up-date attribution window, the persistence shape, and the refresh triggers. Algorithm formulas (sleep factor, per-workout contribution, deep-sleep percent, efficiency, correlation) live in SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay and § RecoveryStatusService.
+
+### Sleep Session Definition
+
+Sum durations of `.asleep*` samples only: `.asleepDeep`, `.asleepREM`, `.asleepCore`, `.asleepUnspecified`. Exclude `.inBed` (time in bed ≠ time asleep) and `.awake` (not sleep). `.inBed` samples are still consumed separately for the sleep efficiency calculation. `.awake` samples within the window are tracked for the stages bar in the Recovery Status Detail Sheet.
+
+### Wake-Up Date Attribution — 6pm-to-6pm Window
+
+Sleep is attributed to the **wake-up date**, not the bedtime date. The window for "today's sleep" is 6pm yesterday through 6pm today (local time). Matches the Apple Health app's convention and handles night-shift cases sensibly (a session ending 4pm belongs to today, since it ends before the 6pm boundary).
+
+All `.asleep*` samples ending within the wake-up window are summed, including daytime naps. A 30-minute afternoon nap + an 8-hour overnight session = 8.5 hours total sleep for the wake-up day. The widget hero label is `SLEEP` (not `LAST NIGHT`) — accurate even with naps in the total.
+
+### Sleep Source Filtering
+
+Accept any HK source. No source filtering. Apple Watch, Oura Ring, Whoop, AutoSleep, etc., all contribute.
+
+The original Apple Watch-only `appleWatchDetected` gating used by the Activity Rings widget is **not** reused for sleep. The Recovery Status widget's gating uses `hasRecentSleepData` instead:
+
+```
+hasRecentSleepData = HK has any .asleep* sample in the last 14 days
+```
+
+14-day window: long enough to handle short device breaks, short enough to detect "user stopped tracking" and degrade to the No Sleep Tracker state (see SCREENS.md § Home Screen → Recovery Status → States).
+
+### `DefaultHealthKitClient` Sleep Methods
+
+`HealthKitClient` exposes the following methods (concrete signatures finalized by Claude Code; see SERVICES.md § HealthKitClient):
+
+**`fetchSleepSamples(from start: Date, to end: Date) async -> [HKCategorySample]`** — anchored query for `HKCategoryTypeIdentifierSleepAnalysis` samples in the range. Used by `RecoveryStatusService` for catch-up on launch and to populate the 30-day cache. Returns all stage values (`.asleep*`, `.awake`, `.inBed`) so the consumer can compute durations, efficiency, and the stages bar.
+
+**`observeSleepChanges(handler: @escaping () -> Void)`** — registers an `HKObserverQuery` for `HKCategoryTypeIdentifierSleepAnalysis` with `enableBackgroundDelivery`. Fires when HK writes new sleep samples (typically Apple Watch syncs in the morning, or a third-party sleep tracker pushes overnight). Handler hops to `@MainActor` before any SwiftData work. Same pattern as the existing `observeWorkoutChanges` (see § 9 Sync Lifecycle).
+
+**`fetchSleepDurationGoal() async -> TimeInterval?`** — protocol method retained for forward compatibility, but the underlying HealthKit characteristic does not exist (BUG-048). Always returns `nil` in the current build. Called only from the "Import from Apple Health" action in the Recovery Status Settings Modal; the consumer (`RecoveryStatusService.importSleepGoalFromAppleHealth()`) surfaces the documented "No sleep goal set in Apple Health." toast on every call.
+
+### `HealthKitSyncService` — Sleep Observer + Background Refresh
+
+`HealthKitSyncService` (see SERVICES.md § HealthKitSyncService) gains:
+
+- A sleep observer subscription registered alongside the existing workout observer at app launch (when `healthKitEnabled == true` AND sleep scope granted).
+- An expanded `BGAppRefreshTask` scope so background fires also refresh sleep data. The single task identifier is preserved — the handler now imports both pending workouts AND pending sleep samples. Allows Apple Watch sleep to sync overnight so morning app opens have fresh data without a spinner.
+- A 6pm-cutoff catch-up trigger: the first `scenePhase == .active` after local 6pm refreshes sleep regardless of observer activity, to bridge any missed background fires.
+
+The Workout Cascade is unchanged. Sleep refresh runs through a separate **Sleep Cascade** documented in SERVICES.md § Sleep Cascade.
+
+### `DailySleepSnapshot` Persistence
+
+Schema in PRD.md § Data Model. One record per wake-up date, deduplicated by date. Written by `RecoveryStatusService` after each anchored query or observer fire:
+
+1. Aggregate the day's `.asleep*` durations, deep/REM/core/awake breakdowns, optional `.inBed` durations.
+2. Compute `sleepEfficiencyPercent` from `inBedMinutes`. When the source writes explicit `.inBed` samples, `inBedMinutes` is the Σ of those samples. When the source omits them (Apple Watch's native sleep tracker on watchOS 9+ — see BUG-059), `inBedMinutes` falls back to `totalSleepMinutes + awakeMinutes` so efficiency surfaces for Apple-Watch-only users instead of staying silently nil. Efficiency is nil only when neither path yields data.
+3. Upsert by `wakeUpDate` — overwrite existing snapshot if HK returned new samples for that day (e.g., a delayed Watch sync).
+4. Bump `capturedDate = .now`.
+5. Fire the Sleep Cascade (see SERVICES.md § Sleep Cascade) — refreshes the Recovery Status widget; if linked to Training Load, recomputes today's TL score on the sleep-adjusted path and rewrites today's `DailyTrainingLoadSnapshot`.
+
+The service also maintains a rolling **30-day in-memory cache** of these snapshots so the Recovery Status Detail Sheet's sparkline + last-7-nights stat row render without on-demand HK queries.
+
+### Refresh Triggers
+
+The Recovery Status widget and detail sheet refresh on:
+
+| Trigger | Behavior |
+|---|---|
+| App launch | Anchored sleep query for new samples since `UserSettings.healthKitAnchor`; rebuild 30-day cache from `DailySleepSnapshot` store. |
+| Sleep observer query fires | Refresh today's snapshot, append to cache, fire Sleep Cascade. |
+| 6pm-cutoff first foreground | Catch-up sleep refresh regardless of observer activity. |
+| `BGAppRefreshTask` handler | Same as observer fire — refresh today's snapshot if new samples present. |
+| Workout Cascade (HK-linked workout only) | No sleep refetch; only the time-since-last-workout timer line is bumped. |
+| Local midnight rollover | Roll the wake-up day forward; the previous day's snapshot becomes historical. |
+
+### Sleep Cascade
+
+A separate cascade from the Workout Cascade because the inputs and consumers differ. Documented in SERVICES.md § Sleep Cascade. Summary:
+
+1. Refresh the Recovery Status widget's view-model (hero value, deep caption, no-sleep-last-night sub-state detection).
+2. If the widget is linked to Training Load (`HomeWidgetService.isLinkedActive(widgets:settings:) == true`), recompute today's TL score on the sleep-adjusted path (SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay) and overwrite today's `DailyTrainingLoadSnapshot`.
+3. If a detail sheet (unlinked OR linked) is currently presented, the sheet's service publisher emits — sleep sparkline, stages bar, comparison band, correlation callout, and personal insights all update live.
+4. Debounce across all triggers: 500ms.
+
+### Known Failure Modes (documented, no UI)
+
+- Apple Watch user keeps the Watch off the wrist overnight → no `.asleep*` samples → Live state degrades to the **no-sleep-last-night sub-state** (hero shows `— h —m`, deep caption reads `NO DATA`, timer line and watermark render normally). See SCREENS.md § Home Screen → Recovery Status widget → no-sleep-last-night sub-state.
+- Source emits stage samples but no `.inBed` (the Apple Watch native sleep tracker case, plus some third-party apps) → `inBedMinutes` falls back to `totalSleepMinutes + awakeMinutes` so `sleepEfficiencyPercent` is computed and the detail-sheet caption renders. Per BUG-059.
+- User force-quit FitNavi → background delivery does not fire. 6pm-cutoff catch-up on next foreground recovers.
+- User disabled Background App Refresh at OS level → sleep imports only during foreground (anchored query on launch + 6pm-cutoff trigger).
+
+---
+
+## 22. Future Phases (Scope-Only)
+
+### Phase 10: Biometrics
 **Net-new entity:** `DailyBiometricSnapshot` (one record per calendar day). Fields include derived values: resting HR, HRV avg, body weight, VO₂ max, etc.
 
 **Pattern:** mirror daily summaries into SwiftData; query HK live for intra-day detail if UI needs it. One snapshot per day, generated via background delivery or foreground catch-up.
 
-**No Phase 1 constraints.** Schema is net-new. Permission additions are additive (user sees a second iOS prompt when Phase 3 enables new types).
+**No Phase 1 constraints.** Schema is net-new. Permission additions are additive (user sees a second iOS prompt when Phase 10 enables new types).
 
-### Phase 4: Sleep
-**Net-new entity:** `DailySleepSnapshot`. Fields: `totalSleepMinutes`, stage breakdowns (deep/REM/core/awake), `sleepStartTime`, `sleepEndTime`, `sleepEfficiencyPercent`.
-
-**Attribution convention:** sleep is attributed to the **wake-up date**, not the bedtime date. Sleep ending Wednesday morning lives on Wednesday's snapshot.
-
-**New UI surfaces required.** Sleep has no current home in FitNavi. Phase 4 requires a dedicated PRD pass for UX (home widget, dedicated screen, or both). Currently listed as "out of scope" in PRD.md § Out of Scope — gets revisited at Phase 4.
-
-**No Phase 1 constraints.**
-
-### Phase 5 (Possible): Write-Back
+### Phase 12+ (Possible): Write-Back
 Deferred indefinitely. Revisit requires: `NSHealthUpdateUsageDescription`, extended authorization request with `typesToShare`, active energy estimation for manual workouts, delete/edit propagation added to Workout Cascade, retroactive-write decision.

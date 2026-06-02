@@ -61,7 +61,7 @@ A holistic health app that helps users track and understand the interaction betw
 - **Dependencies:** Zero third-party. Native frameworks only. Swift Package Manager.
 - **HealthKit:** Read-only integration in Phase 8 (see HEALTHKIT.md). Imports workouts from Apple Watch and other Health-connected sources. No write-back in MVP.
 - **WorkoutKit:** Outbound integration in Phase 8.7 (see WORKOUTKIT.md). Schedules `ScheduledWorkout`s onto the user's paired Apple Watch as native workouts in the Watch's Workout app. Requires watchOS 11+ for the Scheduled section to render. Native iOS framework, no third-party dependency. Plan-ID round-trip via `HKWorkout.workoutPlan?.id` (WorkoutKit extension) lets HealthKit's read pipeline match completed sessions back to the originating `ScheduledWorkout`.
-- **Not in MVP:** CloudKit, authentication, user accounts, HealthKit write-back, native watchOS companion app, biometrics (Phase 10), sleep data (Phase 11).
+- **Not in MVP:** CloudKit, authentication, user accounts, HealthKit write-back, native watchOS companion app, biometrics (Phase 10).
 
 ### Project Structure
 
@@ -86,6 +86,8 @@ FortiFit/
 │   │   ├── HomeWidget.swift
 │   │   ├── TrendsChart.swift
 │   │   ├── WorkoutMatchRejection.swift
+│   │   ├── DailySleepSnapshot.swift
+│   │   ├── DailyTrainingLoadSnapshot.swift
 │   │   └── UserSettings.swift
 │   ├── Services/
 │   │   ├── WorkoutService.swift
@@ -110,7 +112,8 @@ FortiFit/
 │   │   ├── WorkoutMetricService.swift
 │   │   ├── WorkoutSchedulerProtocol.swift
 │   │   ├── DefaultWorkoutScheduler.swift
-│   │   └── WatchScheduleService.swift
+│   │   ├── WatchScheduleService.swift
+│   │   └── RecoveryStatusService.swift
 │   └── Utilities/
 │       ├── Extensions/                # Date+, Double+, Color+
 │       ├── ShareSheet.swift           # UIActivityViewController wrapper
@@ -128,6 +131,12 @@ FortiFit/
 │   │                                  #                FortiFitTrainingLoadDetailSheet.swift,
 │   │                                  #                FortiFitWeeklyStreakDetailSheet.swift,
 │   │                                  #                FortiFitPowerLevelDetailSheet.swift
+│   │                                  # Phase 11 adds: FortiFitRecoveryStatusWidget.swift,
+│   │                                  #               FortiFitRecoveryStatusSettingsModal.swift,
+│   │                                  #               FortiFitRecoveryStatusDetailSheet.swift,
+│   │                                  #               FortiFitLinkedRecoveryLoadComposite.swift,
+│   │                                  #               FortiFitLinkedRecoveryLoadSettingsModal.swift,
+│   │                                  #               FortiFitLinkedRecoveryLoadDetailSheet.swift
 │   ├── Theme/                         # Colors.swift, Typography.swift, Spacing.swift
 │   └── Assets.xcassets
 └── Tests/
@@ -162,6 +171,17 @@ Home → Activity Detail Sheet (tap Activity Rings widget → 7/30-day breakdown
 Home → Activity Rings Settings Modal (long-press Activity Rings widget → "Configure Settings")
 Home → Activity Rings See Info Modal (long-press Activity Rings widget → "See Info")
 Home → Settings (tap "Connect" CTA on Activity Rings widget when Apple Health disconnected)
+Home → Recovery Status Detail Sheet (tap Recovery Status widget — Phase 11)
+Home → Recovery Status Settings Modal (long-press Recovery Status widget → "Configure Settings")
+Home → Recovery Status See Info Modal (long-press Recovery Status widget → "See Info")
+Home → Settings (tap Recovery Status widget in Connect Apple Health state)
+Home → iOS Settings (tap Recovery Status widget in Sleep Access Denied state — deep-links via UIApplication.openSettingsURLString)
+Home → Linked Recovery & Load Detail Sheet (tap either card of the linked composite)
+Home → Linked Recovery & Load Settings Modal (long-press linked composite → "Configure Settings")
+Home → Linked Recovery & Load See Info Modal (long-press linked composite → "See Info")
+Recovery Status Detail Sheet → Workout Detail (tap headline row of Time Since Last Workout block)
+Recovery Status Detail Sheet → Workouts (tap per-type row of Time Since Last Workout block — auto-expands that type's card)
+Recovery Status Detail Sheet → Log Workout (tap "Log a Workout" CTA in cold-start empty state)
 
 Workouts → Log Workout ("+ LOG")
 Workouts → Expand/Collapse Workout Type card (tap)
@@ -377,6 +397,8 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | healthKitAnchor | Data? | nil | Serialized `HKQueryAnchor` for catch-up sync (see HEALTHKIT.md § 9). Updated after every successful anchored query. |
 | healthKitLastSyncDate | Date? | nil | Timestamp of last successful sync. Drives the "Last sync X min ago" status line in Settings. |
 | syncPlanToAppleWatchEnabled | Bool | false | Master kill switch for Apple Watch workout scheduling (see WORKOUTKIT.md § 7, § 9, § 10 and SCREENS.md § Settings → Apple Watch Section). When `false`, all per-card `syncToAppleWatch` flags are visually disabled and any plans previously registered with the Watch are removed. Per-card flags are retained for restoration when master is flipped back on. First flip-on triggers `WorkoutScheduler.shared.requestAuthorization()` (just-in-time pattern). |
+| targetSleepHours | Double | 7.0 | Daily sleep duration target in hours. Range 4.0–12.0, snap to nearest 0.5. Drives the Recovery Status widget's deep-sleep-target context, the Sleep Target slider in the Recovery Status Settings Modal, and the sleep-adjusted decay path of the Training Load algorithm when the Recovery Status widget is linked to Training Load (see SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay). Optionally populated from Apple Health's sleep duration goal characteristic via "Import from Apple Health" in the settings modal. See HEALTHKIT.md § 21. |
+| recoveryLoadManuallyUnlinked | Bool | false | Sticky flag set when the user explicitly chooses "Unlink Widgets" from the combined long-press context menu on the Linked Recovery & Load composite. Prevents auto-relink even when Recovery Status and Training Load become adjacent again. Cleared only when the user manually re-establishes linking (e.g., by removing and re-adding one of the widgets, or via the Add Widgets Menu Order seed). See SCREENS.md § Standard Patterns → Widget Linking and SERVICES.md § HomeWidgetService → `isLinkedActive`. |
 
 #### WorkoutMatchRejection
 | Property | Type | Required | Notes |
@@ -389,6 +411,34 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 
 Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md § WorkoutMatcher). Before proposing any pairing, the matcher checks for an existing rejection with matching `(healthKitUUID, workoutId)` — regardless of `reason`. No `@Relationship` to `Workout` — lookups are by UUID pair. Orphan rejections (when a linked `Workout` is deleted) are harmless and retained.
 
+#### DailySleepSnapshot
+| Property | Type | Required | Notes |
+|----------|------|----------|-------|
+| id | UUID | Yes | Auto-generated |
+| wakeUpDate | Date | Yes | Calendar day the user woke up (time component zeroed). Lookup key — unique per day. |
+| totalSleepMinutes | Int | Yes | Σ duration of all `.asleep*` HK samples for the sleep window (per HEALTHKIT.md § 21) |
+| deepSleepMinutes | Int | Yes | Σ duration of `.asleepDeep` samples |
+| remSleepMinutes | Int | Yes | Σ duration of `.asleepREM` samples |
+| coreSleepMinutes | Int | Yes | Σ duration of `.asleepCore` + `.asleepUnspecified` samples |
+| awakeMinutes | Int | Yes | Σ duration of `.awake` samples within the sleep window |
+| inBedMinutes | Int? | No | Σ duration of `.inBed` samples. Nil if no `.inBed` samples were written by the source. Drives sleep-efficiency calculation. |
+| sleepEfficiencyPercent | Int? | No | `round((totalSleepMinutes / inBedMinutes) × 100)`. Nil if `inBedMinutes` is nil. |
+| sourceBundleID | String? | No | Bundle ID of the writing app (Apple Health, Oura, Whoop, etc.). Used for diagnostic surfacing only. |
+| capturedDate | Date | Yes | Wall-clock timestamp when the snapshot was written. |
+
+Standalone entity (no `@Relationship`). Lookups by `wakeUpDate`. Written by `RecoveryStatusService` on observer-triggered sleep refresh; one snapshot per wake-up day, deduplicated by date. Drives the unlinked Recovery Status detail sheet's 14-day sparkline (sliced from the 30-day cache) and the linked Recovery & Load detail sheet's 14-day sleep chart. See HEALTHKIT.md § 21 and SERVICES.md § RecoveryStatusService.
+
+#### DailyTrainingLoadSnapshot
+| Property | Type | Required | Notes |
+|----------|------|----------|-------|
+| id | UUID | Yes | Auto-generated |
+| date | Date | Yes | Calendar day the snapshot represents (time component zeroed). Lookup key — unique per day. |
+| score | Int | Yes | Training Load score (0–100) captured at midnight rollover for this day. |
+| wasSleepAdjusted | Bool | Yes | `true` if the score was computed using the sleep-adjusted decay path (Recovery Status linked to Training Load at capture time); `false` if computed using the baseline algorithm. |
+| capturedDate | Date | Yes | Wall-clock timestamp when the snapshot was written. |
+
+Standalone entity (no `@Relationship`). Lookups by `date`. Written by the Training Load algorithm's Daily Snapshot Capture path (see SERVICES.md § Training Load Algorithm → Daily Snapshot Capture). Powers the Trends `trainingLoadTrend` chart's snapshot-aware rendering — historical days render from snapshot values, today's value is recomputed live. Also drives the linked detail sheet's 14-day Training Load chart and window comparison.
+
 ### Relationships
 - Workout → many ExerciseSets (cascade delete, ordered by sortOrder)
 - WorkoutTemplate → many TemplateExerciseSets (cascade delete, ordered by sortOrder)
@@ -400,6 +450,8 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 - HomeWidget: one per active widget. No relationship to other entities.
 - TrendsChart: one per active chart. No relationship to other entities. Mirrors HomeWidget pattern.
 - WorkoutMatchRejection: standalone. Links to Workout and HK records by UUID reference, not @Relationship. See HEALTHKIT.md § 12 for matcher lookup semantics. Orphan rejections after Workout deletion are harmless and retained; no cascade.
+- DailySleepSnapshot: standalone. No `@Relationship`. One record per `wakeUpDate`. Written and deduplicated by `RecoveryStatusService` on sleep observer fire. Not affected by Workout deletion. See HEALTHKIT.md § 21.
+- DailyTrainingLoadSnapshot: standalone. No `@Relationship`. One record per `date`. Written at midnight rollover and on any cascade event that mutates today's TL inputs (workout create/edit/delete, sleep refresh while linked). Workout deletion triggers a recompute-and-overwrite of today's snapshot; historical snapshots are immutable. See SERVICES.md § Training Load Algorithm → Daily Snapshot Capture.
 - UserSettings: singleton (UserDefaults)
 
 ---
@@ -428,6 +480,11 @@ Standalone entity used by `WorkoutMatcher` (see HEALTHKIT.md § 12, SERVICES.md 
 | Training Load Detail Sheet (Phase 8.8) | Tap-to-open breakdown of training load with 14-day chart, contributing workouts, week comparison, recovery callout (SCREENS § Training Load Detail Sheet) |
 | Weekly Streak Insights Sheet (Phase 8.8) | Tap-to-open streak insights with typographic hero, stat row, this-week ring, 26-week heatmap, milestone shelf — no flame (SCREENS § Weekly Streak Insights Sheet) |
 | Power Level Breakdown Sheet (Phase 8.8) | Tap-to-open breakdown with 30-day volume chart, top exercises driving trend, window comparison, calculated nudge (SCREENS § Power Level Breakdown Sheet) |
+| Recovery Status Settings Modal (Phase 11) | Configure unlinked Recovery Status widget: Sleep Target slider (4–12h, 0.5 step), Import from Apple Health, Done (SCREENS § Recovery Status Settings Modal) |
+| Recovery Status Detail Sheet (Phase 11) | Tap-to-open detail for the unlinked Recovery Status widget: stages bar, sleep efficiency, 14-day sparkline, last-7-nights stat row, time-since-workout breakdown, See Info / Configure Settings footer (SCREENS § Recovery Status Detail Sheet) |
+| Linked Recovery & Load Settings Modal (Phase 11) | Combined Configure Settings modal for the linked composite: Training Experience, Target Workout Duration, Sleep Target sliders + Import from Apple Health (SCREENS § Linked Recovery & Load Settings Modal) |
+| Linked Recovery & Load Detail Sheet (Phase 11) | Combined detail sheet for the linked composite: dual hero, stacked 14-day sleep + sleep-adjusted TL charts, synchronized scrubbing, window comparison, correlation callout, personal pattern insights, contributing workouts, last-3-nights row, time-since-workout, recovery readiness callout (SCREENS § Linked Recovery & Load Detail Sheet) |
+| Recovery Status / Linked Recovery & Load See Info Modal (Phase 11) | Reuses the existing `FortiFitSeeInfoModal` component; copy keyed by `recoveryStatus` and `linkedRecoveryLoad` in INFO_COPY § Widget Info Modal Copy |
 
 ---
 
@@ -442,7 +499,6 @@ Do NOT build, scaffold UI for, or write service logic for:
 - HealthKit write-back (FitNavi → HealthKit). Read integration is in scope as of Phase 8 — see HEALTHKIT.md § 2 and § 20.
 - Nutrition tracking
 - Mental health or mindfulness
-- Sleep tracking (deferred to future Phase 11 — see HEALTHKIT.md § 20)
 - Biometrics: resting HR, HRV, body weight, VO₂ max, etc. (deferred to future Phase 10 — see HEALTHKIT.md § 20)
 - Onboarding flow
 

@@ -199,7 +199,7 @@ struct SettingsView: View {
                     .tint(FortiFitColors.primaryAccent)
                     .accessibilityIdentifier(AccessibilityID.settingsAppleHealthToggle)
 
-                    Text("Import workouts from Apple Fitness and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk.")
+                    Text("Import Apple Fitness workouts and sleep data from Apple Health.")
                         .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
 

@@ -121,7 +121,7 @@ struct PowerLevelService {
             message = "Your volume has decreased over the last 30 days."
         case .steady:
             indicator = "—"
-            indicatorColor = "3b82f6"
+            indicatorColor = "737373"
             message = "Your volume has been consistent over the last 30 days."
         case .rising:
             indicator = "↑"

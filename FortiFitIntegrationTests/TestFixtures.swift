@@ -37,6 +37,8 @@ enum TestFixtures {
                 HomeWidget.self,
                 TrendsChart.self,
                 WorkoutMatchRejection.self,
+                DailySleepSnapshot.self,
+                DailyTrainingLoadSnapshot.self,
             configurations: config
         )
     }
@@ -536,6 +538,12 @@ final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
     var activitySummariesToReturn: [ActivitySummarySnapshot] = []
     var hasAppleWatchDataToReturn: Bool = false
 
+    // Sleep stubs (Phase 11)
+    var sleepSamplesToReturn: [HKSleepSampleSnapshot] = []
+    var sleepDurationGoalToReturn: TimeInterval? = nil
+    var hasRecentSleepDataToReturn: Bool = false
+    var sleepObserverHandler: (@Sendable () -> Void)?
+
     func requestAuthorization() async throws {
         authorizationRequested = true
     }
@@ -579,5 +587,27 @@ final class StubHealthKitClient: HealthKitClient, @unchecked Sendable {
 
     func hasAppleWatchData(within days: Int) async throws -> Bool {
         hasAppleWatchDataToReturn
+    }
+
+    // Sleep methods (Phase 11)
+    func fetchSleepSamples(from start: Date, to end: Date) async throws -> [HKSleepSampleSnapshot] {
+        sleepSamplesToReturn.filter { $0.endDate > start && $0.endDate <= end }
+    }
+
+    func observeSleepChanges(handler: @escaping @Sendable () -> Void) {
+        sleepObserverHandler = handler
+    }
+
+    func fetchSleepDurationGoal() async throws -> TimeInterval? {
+        sleepDurationGoalToReturn
+    }
+
+    func hasRecentSleepData(within days: Int) async throws -> Bool {
+        hasRecentSleepDataToReturn
+    }
+
+    /// Convenience for tests — synchronously fires the captured sleep observer handler.
+    func fireSleepObserver() {
+        sleepObserverHandler?()
     }
 }

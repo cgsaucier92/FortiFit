@@ -98,7 +98,7 @@ struct TrendsChartService {
         case "personalRecords":
             return personalRecordsSummary(exerciseName: exerciseName, workouts: allWorkouts)
         case "trainingLoadTrend":
-            return trainingLoadTrendSummary(workouts: allWorkouts)
+            return trainingLoadTrendSummary(workouts: allWorkouts, context: context)
         case "workoutVolume":
             return workoutVolumeSummary(workouts: allWorkouts, timeRangeDays: timeRangeDays ?? 30)
         case "rpeTrend":
@@ -198,7 +198,7 @@ struct TrendsChartService {
         return ChartSummary(hero: deltaDisplay, caption: AppConstants.Trends.captionLatestPR)
     }
 
-    private static func trainingLoadTrendSummary(workouts: [Workout]) -> ChartSummary? {
+    private static func trainingLoadTrendSummary(workouts: [Workout], context: ModelContext) -> ChartSummary? {
         let calendar = Calendar.current
         let cutoff = calendar.date(byAdding: .day, value: -14, to: Date()) ?? Date()
         let recentWorkouts = workouts.filter { $0.date >= cutoff }
@@ -210,14 +210,72 @@ struct TrendsChartService {
         let windowStart = calendar.date(byAdding: .day, value: -10, to: Date()) ?? Date()
         let windowWorkouts = workouts.filter { $0.date >= windowStart && $0.date <= Date() }
 
-        let result = ExerciseLoadService.calculateLoad(
-            workouts: windowWorkouts,
-            experienceLevel: settings.experienceLevel,
-            targetMinutesPerWorkout: settings.targetMinutesPerWorkout
+        // BUG-067 — when Recovery Status is linked with Training Load, the chart's
+        // header hero must reflect the same sleep-adjusted score the user sees on the
+        // home widget and the linked detail sheet. Falls back to baseline `calculateLoad`
+        // when unlinked or when called from a background thread (tests).
+        let result = computeTrainingLoadForToday(
+            windowWorkouts: windowWorkouts,
+            settings: settings,
+            now: Date(),
+            context: context
         )
 
         let hero = "\(Int(result.score.rounded()))"
         return ChartSummary(hero: hero, caption: AppConstants.Trends.captionToday)
+    }
+
+    // MARK: - Linked Sleep Input Resolution (BUG-067)
+
+    /// Computes today's Training Load score, preferring the sleep-adjusted path when
+    /// Recovery Status is linked with Training Load on the Home screen. The actor-isolated
+    /// snapshot fetch runs inside `MainActor.assumeIsolated` and the algorithm runs inside
+    /// it too — only the final `LoadResult` (a pure-value struct) crosses the actor
+    /// boundary, so non-Sendable `DailySleepSnapshot` instances never escape MainActor.
+    ///
+    /// Returns the baseline `calculateLoad` result when:
+    ///   - The user is unlinked (Recovery Status / Training Load not adjacent or one is
+    ///     missing or `recoveryLoadManuallyUnlinked` is true)
+    ///   - `RecoveryStatusService.current` is not yet initialized
+    ///   - Called from a background thread (Swift Testing / XCTest contexts that aren't
+    ///     pinned to `@MainActor`) — existing baseline-behavior tests pass unchanged.
+    ///
+    /// Centralizes the linking-state query so `trainingLoadTrendSummary` and
+    /// `trainingLoadPoints` share one source of truth.
+    private static func computeTrainingLoadForToday(
+        windowWorkouts: [Workout],
+        settings: UserSettings,
+        now: Date,
+        context: ModelContext
+    ) -> ExerciseLoadService.LoadResult {
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated {
+                let widgets = HomeWidgetService.fetchAll(context: context)
+                if HomeWidgetService.isLinkedActive(widgets: widgets, settings: settings),
+                   let recovery = RecoveryStatusService.current {
+                    return ExerciseLoadService.computeCurrentScore(
+                        workouts: windowWorkouts,
+                        sleepSnapshotsByDay: recovery.cachedSnapshotsByDay(),
+                        targetSleepHours: settings.targetSleepHours,
+                        experienceLevel: settings.experienceLevel,
+                        targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
+                        now: now
+                    )
+                }
+                return ExerciseLoadService.calculateLoad(
+                    workouts: windowWorkouts,
+                    experienceLevel: settings.experienceLevel,
+                    targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
+                    now: now
+                )
+            }
+        }
+        return ExerciseLoadService.calculateLoad(
+            workouts: windowWorkouts,
+            experienceLevel: settings.experienceLevel,
+            targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
+            now: now
+        )
     }
 
     private static func workoutVolumeSummary(workouts: [Workout], timeRangeDays: Int) -> ChartSummary? {
@@ -776,19 +834,56 @@ struct TrendsChartService {
     private static func trainingLoadPoints(range: DetailTimeRange, workouts: [Workout], calendar: Calendar, now: Date, context: ModelContext) -> [ChartDataPoint] {
         let rangeDays = range.days ?? 30
         let settings = UserSettings.shared
-        var points: [ChartDataPoint] = []
+        let today = calendar.startOfDay(for: now)
 
+        // Phase 11 — prefer `DailyTrainingLoadSnapshot` for historical days. Today is always
+        // computed live so the latest point matches the hero. Pre-feature-launch days
+        // without snapshots fall back to live recompute on the baseline algorithm.
+        let windowStart = calendar.date(byAdding: .day, value: -(rangeDays - 1), to: today) ?? today
+        let snapshots = ExerciseLoadService.snapshots(
+            for: DateInterval(start: windowStart, end: today),
+            context: context
+        )
+        let snapshotsByDay: [Date: DailyTrainingLoadSnapshot] = snapshots.reduce(into: [:]) { acc, snap in
+            acc[calendar.startOfDay(for: snap.date)] = snap
+        }
+
+        var points: [ChartDataPoint] = []
         for daysAgo in (0..<rangeDays).reversed() {
-            guard let day = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: now)) else { continue }
-            let dayNow = daysAgo == 0 ? now : (calendar.date(bySettingHour: 23, minute: 59, second: 59, of: day) ?? day)
-            let windowStart = calendar.date(byAdding: .day, value: -10, to: dayNow) ?? dayNow
-            let dayWorkouts = workouts.filter { $0.date >= windowStart && $0.date <= dayNow }
-            let result = ExerciseLoadService.calculateLoad(
-                workouts: dayWorkouts,
-                experienceLevel: settings.experienceLevel,
-                targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
-                now: dayNow
-            )
+            guard let day = calendar.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let isToday = daysAgo == 0
+
+            if !isToday, let snapshot = snapshotsByDay[day] {
+                let zone = ExerciseLoadService.classifyZone(score: Double(snapshot.score))
+                points.append(ChartDataPoint(x: day, y: Double(snapshot.score), label: "\(snapshot.score) — \(zone.zone)"))
+                continue
+            }
+
+            let dayNow = isToday ? now : (calendar.date(bySettingHour: 23, minute: 59, second: 59, of: day) ?? day)
+            let lookbackStart = calendar.date(byAdding: .day, value: -10, to: dayNow) ?? dayNow
+            let dayWorkouts = workouts.filter { $0.date >= lookbackStart && $0.date <= dayNow }
+            // BUG-067 — today's live recompute must use the sleep-adjusted path when
+            // Recovery Status is linked with Training Load so the latest data point
+            // matches the home widget bar, the chart header hero, and the persisted
+            // `DailyTrainingLoadSnapshot`. Historical pre-snapshot fallback days stay on
+            // baseline `calculateLoad` (their snapshots, if captured later, will be the
+            // authoritative record).
+            let result: ExerciseLoadService.LoadResult
+            if isToday {
+                result = computeTrainingLoadForToday(
+                    windowWorkouts: dayWorkouts,
+                    settings: settings,
+                    now: dayNow,
+                    context: context
+                )
+            } else {
+                result = ExerciseLoadService.calculateLoad(
+                    workouts: dayWorkouts,
+                    experienceLevel: settings.experienceLevel,
+                    targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
+                    now: dayNow
+                )
+            }
             let zone = ExerciseLoadService.classifyZone(score: result.score)
             points.append(ChartDataPoint(x: day, y: result.score, label: "\(formattedInt(result.score)) — \(zone.zone)"))
         }

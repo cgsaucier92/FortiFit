@@ -90,10 +90,9 @@ struct FortiFitTrainingLoadDetailSheet: View {
     private var dailyChartBlock: some View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                Text("Last 14 days")
-                    .font(FortiFitTypography.labelSmall)
-                    .kerning(FortiFitTypography.labelKerning)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                Text("Last 14 Days · Training Load")
+                    .font(FortiFitTypography.detailSheetItemTitle)
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 if chartHasEnoughData {
                     interactiveDailyChart
@@ -219,10 +218,9 @@ struct FortiFitTrainingLoadDetailSheet: View {
     private var contributingWorkoutsBlock: some View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                Text("Contributing this week")
-                    .font(FortiFitTypography.labelSmall)
-                    .kerning(FortiFitTypography.labelKerning)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                Text("Contributing This Week")
+                    .font(FortiFitTypography.detailSheetItemTitle)
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 if contributors.isEmpty {
                     Text(AppConstants.WidgetDetail.EmptyState.trainingLoadContributingWorkouts)
@@ -253,11 +251,11 @@ struct FortiFitTrainingLoadDetailSheet: View {
         HStack(alignment: .center, spacing: FortiFitSpacing.elementSpacing) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(c.workoutName)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(FortiFitColors.mutedText)
                     .lineLimit(1)
                 Text(c.date.shortFormatted)
-                    .font(FortiFitTypography.labelSmall)
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
             }
             Spacer()
@@ -292,22 +290,41 @@ struct FortiFitTrainingLoadDetailSheet: View {
 
     @ViewBuilder
     private var weekComparisonBlock: some View {
-        if let comparison = weekComparison, comparison.currentWeekTss > 0, comparison.previousWeekTss > 0 {
-            let deltaColor: Color = comparison.deltaPct > 0 ? FortiFitColors.alert : FortiFitColors.positive
-            let arrow = comparison.deltaPct > 0 ? "↑" : (comparison.deltaPct < 0 ? "↓" : "—")
-            let magnitude = abs(comparison.deltaPct)
-            FortiFitCard {
-                HStack {
-                    Text("Stress load")
-                        .font(FortiFitTypography.body)
-                        .foregroundStyle(FortiFitColors.primaryText)
-                    Spacer()
-                    Text("\(arrow) \(magnitude)% vs last week")
-                        .font(FortiFitTypography.labelSmall)
-                        .foregroundStyle(deltaColor)
+        if let comparison = weekComparison {
+            let insufficient = comparison.matchedDayCount < 2
+            let hasAnyData = comparison.currentWeekTss > 0 || comparison.previousWeekTss > 0
+            // Hide entirely when there's no data AND no early-week reason to surface the
+            // "Not enough data" treatment — preserves the existing standalone behavior of
+            // not showing an empty card to never-trained users.
+            if insufficient || hasAnyData {
+                FortiFitCard {
+                    VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
+                        HStack {
+                            Text("Stress Load")
+                                .font(FortiFitTypography.detailSheetItemTitle)
+                                .foregroundStyle(FortiFitColors.primaryText)
+                            Spacer()
+                            if insufficient {
+                                Text("Not enough data")
+                                    .font(FortiFitTypography.bodySmall)
+                                    .foregroundStyle(FortiFitColors.mutedText)
+                            } else {
+                                let deltaColor: Color = comparison.deltaPct >= 0 ? FortiFitColors.alert : FortiFitColors.positive
+                                let arrow = comparison.deltaPct >= 0 ? "↑" : "↓"
+                                Text("\(arrow) \(abs(comparison.deltaPct))%")
+                                    .font(FortiFitTypography.bodySmall)
+                                    .foregroundStyle(deltaColor)
+                            }
+                        }
+                        Text(FortiFitLinkedRecoveryLoadDetailSheet.windowComparisonCaption(now: Date()))
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier(AccessibilityID.trainingLoadDetailSheet_weekComparisonCaption)
+                    }
                 }
+                .accessibilityIdentifier(AccessibilityID.trainingLoadDetailSheet_weekComparison)
             }
-            .accessibilityIdentifier(AccessibilityID.trainingLoadDetailSheet_weekComparison)
         }
     }
 
@@ -365,8 +382,16 @@ struct FortiFitTrainingLoadDetailSheet: View {
         let settings = UserSettings.shared
         let now = Date()
         let workouts = WorkoutService.fetchLast10DaysWorkouts(context: modelContext, now: now)
-        loadResult = ExerciseLoadService.calculateLoad(
+        // BUG-067 — route through `computeCurrentScore` (with empty sleep map → every
+        // day uses sleepFactor = 1.0) so the unlinked detail sheet's hero shares the
+        // same discrete per-day decay shape as the Home widget bar and the chip's
+        // baseline. Mathematically equivalent to `calculateLoad` at midnight boundaries;
+        // diverges by a small bounded amount at fractional offsets — uniformly across
+        // the unlinked surface.
+        loadResult = ExerciseLoadService.computeCurrentScore(
             workouts: workouts,
+            sleepSnapshotsByDay: [:],
+            targetSleepHours: settings.targetSleepHours,
             experienceLevel: settings.experienceLevel,
             targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
             now: now

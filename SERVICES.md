@@ -156,21 +156,131 @@ func contributingWorkouts(daysBack: Int = 7, limit: Int = 5) -> [TrainingLoadCon
 
 ```swift
 struct TrainingLoadWeekComparison {
-    let currentWeekTss: Int             // sum of tssContribution across the current Mon–Sun (calendar-local), today inclusive
-    let previousWeekTss: Int            // sum across the prior Mon–Sun
+    let currentWeekTss: Int             // sum of raw session_stress across Mon-through-current-weekday of this ISO week, today inclusive
+    let previousWeekTss: Int            // sum of raw session_stress across Mon-through-the-same-weekday of the prior ISO week
     let deltaPct: Int                   // (current - previous) / previous × 100, rounded; 0 when previous == 0
+    let matchedDayCount: Int            // inclusive day count of the matched window (1 Mon, 4 Thu, 7 Sun)
 }
 
 func weekOverWeekComparison() -> TrainingLoadWeekComparison
 ```
 
-- Drives the Week-over-Week Comparison band (SCREENS.md § Training Load Detail Sheet → block 4).
-- Uses the same Mon–Sun week definition as `StreakService` (consistency).
+- Drives the Week-over-Week Comparison band (SCREENS.md § Training Load Detail Sheet → block 4) and the Linked Recovery & Load Detail Sheet's Window Comparison band (SCREENS.md § Linked Recovery & Load Detail Sheet → block 4).
+- Uses the same Mon-through-current-weekday window on both sides — Mon–Thu vs Mon–Thu on a Thursday, Mon–Sun vs Mon–Sun on a Sunday. Prevents the partial-week-vs-full-week asymmetry that made a Thursday-morning user see "↑ 420% vs last week" simply because 4 days of stress were being divided by 7 (BUG-066).
+- Uses the same ISO Mon definition as `StreakService` (consistency).
+- **Sums raw `session_stress`, not the time-decayed `tssContribution`.** Time decay is appropriate for live readiness/fatigue (the Training Load score and the Contributing Workouts breakdown), but applying it to a week-over-week comparison would make the prior week's contributions arbitrarily smaller than the current week's purely because of the 7–13 day age offset relative to `now`, producing absurd deltas (BUG-057). The week-over-week band describes *workload performed*, so it uses the un-decayed per-session stress totals.
+- Callers should render `Not enough data` instead of a delta when `matchedDayCount < 2` (early Monday) to avoid showing a single-data-point comparison as a confident delta.
 
 **Cache invalidation:** All three helpers are pure reads. The sheet's ViewModel computes them on appear and re-computes when the Workout Cascade fires while the sheet is presented.
 
 ### Settings Change Behavior
 Always uses current `experienceLevel` at calculation time. Changing experience recalculates immediately using new τ and stress capacity for all workouts in the 10-day window. No per-workout versioning.
+
+### Sleep-Adjusted Decay (when linked) — Phase 11
+
+When the Recovery Status widget is linked to Training Load (`HomeWidgetService.isLinkedActive(widgets:settings:) == true`), the per-day decay rate (`λ` from Step 5 — Time-Decayed Contribution) is modulated by a per-day **sleep factor** so under-slept days retain more accumulated stress and well-slept days recover normally. When not linked, the algorithm is unchanged — pure baseline decay.
+
+```swift
+func computeCurrentScore(workouts: [Workout], sleepData: [DailySleepSnapshot]?, targetSleepHours: Double) -> Int
+```
+
+**Sleep factor (per wake-up day d):**
+
+```
+sleepRatio(d)  = totalSleepMinutes(d) / 60.0 / targetSleepHours
+sleepFactor(d) = clamp(0.60 + 0.40 × min(sleepRatio(d), 1.0), 0.60, 1.0)
+```
+
+| Sleep ratio | sleepFactor | Behavior |
+|---|---|---|
+| `≥ 1.0` (sleep met or exceeded target) | `1.0` | Full normal decay — same as baseline |
+| `0.85` | `0.94` | ~6% slower decay |
+| `0.5` (half target — e.g., 3.5h of a 7h target) | `0.80` | ~20% slower decay |
+| `≤ 0.0` or missing | `0.60` | Floor — 40% slower decay |
+
+Aggressive curve: even moderate sleep loss meaningfully slows recovery, matching the locked-spec design intent.
+
+**Per-workout contribution (modified Step 5):**
+
+For each workout `w` in the 10-day window, baseline contribution is now multiplied across each intervening calendar day:
+
+```
+contribution(w, today) = baselineStress(w) × ∏(1 − λ × sleepFactor(d))
+                                              d = (log_date + 1) to today
+```
+
+Where `λ` is the existing baseline daily decay rate from Step 5 and `sleepFactor(d)` per the formula above. Days without a `DailySleepSnapshot` use `sleepFactor(d) = 1.0` (missing-data fallback — silent, conservative, baseline behavior).
+
+The remaining steps (6 Consecutive-Days Multiplier, 7 Stress Capacity, 8 Final Score, 9 Same-Day Floor, 10 Zone Classification) are unchanged. The score is still clamped to 0–100.
+
+**Recompute triggers** (in addition to existing Workout Cascade triggers): sleep observer fire while linked, linking state change (any input to `isLinkedActive` flips), `targetSleepHours` changes while linked. All recomputes debounced 500ms across triggers — see § Sleep Cascade.
+
+**Animation on link/unlink:** When `isLinkedActive` flips, the displayed score number tweens from baseline → adjusted (or adjusted → baseline) over 0.4s; the gradient bar fill animates in parallel. Reduce Motion: snap. See CONSTANTS.md § Linked Recovery & Load → Animation Timing.
+
+### Daily Snapshot Capture — Phase 11
+
+Persisted `DailyTrainingLoadSnapshot` records back the Trends `trainingLoadTrend` chart and the linked Recovery & Load detail sheet's 14-day TL chart. Historical days render from snapshot values (immutable); today's value is recomputed live on demand.
+
+```swift
+struct DailyTrainingLoadSnapshotInputs {
+    let date: Date              // calendar-local day boundary (midnight)
+    let score: Int              // result of computeCurrentScore() for that date
+    let wasSleepAdjusted: Bool  // whether isLinkedActive was true at capture time
+}
+
+func captureDailySnapshot(date: Date = .now) -> DailyTrainingLoadSnapshot
+```
+
+**Capture triggers:**
+
+| Trigger | Behavior |
+|---|---|
+| Local midnight rollover (yesterday's score) | App-launch / first-foreground check: if no snapshot exists for yesterday, compute and persist. Idempotent. |
+| Workout Cascade (today only) | Recompute today's score and upsert today's snapshot with the current `wasSleepAdjusted` value. Historical snapshots not touched. |
+| Sleep Cascade (today only, when linked) | Same as above — recompute and rewrite today's record. |
+| Linking state change (today only) | Recompute today's score on the new path (linked or unlinked) and rewrite today's snapshot with the updated `wasSleepAdjusted` value. |
+| User changes `targetSleepHours` while linked | Recompute today's score and rewrite today's snapshot. |
+
+**Upsert by date:** primary key is the calendar-local day. New writes for today replace the existing record; historical records are immutable (no rewrite path).
+
+**Reads:**
+
+```swift
+func snapshots(for range: DateInterval) -> [DailyTrainingLoadSnapshot]
+```
+
+- Returns one snapshot per day in the inclusive range, oldest first.
+- Days without a snapshot are returned as nil (caller treats as gap).
+- Drives the Trends `trainingLoadTrend` chart (full historical render) and the linked detail sheet's 14-day TL chart.
+
+**Idempotency:** if `captureDailySnapshot()` is called and a snapshot for that date already exists with the same `score` and `wasSleepAdjusted`, no write occurs (avoid SwiftData churn).
+
+---
+
+## Sleep Cascade (Phase 11)
+
+Mirrors the Workout Cascade pattern but for sleep-input changes. Documented separately because inputs and consumers differ — Workout Cascade reads workouts, Sleep Cascade reads `DailySleepSnapshot` records.
+
+**Triggers** (any of these → Sleep Cascade fires):
+
+| Trigger | Source |
+|---|---|
+| Sleep `HKObserverQuery` fires | `HealthKitSyncService` → `RecoveryStatusService.handleSleepObserverFire()` |
+| Sleep catch-up after 6pm local | `HealthKitSyncService` → `RecoveryStatusService.refresh(forceCatchUp: true)` |
+| Background refresh task fires | `HealthKitSyncService` (combined workout + sleep refresh) |
+| User taps Recovery Status widget → Recovery Status Detail Sheet "Sync Now"-style refresh (if implemented) | View layer |
+
+**Cascade steps:**
+
+1. **Upsert `DailySleepSnapshot` for affected wake-up day(s).** `RecoveryStatusService` aggregates `.asleep*` and `.inBed` samples per HEALTHKIT.md § 21 and writes the snapshot. Most fires touch only today's snapshot; multi-day fires (catch-up backfill) touch a range.
+2. **Refresh in-memory 30-day cache** — append/replace the affected day(s).
+3. **Refresh Recovery Status widget view-model** — hero value, deep caption, no-sleep-last-night sub-state detection.
+4. **If `HomeWidgetService.isLinkedActive(...) == true`:** recompute today's `computeCurrentScore(...)` on the sleep-adjusted path → upsert today's `DailyTrainingLoadSnapshot` (`wasSleepAdjusted = true`) → refresh the Training Load widget's score display and Sleep Impact Chip.
+5. **If a detail sheet is currently presented** (unlinked OR linked): the sheet's ViewModel re-fetches `RecoveryStatusService.recent30DaySleep`, `RecoveryStatusService.computeSleepLoadCorrelation()`, `RecoveryStatusService.computePersonalInsights()`, plus (linked only) `ExerciseLoadService.fourteenDayDailyScores(sleepAdjusted: true)`. Re-render in place. Sheets that are not presented do nothing.
+
+**Debounce:** 500ms across all triggers. Implementation: a single `Timer` reset on each trigger; the cascade body runs at the trailing edge. Prevents thrash when HK fires multiple observer callbacks in rapid succession (common at end-of-night when a Watch syncs a long sleep session in chunks).
+
+**No interaction with the Workout Cascade.** The Sleep Cascade does NOT recompute PRs, streak, Power Level, goals, or chart header summaries. Workout-dependent surfaces are untouched. The only overlap is today's `DailyTrainingLoadSnapshot` — both cascades can rewrite it, and the last writer wins (acceptable: the snapshot is a cache, not a source of truth).
 
 ---
 
@@ -489,6 +599,10 @@ Any time a workout is logged, edited, deleted, or batch-deleted via workout type
 - **Workout Type card** — update count. If last workout of a type is gone, remove the card and delete the WorkoutTypeOrder record.
 - **Scheduled workout linkage** — if the deleted workout's ID matches any `ScheduledWorkout.completedWorkoutId`, null that field and revert status to "planned". If the reverted `ScheduledWorkout` had `syncToAppleWatch == true` and gates still pass, `WatchScheduleService.schedule(_:)` is called to re-register the plan on Watch (the user will probably want to redo the session).
 - **Widget Detail Sheet derived data (Phase 8.8)** — when any of the four new detail sheets (Today's Plan, Training Load, Weekly Streak, Power Level) is currently presented, its ViewModel re-fetches its helpers (`StreakService.fetchHeatmap`, `StreakService.thisWeekProgress`, `StreakService.historySummary`, `ExerciseLoadService.fourteenDayDailyScores`, `ExerciseLoadService.contributingWorkouts`, `ExerciseLoadService.weekOverWeekComparison`, `PowerLevelService.topContributingExercises`, `PowerLevelService.windowComparison`, `PowerLevelService.computeNudge`, `PlanService.fetchTodaysScheduledWorkouts`) and re-renders. No caching at the service level; ViewModels recompute on each cascade fire while presented. Sheets that are not presented do nothing — no global recompute.
+- **`DailyTrainingLoadSnapshot` for today (Phase 11)** — after the Training Load score recomputes, `ExerciseLoadService.captureDailySnapshot()` upserts today's `DailyTrainingLoadSnapshot` with the new score and the current `wasSleepAdjusted` flag (true iff `HomeWidgetService.isLinkedActive(widgets:settings:) == true` at capture time). Historical snapshots are immutable — only today's record is rewritten by cascade. Powers the Trends `trainingLoadTrend` chart and the linked Recovery & Load detail sheet's 14-day TL chart. See § Training Load Algorithm → Daily Snapshot Capture.
+- **Recovery Status widget (Phase 11)** — the widget's timer line bumps on every cascade (the time-since-last-workout calculation depends on the latest workout's date). The widget hero block (`SLEEP {h}h {mm}m`) does **not** refresh — sleep inputs flow through the Sleep Cascade, not the Workout Cascade. The `Workout.lastModifiedDate` change does trigger `RecoveryStatusService.refreshTimerLine()` for any presented widget instance.
+- **Linked Recovery & Load detail sheet (Phase 11)** — when presented, the sheet's ViewModel re-fetches `ExerciseLoadService.fourteenDayDailyScores(sleepAdjusted: true)`, `RecoveryStatusService.recent30DaySleep`, `RecoveryStatusService.computeSleepLoadCorrelation()`, and `RecoveryStatusService.computePersonalInsights()`.
+- **Sleep Impact Chip on Training Load widget (Phase 11)** — recomputes only when linked. If `isLinkedActive == false`, the chip is hidden and no recompute fires. The chip value derives from `currentLinkedScore - whatBaselineWouldBe`, both of which depend on the same workout inputs that just changed.
 
 ### Workout Deletion
 Apply the Workout Cascade to remaining data.
@@ -592,12 +706,24 @@ The protocol defines the following operations (exact Swift signatures to be fina
 | `observeWorkoutChanges(handler: @escaping () → Void)` | Register an `HKObserverQuery` with `enableBackgroundDelivery`. Handler fires (on a background thread) when HK has new or changed workout data. `HealthKitSyncService` hops to `@MainActor` before acting. |
 | `fetchEffortScore(for hkWorkoutUUID: UUID) async throws → Int?` | Query the user-entered `workoutEffortScore` sample related to an HK workout. Returns nil if no user-entered score exists. Ignores `estimatedWorkoutEffortScore`. iOS 18+ only — gated `if #available(iOS 18, *)`. See HEALTHKIT.md § 8. |
 | `sourceName(for bundleID: String) → String` | Resolves an `HKSource` bundle ID to a clean human-readable name. **Never returns a raw bundle ID.** Resolution rules: (1) Apple Watch source bundle → `"Apple Workout"` (rebrand from "Apple Watch"). (2) Other recognized sources → their `HKSource.name` value (e.g., `"Strava"`, `"Peloton"`). (3) Unrecognized / unresolvable bundle IDs → `"another app"` (graceful fallback). Used by the Workout Detail source indicator (inline format `{healthKitActivityType} · {sourceName} [glyph]`) and the Source Indicator Info Sheet body copy (`This workout was imported from Apple Health via {sourceName}.`). The caller never has to handle nil; the fallback string is always serviceable in either rendering surface. See SCREENS.md § Workout Detail → Source Indicator. |
+| `fetchSleepSamples(from start: Date, to end: Date) async throws → [HKSleepSampleSnapshot]` (Phase 11) | Anchored query for `HKCategoryTypeIdentifierSleepAnalysis` samples in the range. Returns one `HKSleepSampleSnapshot` per sample (struct mirroring the same protocol-boundary pattern as `HealthKitWorkoutSnapshot` — see below). Includes all stage values (`.asleepDeep`, `.asleepREM`, `.asleepCore`, `.asleepUnspecified`, `.awake`, `.inBed`) so `RecoveryStatusService` can compute durations, efficiency, and the stages bar without re-querying. See HEALTHKIT.md § 21. |
+| `observeSleepChanges(handler: @escaping () → Void)` (Phase 11) | Register an `HKObserverQuery` with `enableBackgroundDelivery` for `HKCategoryTypeIdentifierSleepAnalysis`. Handler fires on a background thread; `RecoveryStatusService` hops to `@MainActor` before any SwiftData write. Same pattern as `observeWorkoutChanges`. |
+| `fetchSleepDurationGoal() async throws → TimeInterval?` (Phase 11) | Protocol method retained for forward compatibility, but HealthKit does not expose a `sleepDurationGoal` characteristic in its public API (BUG-048 — only `activityMoveMode`, `biologicalSex`, `bloodType`, `dateOfBirth`, `fitzpatrickSkinType`, `wheelchairUse` are public). The concrete implementation returns `nil` unconditionally. Called only from the "Import from Apple Health" action in the Recovery Status Settings Modal (see § RecoveryStatusService → Sleep Goal Import); the consumer always emits the documented "No sleep goal set in Apple Health." toast. |
+| `hasRecentSleepData(within days: Int = 14) async throws → Bool` (Phase 11) | Cheap aggregate over sleep-analysis samples scoped to the lookback window. Returns true on the first `.asleep*` match. Drives the Recovery Status widget's `live` vs `noSleepTracker` gating decision (see SCREENS.md § Home Screen → Recovery Status → States). |
 
 ### HealthKitWorkoutSnapshot
 
 A plain Swift struct (not an `HKWorkout`) containing exactly the fields FitNavi cares about. Returned by `fetchWorkouts`. Keeps the protocol boundary free of Apple framework types so the stub and tests don't need to construct real `HKWorkout` instances.
 
 Fields: `uuid`, `activityTypeRawValue`, `activityTypeDisplayString`, `sourceBundleID`, `startDate`, `endDate`, `durationMinutes`, `distanceKm?`, `avgHeartRate?`, `maxHeartRate?`, `activeEnergyKcal?`, `totalEnergyBurnedKcal?`, `elevationAscendedMeters?`, `exerciseMinutes?`, `indoor?`, `isDeleted` (flag indicating this entry represents an upstream delete rather than an addition/update).
+
+### HKSleepSampleSnapshot (Phase 11)
+
+A plain Swift struct returned by `fetchSleepSamples(from:to:)`. Same protocol-boundary pattern as `HealthKitWorkoutSnapshot` — keeps `HKCategorySample` out of consumer code.
+
+Fields: `uuid`, `stage` (enum: `.asleepDeep` / `.asleepREM` / `.asleepCore` / `.asleepUnspecified` / `.awake` / `.inBed`), `startDate`, `endDate`, `durationSeconds` (computed: `endDate - startDate` as raw `TimeInterval`; aggregation must sum these and round once at the very end — see BUG-052), `sourceBundleID`, `isDeleted`.
+
+`RecoveryStatusService` consumes these snapshots and produces one `DailySleepSnapshot` per wake-up date (see HEALTHKIT.md § 21 for aggregation rules).
 
 ### Rules
 
@@ -617,8 +743,10 @@ See HEALTHKIT.md § 9 for the sync lifecycle overview.
 
 - Own the `HKQueryAnchor` persisted in UserDefaults (`UserSettings.healthKitAnchor`).
 - Register the `HKObserverQuery` with `enableBackgroundDelivery` on launch (Phase 2 only — see HEALTHKIT.md § 3 Phases).
-- Register the `BGAppRefreshTask` handler on launch (Phase 2).
+- **Phase 11:** Register a second `HKObserverQuery` for `HKCategoryTypeIdentifierSleepAnalysis` alongside the workout observer. Sleep observer is registered only when `UserSettings.healthKitEnabled == true` AND sleep scope is granted. Callbacks fire on a background thread; the handler calls `RecoveryStatusService.handleSleepObserverFire()` after hopping to `@MainActor`. See HEALTHKIT.md § 21.
+- Register the `BGAppRefreshTask` handler on launch (Phase 2). **Phase 11:** the single `BGAppRefreshTask` handler now performs both workout sync AND sleep sync — no second task identifier. On fire, the handler runs `importPendingWorkouts()` followed by `RecoveryStatusService.refreshFromBackground()` so morning app opens have fresh data without a spinner.
 - Run a catch-up anchored query on every cold launch and foreground transition (Phase 1 — mandatory).
+- **Phase 11:** Run a 6pm-cutoff sleep catch-up on the first `scenePhase == .active` after local 6pm regardless of sleep observer activity — bridges any missed background fires. Single `lastSleepCatchUpDate` UserDefaults entry guards against double-firing within the same 6pm window.
 - On each sync event: fetch workouts since anchor, process each via `importPendingWorkouts()`, update anchor on success.
 - Update `UserSettings.healthKitLastSyncDate` to `.now` after each successful sync.
 - Expose `lastSyncDate(for workout: Workout) -> Date?` — returns the most recent sync timestamp at which the workout's HK record was observed (read from `UserSettings.healthKitLastSyncDate`, scoped to the workout's `healthKitUUID`). Used by the Source Indicator Info Sheet's "Last synced · {relative}" footer row (see SCREENS.md § Workout Detail → Source Indicator Info Sheet). Returns nil for workouts that have never synced.
@@ -634,6 +762,10 @@ See HEALTHKIT.md § 9 for the sync lifecycle overview.
 | `BGAppRefreshTask` executes | 2 | Run anchored query; update anchor; complete task. |
 | `UserSettings.healthKitEnabled` flipped off | 1 | Cancel any in-flight queries. Retain anchor (for re-enable). Existing linked workouts unchanged — see HEALTHKIT.md § 16. |
 | `UserSettings.healthKitEnabled` flipped on (first time) | 1 | Call `client.requestAuthorization()`. On grant, run catch-up. On deny, update Settings status line. |
+| Sleep `HKObserverQuery` fires (Phase 11) | 11 | Marshal to `@MainActor`, call `RecoveryStatusService.handleSleepObserverFire()` (refresh today's `DailySleepSnapshot`, fire Sleep Cascade). Workout matcher does NOT run. |
+| `BGAppRefreshTask` executes (Phase 11 update) | 2 + 11 | Existing workout `importPendingWorkouts()` runs first; then `RecoveryStatusService.refreshFromBackground()` runs to fetch any pending sleep samples and fire the Sleep Cascade if today's snapshot changed. |
+| First `scenePhase == .active` after local 6pm (Phase 11) | 11 | Run sleep catch-up via `RecoveryStatusService.refresh(forceCatchUp: true)`. Guarded by `lastSleepCatchUpDate` to prevent re-firing within the same 6pm window. |
+| Sleep scope first granted via iOS prompt (Phase 11) | 11 | Register the sleep observer (was suppressed prior to grant) and run an immediate full sleep catch-up to backfill `DailySleepSnapshot` records for the last 30 days. |
 
 ### Import Pipeline (`importPendingWorkouts()`)
 
@@ -1072,6 +1204,28 @@ On launch, before any home rendering:
 
 This is a destructive migration — there is no replacement widget. If a user previously had Workout Info, Training Load, and Week Streak in that order, after migration they have Training Load and Week Streak. The user can re-add any widget from the Add Widgets menu.
 
+### Widget Linking — `isLinkedActive(widgets:settings:)` (Phase 11)
+
+Helper that decides whether the Recovery Status + Training Load pair should render as a single `FortiFitLinkedRecoveryLoadComposite` (shared border, zero padding) or as two independent cards. Pure function over the home widget array and `UserSettings` — no side effects, no SwiftData reads. Called from `HomeViewModel` on every widget array change.
+
+```swift
+func isLinkedActive(widgets: [HomeWidget], settings: UserSettings) -> Bool
+```
+
+**Rules:**
+
+1. `settings.recoveryLoadManuallyUnlinked == true` → return `false` (sticky manual override).
+2. `widgets` does not contain both `"recoveryStatus"` AND `"trainingLoad"` → return `false`.
+3. The two widgets are NOT adjacent in `sortOrder` (i.e., `|recoveryStatusSortOrder - trainingLoadSortOrder| != 1`) → return `false`.
+4. The Recovery Status widget's gating state is NOT `live` (i.e., `.connectAppleHealth`, `.sleepAccessDenied`, or `.noSleepTracker`) → return `false`. Note: `RecoveryStatusGatingState` lives on `RecoveryStatusService` — this helper queries `RecoveryStatusService.currentGatingState` rather than recomputing from settings.
+5. All gates passed → return `true`.
+
+**Auto-unlink:** the function is re-evaluated whenever any of the inputs change (widget reorder, widget delete, sleep observer fire that changes gating state, `recoveryLoadManuallyUnlinked` flip). The composite container appears/disappears with the 0.2s border-swap + padding-collapse animation defined in CONSTANTS.md § Linked Recovery & Load → Animation Timing.
+
+**Manual unlink:** Triggered from the linked composite's combined long-press context menu → "Unlink Widgets" item. The handler sets `settings.recoveryLoadManuallyUnlinked = true` and the composite collapses to two independent cards. The flag is sticky — adjacency alone is not enough to re-link.
+
+**Clearing the manual flag:** Set `recoveryLoadManuallyUnlinked = false` whenever any reorder operation in Widget Edit Mode actually changes the `sortOrder` of either Recovery Status or Training Load (see SCREENS.md § Home Screen → Widget Edit Mode → Manual-unlink flag clearing on drag). Entering edit mode without dragging does NOT clear the flag — no `sortOrder` change occurred. Deleting one of the pair via long-press → "Delete Widget" → confirm also clears the flag (the next re-add of that widget can re-establish auto-link if the user lands it adjacent to the other). Note: there is no "x" delete button on widgets in edit mode — deletion is exclusively via the long-press context menu (see SCREENS.md § Home Screen → Widget Edit Mode and BUGS.md doc-drift entry).
+
 ### Today's Plan — Complete Workout from context menu
 The Today's Plan widget exposes a "Complete Workout" item in its long-press context menu (see SCREENS.md § Home Screen → Widget Context Menu). Visibility rule: the item is rendered if and only if `PlanService.fetchTodaysPlanned()` returns a non-nil `ScheduledWorkout` (i.e., at least one uncompleted plan for today). The action delegates to the same compact confirmation sheet used by the Plan tab (`PlanService.completeScheduled(workoutId:)` flow). On confirm, the widget refresh (see Workout Cascade above) repopulates the left column with the next planned workout for today, or falls back to the "All planned workouts completed." state when no more remain.
 
@@ -1088,6 +1242,11 @@ enum WidgetDetailRoute {
     case appleActivityLive          // existing — opens Activity Detail Sheet
     case appleActivityConnectHK     // existing — navigates to Settings → Apple Health
     case appleActivityPairWatch     // existing — no-op
+    case recoveryStatusLive         // Phase 11 — opens Recovery Status Detail Sheet
+    case recoveryStatusConnectHK    // Phase 11 — navigates to Settings → Apple Health
+    case recoveryStatusSleepDenied  // Phase 11 — deep-links to iOS Settings (UIApplication.openSettingsURLString)
+    case recoveryStatusNoTracker    // Phase 11 — no-op (No Sleep Tracker state)
+    case linkedRecoveryLoad         // Phase 11 — opens Linked Recovery & Load Detail Sheet (both cards route here when isLinkedActive == true)
     case suppressed                 // home is in Widget Edit Mode
 }
 
@@ -1097,6 +1256,8 @@ func tapRoute(for widget: HomeWidget, isEditMode: Bool) -> WidgetDetailRoute
 **Rules:**
 - `isEditMode == true` → always returns `.suppressed`. The view layer's tap handler short-circuits and does nothing (taps still reach the existing delete-and-drag chrome inside the card).
 - `widgetType == "appleActivity"` → returns the existing three-state branch (`.appleActivityLive` / `.appleActivityConnectHK` / `.appleActivityPairWatch`) per the existing Activity Rings widget state table (SCREENS.md § Home Screen → Activity Rings widget).
+- `widgetType == "recoveryStatus"` (Phase 11) AND `isLinkedActive(widgets:settings:) == true` → returns `.linkedRecoveryLoad` (opens the combined detail sheet). Otherwise branches on `RecoveryStatusService.currentGatingState`: `.live` → `.recoveryStatusLive`, `.connectAppleHealth` → `.recoveryStatusConnectHK`, `.sleepAccessDenied` → `.recoveryStatusSleepDenied`, `.noSleepTracker` → `.recoveryStatusNoTracker`.
+- `widgetType == "trainingLoad"` (Phase 11) AND `isLinkedActive == true` → returns `.linkedRecoveryLoad` (the TL card on the linked composite opens the same combined sheet). Otherwise returns `.trainingLoad` (Phase 8.8 unlinked behavior).
 - All other widget types map 1:1 to their new detail-sheet route value.
 
 **Detail-sheet lifecycle:** Sheets are presented via SwiftUI `.sheet(item:)` from `HomeView`. Sheet ViewModels subscribe to the same Workout Cascade publishers the widget cards already use — when the cascade fires while a sheet is presented, the sheet re-fetches its helpers (StreakService.fetchHeatmap, etc.) and re-renders in place. Sheet dismissal does NOT clear that subscription — it is owned by the sheet's ViewModel lifecycle.
@@ -1452,4 +1613,59 @@ The app must register `fitnavi` as a custom URL scheme in Info.plist. In `FortiF
 1. Call `decodeTemplateURL(url:)`.
 2. If decoding succeeds → present the Template Import Prompt (see `SCREENS.md` § Template Import Prompt).
 3. If decoding fails → present the error modal with "This QR code couldn't be read." message.
+
+---
+
+## RecoveryStatusService (RecoveryStatusService.swift) — Phase 11
+
+**Purpose:** Single owner of all sleep data orchestration, the Recovery Status widget's gating state, the 30-day sleep cache, sleep efficiency, sleep-load correlation, smart workout suggestions, and personal pattern insights. Sits between `HealthKitClient` (sleep methods, see § HealthKitClient) and the widget / detail-sheet view layer. Does not own the sleep observer subscription itself — `HealthKitSyncService` owns that and dispatches into this service. Does own everything downstream.
+
+### Responsibilities
+
+- **Sleep aggregation.** Translate `HKSleepSampleSnapshot` arrays into `DailySleepSnapshot` records per HEALTHKIT.md § 21 (6pm-to-6pm wake-up-date window, all `.asleep*` stages summed, optional `.inBed` for efficiency).
+- **30-day in-memory cache.** Rolling cache of `DailySleepSnapshot` records loaded from the SwiftData store on launch and kept current via observer fires + 6pm-cutoff catch-ups. Drives the detail sheet's sparkline + last-7-nights stat row without on-demand HK queries.
+- **Gating state computation.** `RecoveryStatusGatingState` enum (`connectAppleHealth`, `sleepAccessDenied`, `noSleepTracker`, `live`) — see SCREENS.md § Home Screen → Recovery Status widget → States for derivation rules. Computed from `UserSettings.healthKitEnabled`, `HealthKitClient.authorizationStatus()` for sleep scope, and `hasRecentSleepData(within: 14)`.
+- **Sleep efficiency.** Compute and cache `sleepEfficiencyPercent = round(asleepDuration / inBedDuration × 100)`. When the source writes explicit `.inBed` samples (Oura, Whoop, AutoSleep, manual logging), `inBedDuration` is the Σ of those samples. When the source omits them — Apple Watch's native sleep tracker on watchOS 9+ does, see BUG-059 — `inBedDuration` falls back to `totalSleepMinutes + awakeMinutes` so efficiency surfaces for the most common HK source. Nil only when neither path yields data (e.g., zero asleep minutes). `reloadCacheFromStore` also backfills the same fallback into legacy snapshots written before BUG-059 shipped, so pre-fix data repairs on next launch instead of waiting for a fresh HK ingest.
+- **Personal Pattern Insights.** `computePersonalInsights()` returns up to 3 auto-detected patterns from ≥ 21 days of paired (sleep, next-day-score) data. Detection types: score-by-sleep-bucket, sleep-by-workout-type, multi-week aggregates. Per-pattern detection thresholds and selection priority are defined inline in the service implementation.
+- **Sleep-Load correlation.** `computeSleepLoadCorrelation()` — median-split paired data at the 7h sleep mark; return `correlationDelta = mean(highSleepScores) - mean(lowSleepScores)` and a copy variant (high-sleep / low-sleep / no-pattern). Copy variants live in CONSTANTS.md § Linked Recovery & Load Detail Sheet → Correlation Callout; the three variants are selected by sign + magnitude (`correlationDelta <= -5` / `correlationDelta >= +5` / `|correlationDelta| < 5`).
+- **Linked Recovery & Load advisory.** `computeLinkedAdvisory(baseAdvisory:zone:trainedToday:sleepHours:targetSleepHours:)` returns a single coherent sentence drawn from `AppConstants.TrainingLoad.linkedAdvisoryText`, keyed on the TL zone, whether the user trained today, and the sleep-to-target ratio bucket. Met-target (`0.85–0.99`) and missing-data nights pass `baseAdvisory` through unchanged. Used **only** by the linked Recovery & Load composite (TL widget body in the linked pair + Linked Recovery & Load Detail Sheet's Recovery Readiness callout); the standalone TL widget keeps rendering `LoadResult.advisory` directly. Replaces the prior `computeSleepQualifier` concat pattern that produced contradictions (BUG-061). Copy in CONSTANTS.md § Training Load Zones → Linked Advisory Copy.
+- **Time-since-last-workout.** `timeSinceLastWorkout()` reads the most recent `Workout.date` across all workouts (manual or HK-imported, any of the 6 types), formats with the trailing "since your last workout" descriptor used by the detail sheet's headline row. Per-type variant `timeSinceLastWorkout(for type: String)` for the detail sheet's per-type rows. The bare-value variant `lastWorkoutHero()` (no trailing descriptor — `4h 12m` / `NO DATA` on cold start) drives the Recovery Status widget's SINCE LAST WORKOUT hero column per CONSTANTS.md § Recovery Status Widget → Since Last Workout Hero Value.
+- **Apple Health sleep goal import.** `importSleepGoalFromAppleHealth()` reads `HealthKitClient.fetchSleepDurationGoal()`. If non-nil, write the value (rounded to 0.5 hr increment) into `UserSettings.targetSleepHours`. If nil, emit a Toast Style toast: `"No sleep goal set in Apple Health."` Called only from the "Import from Apple Health" actions in the Recovery Status Settings Modal and the Linked Recovery & Load Settings Modal.
+
+### Derived State (read-only, reactive)
+
+The service exposes these as `@Observable` properties consumed by the widget and detail-sheet view layer:
+
+| Property | Type | Refresh trigger |
+|---|---|---|
+| `currentGatingState` | `RecoveryStatusGatingState` | App launch, HK auth change, `UserSettings.healthKitEnabled` flip, sleep observer fire (`hasRecentSleepData` re-evaluation), 14-day sleep window rollover |
+| `todaysSnapshot` | `DailySleepSnapshot?` | Sleep observer fire, app launch catch-up, 6pm-cutoff |
+| `recent30DaySleep` | `[DailySleepSnapshot]` | Same as above |
+| `timeSinceLastWorkoutFormatted` | `String` | Foreground entry, 60s timer while Home tab visible, Workout Cascade |
+| `lastWorkoutHeroFormatted` | `String` (bare value — `4h 12m` / `NO DATA`) | Same as `timeSinceLastWorkoutFormatted` (refreshed alongside it in `refreshTimerLine`) |
+| `currentSleepEfficiencyPercent` | `Int?` | Sleep Cascade |
+
+The linked advisory copy is *not* cached on the service — the joint string depends on the live TL zone + `trainedToday` signal in addition to sleep, so call sites compute it on demand via `computeLinkedAdvisory(...)` (BUG-061).
+
+### Refresh Triggers
+
+| Trigger | Behavior |
+|---|---|
+| App launch | Run `refresh(forceCatchUp: true)` — anchored sleep query for new samples since `UserSettings.healthKitAnchor`, rebuild 30-day cache from `DailySleepSnapshot` store, evaluate `currentGatingState`. |
+| Sleep observer fires (via `HealthKitSyncService`) | `handleSleepObserverFire()` — fetch any new sleep samples, upsert affected `DailySleepSnapshot` records, append to cache, fire Sleep Cascade. |
+| 6pm-cutoff catch-up (via `HealthKitSyncService`) | `refresh(forceCatchUp: true)` — same as launch, but only for sleep. |
+| `BGAppRefreshTask` (via `HealthKitSyncService`) | `refreshFromBackground()` — fetch any new sleep samples, upsert today's snapshot if changed, fire Sleep Cascade. |
+| `UserSettings.targetSleepHours` change | If linked, trigger Sleep Cascade (TL score depends on `targetSleepHours`). The linked advisory copy isn't cached — it re-computes on every render of the linked composite. |
+| Workout Cascade fires | Bump `timeSinceLastWorkoutFormatted` and `lastWorkoutHeroFormatted` only. Does NOT re-query sleep — sleep inputs flow through Sleep Cascade. |
+| Local midnight rollover | Roll the wake-up day forward — yesterday's snapshot becomes historical, today starts empty. |
+
+### Threading
+
+All public methods are `@MainActor`-isolated. Internal `HealthKitClient` calls run on whatever actor the client elects; the result handlers hop back to MainActor before any SwiftData write or `@Observable` property mutation.
+
+### Cascade Impact
+
+`RecoveryStatusService` is the entry point for the Sleep Cascade (see § Sleep Cascade). It is NOT a participant in the Workout Cascade — workout changes only bump the timer line and last-workout hero value.
+
+When `currentGatingState` transitions from `live` to anything else, `HomeWidgetService.isLinkedActive(...)` re-evaluates → if currently linked, the composite auto-unlinks (per CONSTANTS.md § Linked Recovery & Load → Animation Timing). Conversely, transitioning from any non-`live` state to `live` re-evaluates `isLinkedActive` → if the pair is adjacent AND `recoveryLoadManuallyUnlinked == false`, the composite auto-links.
 

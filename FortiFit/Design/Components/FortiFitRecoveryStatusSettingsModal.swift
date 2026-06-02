@@ -1,0 +1,160 @@
+import SwiftUI
+
+/// Settings modal for the unlinked Recovery Status widget (Phase 11). Sleep Target
+/// slider (4–12h, 0.5 step), Import from Apple Health button, Done button. See
+/// SCREENS.md § Recovery Status Settings Modal and CONSTANTS.md § Recovery Status
+/// Settings Modal.
+struct FortiFitRecoveryStatusSettingsModal: View {
+    var onDismiss: () -> Void
+    var onImportFromAppleHealth: () async -> Void
+
+    @State private var settings = UserSettings.shared
+    @State private var toastMessage: String?
+
+    private var hkConnected: Bool { settings.healthKitEnabled }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+                .onTapGesture { onDismiss() }
+
+            VStack(spacing: FortiFitSpacing.gapLarge) {
+                Text("Configure Recovery Status")
+                    .font(FortiFitTypography.widgetHeader)
+                    .kerning(FortiFitTypography.labelKerning)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                sleepTargetCard
+                importFromAppleHealthRow
+
+                FortiFitButton("Done", style: .outline) {
+                    onDismiss()
+                }
+                .accessibilityIdentifier(AccessibilityID.recoveryStatusSettings_doneButton)
+            }
+            .padding(FortiFitSpacing.cardPadding)
+            .background(
+                RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
+                    .fill(FortiFitColors.cardSurface)
+                    .stroke(FortiFitColors.border, lineWidth: 1)
+            )
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    onDismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.mutedText)
+                        .frame(
+                            width: FortiFitSpacing.minTouchTarget,
+                            height: FortiFitSpacing.minTouchTarget
+                        )
+                }
+                .padding([.top, .trailing], FortiFitSpacing.cardPadding / 2)
+                .accessibilityIdentifier(AccessibilityID.recoveryStatusSettings_closeButton)
+            }
+            .padding(.horizontal, FortiFitSpacing.screenHorizontal + 8)
+            .overlay(alignment: .top) {
+                if let toast = toastMessage {
+                    Text(toast)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(FortiFitColors.primaryText)
+                        .padding(.horizontal, FortiFitSpacing.cardPadding)
+                        .padding(.vertical, FortiFitSpacing.elementSpacing)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(FortiFitColors.elevatedSurface)
+                                .stroke(FortiFitColors.border, lineWidth: 1)
+                        )
+                        .offset(y: -32)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: toastMessage)
+        }
+        .accessibilityIdentifier(AccessibilityID.recoveryStatusSettings_modal)
+    }
+
+    // MARK: - Slider card
+
+    private var sleepTargetCard: some View {
+        FortiFitCard(borderColor: FortiFitColors.border) {
+            VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                HStack {
+                    Text("Sleep Target")
+                        .font(FortiFitTypography.tabLabel)
+                        .foregroundStyle(FortiFitColors.primaryText)
+                    Spacer()
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(formattedHours(settings.targetSleepHours))
+                            .font(FortiFitTypography.largeValue)
+                            .foregroundStyle(FortiFitColors.primaryAccent)
+                        Text("hrs")
+                            .font(FortiFitTypography.bodySmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
+                    }
+                }
+                Slider(
+                    value: Binding(
+                        get: { settings.targetSleepHours },
+                        set: { newValue in
+                            let snapped = (newValue * 2.0).rounded() / 2.0
+                            settings.targetSleepHours = min(max(snapped, 4.0), 12.0)
+                        }
+                    ),
+                    in: 4.0...12.0,
+                    step: 0.5
+                )
+                .tint(FortiFitColors.primaryAccent)
+                .accessibilityIdentifier(AccessibilityID.recoveryStatusSettings_targetSleepHoursSlider)
+
+                HStack {
+                    Text("4 HRS")
+                    Spacer()
+                    Text("12 HRS")
+                }
+                .font(FortiFitTypography.labelSmall)
+                .kerning(FortiFitTypography.labelKerning)
+                .foregroundStyle(FortiFitColors.mutedText)
+            }
+        }
+    }
+
+    private func formattedHours(_ value: Double) -> String {
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(Int(value))
+        }
+        return String(format: "%.1f", value)
+    }
+
+    // MARK: - Import row
+
+    /// Matches the Activity Rings Settings Modal — full-width filled primary button,
+    /// dim/disable when HK is not connected, muted caption below.
+    private var importFromAppleHealthRow: some View {
+        VStack(spacing: FortiFitSpacing.elementSpacing) {
+            FortiFitButton("Import from Apple Health", style: .primary) {
+                Task {
+                    await onImportFromAppleHealth()
+                    if let recovery = RecoveryStatusService.current,
+                       let toast = recovery.lastToastMessage {
+                        toastMessage = toast
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        toastMessage = nil
+                    }
+                }
+            }
+            .opacity(hkConnected ? 1.0 : 0.4)
+            .disabled(!hkConnected)
+            .accessibilityIdentifier(AccessibilityID.recoveryStatusSettings_importButton)
+
+            if !hkConnected {
+                Text("Connect Apple Health to import your goal.")
+                    .font(FortiFitTypography.note)
+                    .foregroundStyle(FortiFitColors.mutedText)
+            }
+        }
+    }
+}

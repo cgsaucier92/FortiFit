@@ -12,7 +12,7 @@
 		<false/>
 	</dict>
 	<key>NSHealthShareUsageDescription</key>
-	<string>FortiFit uses your Apple Health workout data to automatically log sessions recorded on Apple Watch or other connected apps, and reads your daily Move, Exercise, and Stand activity to display your activity rings inside FortiFit.</string>
+	<string>FitNavi reads your workouts, sleep, and activity data from Apple Health to give you context-aware recovery insights, training load scores, and activity rings visualization.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -14,6 +14,12 @@ enum WidgetDetailRoute: String, Equatable, Identifiable {
     case appleActivityLive
     case appleActivityConnectHK
     case appleActivityPairWatch
+    // Phase 11
+    case recoveryStatusLive
+    case recoveryStatusConnectHK
+    case recoveryStatusSleepDenied
+    case recoveryStatusNoTracker
+    case linkedRecoveryLoad
     case suppressed
 
     var id: String { rawValue }
@@ -88,9 +94,19 @@ final class HomeViewModel {
         let now = Date()
 
         // Training Load
+        //
+        // BUG-067 — route the unlinked-bar score through `computeCurrentScore` with an
+        // empty sleep map (every day falls through to `sleepFactor = 1.0`) so the
+        // discrete per-day decay shape matches the chip's baseline computation and the
+        // linked path. This eliminates a continuous-vs-discrete decay discrepancy that
+        // caused the chip's "+N from sleep" delta to disagree with the score change the
+        // user actually saw when toggling linking. `linkedAwareLoadResult` in HomeView
+        // still overrides this with the sleep-adjusted score when linked.
         let recentWorkouts10 = WorkoutService.fetchLast10DaysWorkouts(context: context, now: now)
-        loadResult = ExerciseLoadService.calculateLoad(
+        loadResult = ExerciseLoadService.computeCurrentScore(
             workouts: recentWorkouts10,
+            sleepSnapshotsByDay: [:],
+            targetSleepHours: settings.targetSleepHours,
             experienceLevel: settings.experienceLevel,
             targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
             now: now
@@ -137,12 +153,20 @@ final class HomeViewModel {
 
     /// Resolves the route to take when a widget card is tapped. Returns `.suppressed` in edit mode.
     /// Activity Rings branches on its live/HK-off/Watch-missing state, decided by the caller.
-    func tapRoute(for widget: HomeWidget, isEditMode: Bool, appleActivityLive: Bool = false, healthKitEnabled: Bool = false) -> WidgetDetailRoute {
+    func tapRoute(
+        for widget: HomeWidget,
+        isEditMode: Bool,
+        appleActivityLive: Bool = false,
+        healthKitEnabled: Bool = false,
+        recoveryStatusGating: RecoveryStatusGatingState? = nil,
+        isLinkedActive: Bool = false
+    ) -> WidgetDetailRoute {
         if isEditMode { return .suppressed }
         switch widget.widgetType {
         case "todaysPlan":
             return .todaysPlan
         case "trainingLoad":
+            if isLinkedActive { return .linkedRecoveryLoad }
             return .trainingLoad
         case "weekStreak":
             return .weeklyStreak
@@ -152,6 +176,14 @@ final class HomeViewModel {
             if appleActivityLive { return .appleActivityLive }
             if !healthKitEnabled { return .appleActivityConnectHK }
             return .appleActivityPairWatch
+        case "recoveryStatus":
+            if isLinkedActive { return .linkedRecoveryLoad }
+            switch recoveryStatusGating ?? .connectAppleHealth {
+            case .live:               return .recoveryStatusLive
+            case .connectAppleHealth: return .recoveryStatusConnectHK
+            case .sleepAccessDenied:  return .recoveryStatusSleepDenied
+            case .noSleepTracker:     return .recoveryStatusNoTracker
+            }
         default:
             return .suppressed
         }

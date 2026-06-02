@@ -19,6 +19,10 @@ private final class ActivityStubClient: HealthKitClient, @unchecked Sendable {
     func fetchActivitySummaries(from start: Date, to end: Date) async throws -> [ActivitySummarySnapshot] { activitySummariesToReturn }
     func observeActivitySummaryChanges(handler: @escaping @Sendable () -> Void) {}
     func hasAppleWatchData(within days: Int) async throws -> Bool { hasAppleWatchDataToReturn }
+    func fetchSleepSamples(from start: Date, to end: Date) async throws -> [HKSleepSampleSnapshot] { [] }
+    func observeSleepChanges(handler: @escaping @Sendable () -> Void) {}
+    func fetchSleepDurationGoal() async throws -> TimeInterval? { nil }
+    func hasRecentSleepData(within days: Int) async throws -> Bool { false }
 }
 
 @Suite(.serialized)

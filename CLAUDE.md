@@ -48,10 +48,9 @@ Before closing a session: all three test targets passing (intentionally failing 
 - Native watchOS companion app. WorkoutKit-based outbound scheduling is in scope as of Phase 8.7 — see WORKOUTKIT.md.
 - Third-party device integration (Garmin, Whoop, Fitbit)
 - Cloud sync or user accounts
-- HealthKit write-back (FitNavi → HealthKit). HealthKit **read** integration is in scope as of Phase 8 — see HEALTHKIT.md. Write-back remains deferred indefinitely; see HEALTHKIT.md § 2 Scope and § 20 Future Phases.
+- HealthKit write-back (FitNavi → HealthKit). HealthKit **read** integration is in scope as of Phase 8 (workouts/activity) and Phase 11 (sleep) — see HEALTHKIT.md. Write-back remains deferred indefinitely; see HEALTHKIT.md § 2 Scope and § 20 Future Phases.
 - Nutrition tracking
 - Mental health or mindfulness features
-- Sleep tracking
 - Onboarding flow
 
 ---
@@ -302,6 +301,37 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Workout Cascade hook for derived data refresh while a detail sheet is presented | SERVICES § Workout Cascade |
 | Tests + new accessibility identifiers (and retirement of `activityRingsSettings_resetButton`) | TESTING § Widget Detail Sheet Test Strategy; TESTING § Accessibility Identifiers → Widget Detail Sheets |
 | Implementation plan | IMPLEMENTATION_PLAN_PHASE_8_8.md |
+
+### Phase 11: Recovery Status Widget + Training Load Linking
+*New Home widget surfacing last-night sleep, deep-sleep breakdown, and time-since-last-workout, with a four-state gating system (Connect Apple Health / Sleep Access Denied / No Sleep Tracker / Live). When placed adjacent to Training Load, the two widgets visually link via a shared border + zero padding, expose a combined long-press menu, combined Settings / See Info / Detail Sheet, and the TL algorithm gains a sleep-adjusted decay path (driven by `targetSleepHours`). Adds two SwiftData snapshots (`DailySleepSnapshot`, `DailyTrainingLoadSnapshot`) so the Training Load Trend chart can render history without recomputing from raw HK each open.*
+
+| Feature | Spec |
+|---|---|
+| `recoveryStatus` widget type + default-seed update + Add Widgets order (adjacent to Training Load) | CONSTANTS § Widget Types, § Add Widgets Menu Order; SERVICES § HomeWidgetService; SCREENS § Home Screen |
+| Four gating states (Connect Apple Health / Sleep Access Denied / No Sleep Tracker / Live) + no-sleep-last-night sub-state | SCREENS § Home Screen (Recovery Status → States); SERVICES § RecoveryStatusService |
+| Sleep hero (32/900 value, deep-sleep caption) + timer line + `moon.zzz` watermark | SCREENS § Home Screen (Recovery Status widget); CONSTANTS § Recovery Status Widget |
+| `RecoveryStatusService` (sleep fetch + observer, 30-day cache, efficiency, correlation, gating, readiness copy, smart suggestion, personal insights) | SERVICES § RecoveryStatusService |
+| `DefaultHealthKitClient` sleep methods (sample query, observer subscription, sleep duration goal characteristic read) | SERVICES § HealthKitClient; HEALTHKIT § 21 |
+| `HealthKitSyncService` sleep observer + BG refresh registration | SERVICES § HealthKitSyncService; HEALTHKIT § 21 |
+| HK auth scope expansion (sleep) + Info.plist `NSHealthShareUsageDescription` update | HEALTHKIT § 17, § 21 |
+| Recovery Status Settings Modal (Sleep Target slider 4–12h step 0.5, Import from Apple Health) | SCREENS § Recovery Status Settings Modal; CONSTANTS § Recovery Status Settings Modal |
+| Recovery Status Detail Sheet (stages bar, sleep efficiency, 14-day sparkline, last-7-nights row, time-since-workout breakdown) | SCREENS § Recovery Status Detail Sheet; CONSTANTS § Recovery Status Detail Sheet |
+| Recovery Status See Info Modal | SCREENS § Recovery Status See Info Modal; INFO_COPY § Widget Info Modal Copy → recoveryStatus |
+| Widget Linking — adjacency rule, auto-unlink, manual-unlink flag, shared border, zero padding, animations | SCREENS § Standard Patterns → Widget Linking; SERVICES § HomeWidgetService (`isLinkedActive`) |
+| Linked Recovery & Load composite (container) | SCREENS § Linked Recovery & Load Composite |
+| Combined long-press context menu (See Info / Configure Settings / Unlink Widgets / Reorder) | SCREENS § Home Screen (Widget Context Menu) |
+| Combined Settings / See Info / Detail Sheet for the linked pair | SCREENS § Linked Recovery & Load Settings Modal, § Linked Recovery & Load See Info Modal, § Linked Recovery & Load Detail Sheet; INFO_COPY § Widget Info Modal Copy → linkedRecoveryLoad |
+| Training Load widget — Sleep Impact Chip when linked | SCREENS § Home Screen (Widget Definitions → Training Load); CONSTANTS § Linked Recovery & Load |
+| Training Load algorithm — Sleep-Adjusted Decay subsection + sleep cascade hooks | SERVICES § Training Load Algorithm (Sleep-Adjusted Decay, Daily Snapshot Capture), § Sleep Cascade |
+| Trends `trainingLoadTrend` chart — snapshot-aware rendering + new "About this chart's calculation" info section | SCREENS § Trends; SERVICES § Training Load Algorithm (Daily Snapshot Capture); INFO_COPY § Chart Info Modal Copy → Training Load Trend |
+| Linked Recovery & Load joint advisory copy (27 strings, zone × trainedToday × sleep bucket) | INFO_COPY § Training Load Zones → Linked Advisory Copy |
+| `UserSettings.targetSleepHours` (Double, default 7.0) + `recoveryLoadManuallyUnlinked` (Bool, default false) | PRD § Data Model |
+| `DailySleepSnapshot` + `DailyTrainingLoadSnapshot` SwiftData entities | PRD § Data Model; HEALTHKIT § 21 |
+| `Sleep Awake` color token `#FF6B5B`; `moon.zzz` + `rectangle.on.rectangle.slash` SF Symbols | CONSTANTS § Colors, § SF Symbols |
+| Widget Edit Mode — linked-pair-as-composite behavior + doc-drift fix on "x" delete button | SCREENS § Home Screen (Widget Edit Mode); BUGS (doc-drift entry) |
+| Tests + new accessibility identifiers | TESTING § Accessibility Identifiers → Recovery Status |
+| Collapsible insight cards on Linked Recovery & Load Detail Sheet (5 cards, persisted via UserSettings, default collapsed) | SCREENS § Linked Recovery & Load Detail Sheet → Collapsible insight cards; CONSTANTS § Linked Recovery & Load Detail Sheet → Collapsible Insight Cards |
+| Implementation plan | IMPLEMENTATION_PLAN_PHASE_11.md |
 
 ### Phase 9: Launch Prep
 *Ready for TestFlight or App Store.*

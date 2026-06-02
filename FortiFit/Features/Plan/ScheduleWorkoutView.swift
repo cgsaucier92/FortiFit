@@ -70,7 +70,7 @@ struct ScheduleWorkoutView: View {
             if templates.isEmpty {
                 VStack {
                     Spacer()
-                    Text("You'll need to create a template before scheduling a workout. You can create a template from the Workouts or Workout Templates screens.")
+                    Text("You'll need to create a template before planning a workout. You can create a template from the Workouts or Workout Templates screens.")
                         .font(FortiFitTypography.body)
                         .foregroundStyle(FortiFitColors.mutedText)
                         .multilineTextAlignment(.center)

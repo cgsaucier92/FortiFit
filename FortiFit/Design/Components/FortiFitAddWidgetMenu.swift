@@ -41,19 +41,23 @@ struct FortiFitAddWidgetMenu: View {
                     .background(FortiFitColors.border)
                     .padding(.top, FortiFitSpacing.elementSpacing)
 
-                // Widget list
-                VStack(spacing: 0) {
-                    ForEach(AppConstants.widgetTypes, id: \.self) { widgetType in
-                        widgetRow(for: widgetType)
+                // Widget list (scrollable)
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(spacing: 0) {
+                        ForEach(AppConstants.widgetTypes, id: \.self) { widgetType in
+                            widgetRow(for: widgetType)
 
-                        if widgetType != AppConstants.widgetTypes.last {
-                            Divider()
-                                .background(FortiFitColors.border)
+                            if widgetType != AppConstants.widgetTypes.last {
+                                Divider()
+                                    .background(FortiFitColors.border)
+                            }
                         }
                     }
                 }
+                .scrollIndicators(.visible)
                 .padding(.bottom, FortiFitSpacing.cardPadding)
             }
+            .frame(maxHeight: 500)
             .background(
                 RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
                     .fill(FortiFitColors.cardSurface)

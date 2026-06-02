@@ -32,6 +32,7 @@
 | Chart (Light Cyan) | `#8​FE6​F6` | A potential color for chart lines or bars |
 | Chart (Deep Blue) | `#0845​AD` | A potential color for chart lines or bars |
 | HealthKit Pink | `#FF2D55` | Source indicator heart icon and leading glyph on Workout Detail, info sheet accents. Matches Apple's system pink used in the Health app. See HEALTHKIT.md § 15. |
+| Sleep Awake | `#FF6B5B` | Awake segment of the sleep stages bar on the Recovery Status Detail Sheet and the Linked Recovery & Load Detail Sheet (Phase 11). Verify against the Apple Health app's sleep stages chart before committing the hex. Other stage colors are reused: Deep → Chart Purple (`#4B2893`), REM → Primary Accent Blue (`#3b82f6`), Core → Light Blue token from `Secondary` palette (`#93c5fd` — define inline if not already in the token set). |
 ---
 
 ## Ellipsis Menu SF Symbols
@@ -751,7 +752,7 @@ Goal cards use the **same long-press tease animation as Home screen widget cards
 ## Widget Types
 
 ```swift
-["trainingLoad", "weekStreak", "powerLevel", "todaysPlan", "appleActivity"]
+["trainingLoad", "weekStreak", "powerLevel", "todaysPlan", "appleActivity", "recoveryStatus"]
 ```
 
 | Identifier | Display Name | Description |
@@ -761,6 +762,7 @@ Goal cards use the **same long-press tease animation as Home screen widget cards
 | `powerLevel` | Power Level | Measures your average strength volume trend over the last 30 days across Strength Training and HIIT workouts. |
 | `todaysPlan` | Today's Plan | Shows your scheduled workout for today so you can jump straight into logging. Long-press → "Complete Workout" opens the same compact confirmation sheet as the Plan tab. |
 | `appleActivity` | Activity Rings | Tracks your daily Move, Exercise, and Stand rings. Requires an Apple Watch and Apple Health connected in Settings. |
+| `recoveryStatus` | Recovery Status | Tracks your sleep, recovery, and time since your last workout. Requires a sleep-tracking device (Apple Watch, Oura, Whoop, etc.) and Apple Health connected in Settings. When placed adjacent to Training Load, the two widgets link into a single composite with shared border, sleep-adjusted decay, and Sleep Impact Chip. |
 
 > **Removed widgets:** `workoutInfo` (Workout Info) was retired in this revision. It duplicated the Recent Workouts list directly below the widget stack and offered no decision-relevant signal beyond a vanity Total Workouts count. See SERVICES.md § HomeWidgetService → One-time migration for the cleanup of existing `workoutInfo` records on the upgrade build.
 
@@ -768,7 +770,26 @@ Goal cards use the **same long-press tease animation as Home screen widget cards
 ```swift
 ["todaysPlan", "trainingLoad", "powerLevel"]
 ```
-Week Streak and Activity Rings are add-only — available via the Add Widgets menu but not seeded on first launch.
+Week Streak, Activity Rings, and Recovery Status are add-only — available via the Add Widgets menu but not seeded on first launch.
+
+### Add Widgets Menu Order
+
+The Add Widgets menu lists every non-active widget type in this canonical order. Recovery Status sits directly below Training Load so users discover the linking behavior when they add the second of the pair. Weekly Streak anchors the bottom of the list.
+
+```swift
+["trainingLoad", "recoveryStatus", "powerLevel", "todaysPlan", "appleActivity", "weekStreak"]
+```
+
+| Position | Identifier | Notes |
+|---|---|---|
+| 1 | `trainingLoad` | Anchors the recovery cluster at the top of the list. |
+| 2 | `recoveryStatus` | **Phase 11.** Directly below Training Load so the linking affordance is discoverable: dragging Recovery Status to the slot directly above or below Training Load auto-links the pair (unless `recoveryLoadManuallyUnlinked == true`). See SCREENS.md § Standard Patterns → Widget Linking. |
+| 3 | `powerLevel` | Strength-trend complement to the recovery cluster. |
+| 4 | `todaysPlan` | Schedule-driven companion to the performance/recovery cluster above. |
+| 5 | `appleActivity` | Apple Health–gated; clusters with other HK-aware widgets. |
+| 6 | `weekStreak` | Motivational anchor at the bottom of the list. |
+
+Rows render with: SF Symbol (widget glyph), Display Name, description string from the table above. Add button is always enabled regardless of HK/Watch state — gating happens via the in-card states once the widget is on the Home grid (mirrors Activity Rings precedent — see HEALTHKIT.md § 21 and SCREENS.md § Home Screen → Add Widgets Menu).
 
 ---
 
@@ -1036,17 +1057,37 @@ Same suppression rules as the compact card (gradient + hairline + header summary
 | 56–80 | High | Dark Yellow (`#B7FF00`) |
 | 81–100 | Peak | Red (`#ef4444`) |
 
-### Advisory Text (Context-Aware)
+### Advisory Text (Context-Aware) — Standalone Training Load Widget
+
+Used by the standalone Training Load widget body and the Training Load Detail Sheet's Recovery Readiness callout. The linked Recovery & Load composite uses a different copy table — see § Linked Advisory Copy below.
 
 If user has NOT logged a workout today → readiness variant. If user HAS → post-training variant.
 
 | Zone | Readiness (no workout today) | Post-Training (trained today) |
 |---|---|---|
 | Resting | "No recent training stress. Ready for a full session." | *(cannot occur — floor > 0 if trained today)* |
-| Low | "Well recovered. Today is a good day to train hard." | "Session logged. Still feeling fresh." |
+| Low | "Well recovered. Ready to train." | "Session logged. You have more capacity to train again if you choose." |
 | Moderate | "Some muscle fatigue. A moderate session would be ideal." | "Good work today. Rest up." |
-| High | "Significant muscle fatigue. Consider a lighter session or active recovery." | "Heavy day. Recovery is the priority." |
+| High | "Significant muscle fatigue. Consider a lighter session or active recovery." | "Recovery is the priority." |
 | Peak | "High physical stress. Rest or very light activity recommended." | "You've been pushing hard. Time to rest." |
+
+### Linked Advisory Copy (linked Recovery & Load composite only)
+
+Used by the linked Recovery & Load composite — the Training Load widget body inside the linked pair, and the Linked Recovery & Load Detail Sheet's Recovery Readiness callout. The standalone Training Load widget and its detail sheet keep using the table above; this copy never bleeds into the unlinked surface.
+
+Computed by `RecoveryStatusService.computeLinkedAdvisory(baseAdvisory:zone:trainedToday:sleepHours:targetSleepHours:)`. Met-target and missing-data nights pass `baseAdvisory` through unchanged — the joint sentence only replaces the base when sleep is strong, moderately below, or significantly below target. Resolves BUG-061 (concatenating an independent sleep qualifier could produce contradictory pairings like *"Well recovered. Ready to train. You're significantly under-slept."*).
+
+Sleep buckets:
+
+| Sleep ratio (sleepHours / targetSleepHours) | Bucket | Behavior |
+|---|---|---|
+| `≥ 1.0` | `strong` | Base advisory replaced with a joint sentence that appends a positive sleep note. |
+| `0.85 – 0.99` | `metTarget` | `baseAdvisory` returned unchanged. |
+| `0.70 – 0.84` | `moderatelyBelow` | Base advisory replaced with a joint sentence that downgrades intensity one notch. |
+| `< 0.70` | `significantlyBelow` | Base advisory replaced with a joint sentence that clamps the recommendation at light / rest. |
+| `nil` (no sleep data) | n/a | `baseAdvisory` returned unchanged. |
+
+Stored in `AppConstants.TrainingLoad.linkedAdvisoryText` as a dictionary keyed by `"<zone>|<trainedToday>|<sleepBucket>"`. 27 unique strings — five zones × two `trainedToday` values × three non-empty sleep buckets, minus three Resting × trained combinations (the same-day floor in `ExerciseLoadService.calculateLoad` prevents that pairing). See INFO_COPY.md § Training Load Zones → Linked Advisory Copy for the canonical copy entries.
 
 ---
 
@@ -1084,7 +1125,7 @@ If user has NOT logged a workout today → readiness variant. If user HAS → po
 | Status | Directional Indicator | Color | Contextual Message |
 |--------|----------------------|-------|-------------------|
 | Deloading | ↓ | Red (#ef4444) | "Your volume has decreased over the last 30 days." |
-| Steady | — | Blue (#3b82f6) | "Your volume has been consistent over the last 30 days." |
+| Steady | — | Muted Text gray (#737373) | "Your volume has been consistent over the last 30 days." |
 | Rising | ↑ | Green (#10b981) | "Your volume has been increasing over the last 30 days." |
 | No data | — | — | "Log Strength Training or HIIT workouts to track your power level." |
 
@@ -1424,12 +1465,19 @@ Visual + content constants specific to the Training Load Detail Sheet (SCREENS.m
 
 ### Week Comparison Band
 
+Row + trailing italic caption inside a single `FortiFitCard`. Matches the linked Recovery & Load Detail Sheet's Window Comparison treatment (CONSTANTS § Linked Recovery & Load Detail Sheet → Window Comparison Band).
+
 | Property | Value |
 |---|---|
-| Copy template | `Stress load · {arrow} {abs(deltaPct)}% vs last week` where `arrow` ∈ `↑` (up) / `↓` (down) / `—` (flat) — matches the directional indicator convention used by the Power Level widget |
+| Row copy template | `Stress load · {arrow} {abs(deltaPct)}%` (no "vs last week" suffix — the caption beneath establishes the comparison) |
+| Arrow rule | `↑` when `deltaPct >= 0`, `↓` when `deltaPct < 0` |
 | Delta color when current ≤ previous | Positive Green `#10b981` |
 | Delta color when current > previous | Alert Red `#ef4444` |
-| Hidden when | Either current or previous week has 0 stress load |
+| Caption copy template | `This week so far ({Mon, MMM d} – today) vs same period last week ({Mon, MMM d} – {matched weekday, MMM d})` — 11pt italic Muted Text |
+| Caption identifier | `trainingLoadDetailSheet_weekComparisonCaption` |
+| Comparison windows | Day-of-week matched (BUG-066): Mon-through-current-weekday this ISO week vs Mon-through-the-same-weekday last ISO week. On Sunday the windows collapse to a full Mon–Sun comparison. Driven by `ExerciseLoadService.weekOverWeekComparison(context:now:)` |
+| Insufficient-data treatment | When `matchedDayCount < 2` (early Monday), the row renders `Not enough data` in Muted Text in place of a delta. Caption still renders so the user can see what window would have been used |
+| Hidden when | `matchedDayCount >= 2` AND `currentWeekTss == 0` AND `previousWeekTss == 0` (truly no data on either side) — preserves the existing "never-trained users don't see an empty card" behavior |
 | Absolute total | Intentionally not displayed — consistency with contributing-workouts rows (no per-row absolute either) and avoids the additivity-vs-hero confusion |
 
 ---
@@ -1513,3 +1561,486 @@ The chip was removed from the Today's Plan Detail Sheet entirely. Users schedule
 |---|---|
 | Copy | `No workouts planned for today.` (Muted Text, centered) |
 | Identifier | `todaysPlanDetailSheet_emptyState` |
+
+---
+
+## Recovery Status Widget (Phase 11)
+
+Visual + content constants for the standalone (unlinked) Recovery Status widget on the Home screen. See SCREENS.md § Home Screen → Recovery Status widget.
+
+### Hero Typography
+
+The hero region is two side-by-side columns: `SLEEP` (left) + `SINCE LAST WORKOUT` (right). Both columns share the same label/value styling. The SINCE LAST WORKOUT column renders in all 4 gating states (workout history is independent of HK sleep gating).
+
+| Slot | Style |
+|---|---|
+| Widget header | `RECOVERY STATUS` — Primary Accent Blue 13/900, uppercase, 2px letter-spacing (standard widget header treatment) |
+| Hero sub-labels | `SLEEP` / `SINCE LAST WORKOUT` — Primary Accent Blue 11/700, uppercase, 2px letter-spacing |
+| Hero values | `{h}h {mm}m` (sleep) / `{value}` (workout — no trailing descriptor, sub-label supplies it) — Primary Text, **32px / 900 weight** (matches Weekly Streak count treatment). Muted Text when no data. |
+| Deep caption (SLEEP column only) | `{pct}% DEEP · {h}h {mm}m` (e.g., `34% DEEP · 1h 24m`) — Muted Text 11/700, uppercase, 2px letter-spacing, dot-separated |
+
+### Since Last Workout Hero Value
+
+Bare value rendered under the `SINCE LAST WORKOUT` sub-label in the right hero column. Same graceful precision degradation as the legacy timer meta line but without the trailing descriptor (the sub-label supplies that context). Any workout type counts (manual or HK-imported, all 6 types). Primary Text 32/900 (or Muted Text when `NO DATA`).
+
+| Time since last workout | Format |
+|---|---|
+| `< 1 hour` | `{n} min` |
+| `1–23 hours` | `{h}h {mm}m` |
+| `24–72 hours` | `{d}d {h}h` |
+| `> 72 hours` | `{d} days` |
+| Never logged | `NO DATA` |
+
+### Decorative Watermark
+
+| Property | Value |
+|---|---|
+| SF Symbol | `moon.zzz` |
+| Size | ~140pt |
+| Color | Muted Text fill |
+| Opacity (Live, incl. no-sleep-last-night sub-state) | 20% |
+| Opacity (Connect Apple Health) | 10% (reduced — quieter empty state) |
+| Opacity (No Sleep Tracker) | 10% |
+| Opacity (Sleep Access Denied) | 10% |
+| Placement | Centered in the card via `ZStack` (sits behind both hero columns), clipped by card edges |
+| Identifier | `homeWidget_recoveryStatus_watermark` |
+
+Identical treatment to Today's Plan's silhouette pattern. **No `info.circle` on the card body** — See Info accessed via long-press context menu only.
+
+### No-Sleep-Last-Night Sub-State
+
+When `hasRecentSleepData == true` but no `.asleep*` samples ended within last night's wake-up window:
+
+| Element | Rendering |
+|---|---|
+| Hero value | `— h —m` (Muted Text 32/900) |
+| Deep caption | `NO DATA` (Muted Text 11/700, uppercase) |
+| Timer line | Renders normally per format breakpoints above |
+| Watermark | Full 20% opacity |
+
+### SF Symbols
+
+| Symbol | Usage |
+|---|---|
+| `moon.zzz` | Card watermark and the `Sleep` row icon in Settings → Apple Health (see HEALTHKIT.md § 16). |
+
+---
+
+## Recovery Status Settings Modal (Phase 11)
+
+Visual + content constants for the unlinked Configure Settings modal (SCREENS.md § Recovery Status Settings Modal).
+
+### Heading
+
+`Configure Recovery Status` — modal heading treatment per existing Configure modals.
+
+### Sleep Target Slider
+
+| Property | Value |
+|---|---|
+| Label | `Sleep Target — {value} hrs` (value bolded inline) |
+| Range | `4.0` – `12.0` hours |
+| Increment | `0.5` hours |
+| Default | `7.0` hours |
+| UserSettings field | `targetSleepHours: Double` |
+| Identifier | `recoveryStatusSettings_targetSleepHoursSlider` |
+
+### Import from Apple Health Button
+
+| Property | Value |
+|---|---|
+| Label | `Import from Apple Health` |
+| Style | `FortiFitButton(..., style: .primary)` — full-width filled Primary Accent Blue button. Matches Activity Rings Settings Modal Import button treatment for visual consistency. |
+| Position | Below the slider |
+| Action | `RecoveryStatusService.importSleepGoalFromAppleHealth()` — calls `HealthKitClient.fetchSleepDurationGoal()`. HealthKit does not expose a sleep duration goal characteristic in its public API (BUG-048), so the call always returns `nil` in the current build and the toast fires. The snap-to-0.5-hr-increment + 4.0–12.0 clamp logic is exercised in unit tests and ready for the day Apple ships a real API. |
+| Disabled state | When HK not connected: `.opacity(0.4)` + `.disabled(true)` |
+| Disabled caption (HK not connected) | `"Connect Apple Health to import your goal."` (Muted Text, `FortiFitTypography.note`, below button) |
+| HK-no-goal toast | `"No sleep goal set in Apple Health."` (Toast Style — see § Toast Style) |
+| Identifier | `recoveryStatusSettings_importButton` |
+
+### Done Button
+
+Reuses the **Settings Modal Done Button** treatment defined in § Settings Modal Done Button (Phase 8.8) — outlined Primary Accent Blue, full width, dismisses the modal. Identifier: `recoveryStatusSettings_doneButton`.
+
+### Close Button
+
+Standard modal `xmark` close button in the top-trailing corner. Identifier: `recoveryStatusSettings_closeButton`.
+
+---
+
+## Recovery Status Detail Sheet (Phase 11)
+
+Visual + content constants for the unlinked Detail Sheet (SCREENS.md § Recovery Status Detail Sheet). Reuses the Widget Detail Sheet Visual Tokens (Phase 8.8) for sheet presentation, header, hero, body spacing, and footer button block.
+
+### Hero Block
+
+| Element | Rendering |
+|---|---|
+| Hero label | `SLEEP` (Primary Accent Blue 11/700, uppercase) |
+| Hero value | `{h}h {mm}m` (Primary Text, sheet-hero scale — typically 48/900 per § Widget Detail Sheet Visual Tokens → Hero Block) |
+| Deep caption | `{pct}% DEEP · {h}h {mm}m` (Muted Text 11/700, uppercase) |
+| Identifier | `recoveryStatusDetailSheet_hero` |
+
+### Sleep Stages Bar
+
+Horizontal stacked bar showing the proportion of each stage within the wake-up window.
+
+| Stage | Color |
+|---|---|
+| Deep | Chart Purple `#4B2893` |
+| REM | Primary Accent Blue `#3b82f6` |
+| Core | Light Blue `#93c5fd` (inline; not in token table) |
+| Awake | Sleep Awake `#FF6B5B` (Phase 11) |
+
+| Property | Value |
+|---|---|
+| Bar height | 12pt |
+| Corner radius | 6pt (continuous) |
+| Inter-stage divider | None — stages render edge-to-edge |
+| Legend position | Below the bar, dot-separated, Muted Text 11/700 |
+| Identifier (bar) | `recoveryStatusDetailSheet_stagesBar` |
+| Identifier (legend) | `recoveryStatusDetailSheet_stagesLegend` |
+
+### Sleep Efficiency Caption
+
+| Property | Value |
+|---|---|
+| Format | `Sleep efficiency: {pct}% ({h}h {mm}m asleep of {h}h {mm}m in bed)` (italic, Muted Text 13px) |
+| Visibility | Hidden when `DailySleepSnapshot.inBedMinutes == nil` |
+| Position | Beneath the stages legend |
+| Identifier | `recoveryStatusDetailSheet_sleepEfficiencyCaption` |
+
+### 14-Day Sleep Sparkline
+
+| Property | Value |
+|---|---|
+| Window | Last 14 days (rolling, anchored to today's wake-up date). Sourced from `RecoveryStatusService.recent30DaySleep.suffix(14)` so the underlying 30-day cache is unchanged. Matches the linked Recovery & Load Detail Sheet's sleep sparkline window. |
+| Y-axis | Domain `4…10` hours; leading axis marks at `5`, `7`, `9` with 0.5pt dashed gridlines (Border) and Muted Text value labels. Matches the linked Recovery & Load Detail Sheet's sleep sparkline. |
+| Line color | Chart Purple `#4B2893` |
+| Line interpolation | `.catmullRom` (matches Trends chart visual tokens — § Trends Chart Visual Tokens → Line Interpolation) |
+| Latest-point highlight | 6pt Primary Accent Blue filled dot (matches § Trends Chart Visual Tokens → Latest Data-Point Highlight) |
+| Caption | `Last 14 days · Sleep duration` |
+| Selection annotation | `{hours}h · {date}` on tap; `{hours}h · {weekday}` while scrubbing |
+| Empty-state copy | `Not enough sleep data yet to chart trends.` (rendered when fewer than 7 days of snapshots exist) |
+| Identifier (chart) | `recoveryStatusDetailSheet_sleepSparkline` |
+| Identifier (data point) | `recoveryStatusDetailSheet_sleepSparkline_dataPoint_{index}` |
+| Identifier (annotation) | `recoveryStatusDetailSheet_sleepSparkline_selectionAnnotation` |
+
+### Last-7-Nights Stat Row
+
+Three-cell stat row beneath the sparkline.
+
+| Cell | Label | Value source |
+|---|---|---|
+| 1 | `AVG SLEEP` | Mean of `totalSleepMinutes` across last 7 `DailySleepSnapshot` records → formatted `{h}h {mm}m` |
+| 2 | `AVG DEEP` | Mean of `deepSleepMinutes` across last 7 records → `{h}h {mm}m` |
+| 3 | `NIGHTS ON TARGET` | Count of last 7 nights where `sleepHours >= targetSleepHours × 0.85` → `{n}/7` |
+
+| Property | Value |
+|---|---|
+| Label style | Muted 11/700, uppercase, 2px letter-spacing |
+| Value style | Primary Text 17/800 |
+| Identifier | `recoveryStatusDetailSheet_last7NightsStatRow` |
+
+### Time Since Last Workout Block
+
+Below the sparkline + stat row. Shows the same headline timer line that's on the widget, plus a per-type breakdown.
+
+| Element | Rendering |
+|---|---|
+| Headline row | Same format as widget timer line (§ Recovery Status Widget → Timer Meta Line). Tappable → Workout Detail of the most recent workout. |
+| Per-type rows | One row per of the 6 workout types that has ≥ 1 record. Format: `{Workout Type Glyph} {Type Name} · {time since last}` (Muted 13px). Tap → Workouts tab with that type's card auto-expanded. |
+| Per-type sort | Most-recent first (across types). |
+| Identifier (block) | `recoveryStatusDetailSheet_timeSinceWorkout` |
+| Identifier (headline) | `recoveryStatusDetailSheet_timeSinceWorkout_headline` |
+| Identifier (type row) | `recoveryStatusDetailSheet_timeSinceWorkout_typeRow_{type}` |
+
+### Cold-Start Empty State
+
+When `Workout` count is zero (user has never logged a workout):
+
+| Property | Value |
+|---|---|
+| Copy | `No workouts logged yet.` (Muted Text 15px, centered) |
+| CTA | Full-width `Log a Workout` button (filled Primary Accent Blue) → navigates to Log Workout |
+| Identifier | `recoveryStatusDetailSheet_emptyState_coldStart` |
+
+### Footer Buttons (See Info / Configure Settings)
+
+Reuses the Phase 8.8 detail-sheet footer pattern: two side-by-side outlined buttons.
+
+| Button | Action | Identifier |
+|---|---|---|
+| `See Info` | Opens Recovery Status See Info Modal | `recoveryStatusDetailSheet_seeInfoButton` |
+| `Configure Settings` | Opens Recovery Status Settings Modal | `recoveryStatusDetailSheet_configureSettingsButton` |
+
+---
+
+## Linked Recovery & Load (Phase 11)
+
+Visual + content constants for the linked composite (`FortiFitLinkedRecoveryLoadComposite`) — the container that renders Recovery Status + Training Load as a single visual unit when adjacent and not manually unlinked.
+
+### Shared Border Treatment
+
+| Property | Value |
+|---|---|
+| Border color | Primary Accent Blue `#3b82f6` (replaces each card's default Border `#404040`) |
+| Border width | 1px |
+| Corner radius | Standard card corner radius |
+| Per-card padding between RS and TL | **Zero** (cards render edge-to-edge inside the composite) |
+| Internal divider | None — the absence of inter-card padding IS the divider |
+| Tap target | Single composite tap target for long-press / tease; individual cards still route their own taps to their own detail sheet behavior (both open the **same** combined detail sheet). |
+
+When unlinked (including manually unlinked), each widget renders independently with its own card border + standard padding. The composite container is conditional on `HomeWidgetService.isLinkedActive(widgets:settings:)`.
+
+### Gradient Backdrop
+
+Subtle blue gradient that spans the full composite, used to give the linked pair its own visual identity vs. the surrounding flat-surface widgets. Mirrors the `FortiFitChartCard` single-color gradient pattern (CONSTANTS § Trends Chart Visual Tokens → Gradient Treatment) at a lower opacity so it reads as a hint, not a treatment.
+
+| Property | Value |
+|---|---|
+| Type | `LinearGradient`, top → bottom |
+| Color | Primary Accent Blue `#3b82f6` |
+| Top stop opacity | **0.12** (vs. 0.2 used by Trends Chart Cards — intentionally lower for subtlety) |
+| Bottom stop opacity | 0.0 |
+| Base fill | `FortiFitColors.cardSurface` (`#1a1a1a`) — the gradient renders in a `ZStack` over this surface, both clipped to the composite corner radius |
+| Child card fill | Both child cards (Recovery Status + Training Load) pass `fillColor: .clear` to `FortiFitCard` so the composite's gradient shows through both halves. The default `FortiFitCard.fillColor` remains `cardSurface` — only the embedded path opts out. |
+| Owner | `FortiFitLinkedRecoveryLoadComposite` — the gradient is part of the composite container, never the child widgets. |
+| Unlinked state | When `isLinkedActive == false`, each child reverts to `fillColor: cardSurface` so individual cards regain their opaque surfaces. |
+
+### `FortiFitCard.fillColor` parameter
+
+Added alongside Phase 11's Linked composite to let embedded cards opt out of their own surface fill so a parent container (e.g. the linked composite) can paint a single shared background.
+
+| Property | Value |
+|---|---|
+| Type | `Color` |
+| Default | `FortiFitColors.cardSurface` |
+| Embedded usage | `.clear` — used by both child widgets when rendered inside `FortiFitLinkedRecoveryLoadComposite` (`isEmbedded: true` path) |
+| Non-embedded usage | Default (`cardSurface`) — preserves the original look for every other caller |
+
+### Animation Timing
+
+| Transition | Duration | Curve |
+|---|---|---|
+| Border swap on link/unlink | 0.2s | Ease |
+| Padding collapse/expand between cards | 0.2s | Ease |
+| Score number tween on linking state change | 0.4s | Ease (matches PRD § 2 progress-bar standard) |
+| Gradient bar fill on score recompute | 0.4s | Parallel to score tween |
+| Drag preview opacity in Widget Edit Mode (composite as one unit) | 30% | (matches existing widget drag preview) |
+
+Reduce Motion: snap (no tweens).
+
+### No Bridge / No LINKED Chip
+
+Confirmed against the locked spec: there is **no** bridge bar between the cards, **no** LINKED micro-chip, **no** inner-edge glow pulse, **no** shared header strip. Border swap + zero padding are the only visual signals of linking.
+
+### Dual Hero Spec (composite layout reference)
+
+Both cards retain their existing hero blocks.
+
+- The `moon.zzz` watermark on the RS card is **suppressed in the linked variant** — the composite leans on the shared blue border + Sleep Impact Chip as the linking signals, and removing the watermark keeps the dual-hero block visually cleaner. The watermark returns the moment the pair auto-unlinks or is manually unlinked (`isEmbedded == false`).
+
+### Sleep Impact Chip (on Training Load widget when linked)
+
+| Property | Value |
+|---|---|
+| Position | Beneath the existing zone advisory copy on the TL widget body |
+| Format | `{arrow} {signed integer} from sleep` (e.g., `↑ +3 from sleep`) |
+| Computation | `currentLinkedScore − whatBaselineWouldBe` (rounded integer); algorithm in SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay |
+| Up-arrow `↑` | Positive delta (more retained stress — sleep-adjusted decay slowed) |
+| Down-arrow `↓` | Negative delta (less stress) — rare since linked algorithm only slows decay |
+| Em-dash `—` | Zero delta (sleep met target) |
+| Color | Alert Red `#ef4444` when positive (more stress = warning), Positive Green `#10b981` when negative, Muted Text `#737373` when zero |
+| Visibility | Only when linked AND sleep data available for last night |
+| Hidden | When linked but missing last-night sleep data (silent baseline fallback) |
+| Identifier | `homeWidget_trainingLoad_sleepImpactChip` |
+
+### SF Symbols
+
+| Symbol | Usage |
+|---|---|
+| `rectangle.on.rectangle.slash` | "Unlink Widgets" item in the combined long-press context menu (see SCREENS.md § Home Screen → Widget Context Menu). |
+
+### Composite Identifier
+
+| Identifier | Element |
+|---|---|
+| `homeWidget_linkedRecoveryLoad_composite` | The composite container itself |
+
+---
+
+## Linked Recovery & Load Settings Modal (Phase 11)
+
+Visual + content constants for the combined Configure Settings modal (SCREENS.md § Linked Recovery & Load Settings Modal). Reuses Settings Modal Done Button (Phase 8.8) treatment.
+
+### Heading
+
+`Configure Recovery & Load`
+
+### Slider Order
+
+Three slider cards, top-to-bottom. Preserves existing TL settings modal order (Experience → Duration), appends Sleep Target as the new addition.
+
+| # | Card | Range | Increment | Default | UserSettings field | Identifier |
+|---|---|---|---|---|---|---|
+| 1 | Training Experience | Beginner / Intermediate / Advanced (3-position) | — | Beginner (0) | `experienceLevel` | `linkedRecoveryLoadSettings_experienceLevelSlider` |
+| 2 | Target Workout Duration | 0–300 min | (existing TL spec) | 52 min | `targetMinutesPerWorkout` | `linkedRecoveryLoadSettings_targetWorkoutDurationSlider` |
+| 3 | Sleep Target | 4–12 hrs | 0.5 hrs | 7.0 hrs | `targetSleepHours` | `linkedRecoveryLoadSettings_targetSleepHoursSlider` |
+
+### Import from Apple Health Button
+
+Single import button — **scope limited to Sleep Target only** (the other two sliders have no Apple Health equivalent). Same behavior as the unlinked Recovery Status Settings Modal's Import button.
+
+| Property | Value |
+|---|---|
+| Label | `Import from Apple Health` |
+| Style | `FortiFitButton(..., style: .primary)` — full-width filled Primary Accent Blue button. Matches Activity Rings Settings Modal Import button + unlinked Recovery Status Settings Modal Import button. |
+| Position | Beneath the Sleep Target slider card (matches unlinked modal placement convention) |
+| Action | `RecoveryStatusService.importSleepGoalFromAppleHealth()` |
+| Disabled state | When HK not connected: `.opacity(0.4)` + `.disabled(true)`, with the same `"Connect Apple Health to import your goal."` caption below |
+| Identifier | `linkedRecoveryLoadSettings_importButton` |
+
+### Done Button + Close Button
+
+| Button | Identifier |
+|---|---|
+| Done (outlined, full width) | `linkedRecoveryLoadSettings_doneButton` |
+| Close (`xmark`, top-trailing) | `linkedRecoveryLoadSettings_closeButton` |
+
+### Modal Identifier
+
+`linkedRecoveryLoadSettings_modal`
+
+---
+
+## Linked Recovery & Load Detail Sheet (Phase 11)
+
+Visual + content constants for the combined Detail Sheet (SCREENS.md § Linked Recovery & Load Detail Sheet). Reuses Widget Detail Sheet Visual Tokens (Phase 8.8) for sheet presentation, header, body block spacing, footer button block.
+
+### Sheet Title
+
+`Recovery & Load Insights`
+
+### Dual Hero Block
+
+Two hero columns side-by-side at the top.
+
+| Column | Label | Value | Subtext |
+|---|---|---|---|
+| Left | `SLEEP` (Primary Accent Blue 11/700) | `{h}h {mm}m` (Primary Text 48/900) | `{pct}% DEEP · {h}h {mm}m` (Muted 11/700) |
+| Right | `TRAINING LOAD` (Primary Accent Blue 11/700) | `{score}/100` (Primary Text 48/900) | `Adjusted for sleep` (Muted 11/700) |
+
+| Identifier (block) | Element |
+|---|---|
+| `linkedRecoveryLoadDetailSheet_dualHero` | Container |
+| `linkedRecoveryLoadDetailSheet_recoveryHero` | Left column |
+| `linkedRecoveryLoadDetailSheet_loadHero` | Right column |
+
+### Stacked Combined Chart (14-Day Sleep + Sleep-Adjusted TL)
+
+Two vertically-stacked sparklines sharing an x-axis (calendar day), with **synchronized scrubbing**.
+
+| Property | Value |
+|---|---|
+| Window | Last 14 days |
+| Top sparkline | Sleep duration. Line color: Chart Purple `#4B2893`. Interpolation: `.catmullRom`. |
+| Top caption | `Last 14 days · Sleep duration` |
+| Bottom sparkline | Training Load score (sleep-adjusted). Line color: TL zone color of latest score (per § Training Load Zones). Interpolation: `.catmullRom`. |
+| Bottom caption | `Last 14 days · Training Load (sleep-adjusted)` |
+| Synchronized scrub | Dragging on either chart highlights the matching day on both. Annotation: `{date} · {sleepHours}h sleep · {zone} ({score}/100)` |
+| Data source | `DailySleepSnapshot` (top) + `DailyTrainingLoadSnapshot` (bottom) — see PRD.md § Data Model |
+| Identifier (combined block) | `linkedRecoveryLoadDetailSheet_combinedChart` |
+| Identifier (top chart) | `linkedRecoveryLoadDetailSheet_sleepSparkline` |
+| Identifier (bottom chart) | `linkedRecoveryLoadDetailSheet_loadSparkline` |
+
+### Window Comparison Band
+
+Two-line band + trailing caption, all inside a single `FortiFitCard` below the combined chart. No card title — the two rows (`Stress Load` and `Sleep`) act as the card's visible identity at all collapse states; only the caption hides behind the chevron (see SCREENS.md § Linked Recovery & Load Detail Sheet → Collapsible insight cards).
+
+| Line | Format |
+|---|---|
+| Stress Load | `STRESS LOAD · {↑/↓} {pct}%` (uppercase Muted label + Primary Text value). The trailing "vs last week" is intentionally omitted — the grey caption beneath the rows already names the matched windows. When the matched window is fewer than 2 days (i.e. early Monday before any data has accrued), the value renders as `Not enough data` in Muted Text. |
+| Sleep | `SLEEP · {↑/↓} {pct}%`. Same `Not enough data` treatment as Stress Load when the matched window is fewer than 2 days. |
+| Caption (below both rows) | `This week so far ({Mon, MMM d} – today) vs same period last week ({Mon, MMM d} – {matched weekday, MMM d})` — 11pt italic Muted Text, ID `linkedRecoveryLoadDetailSheet_windowComparisonCaption`. Names the day-of-week-matched windows (BUG-065, BUG-066). |
+
+Arrow colors: Alert Red for higher stress load / lower sleep, Positive Green for the inverse. Computation: **day-of-week matched windows** — both rows compare Mon-through-current-weekday of this ISO week vs Mon-through-the-same-weekday of the prior ISO week. On Monday the window is a single day (and the row collapses to `Not enough data`); on Sunday it is the full Mon–Sun week. Stress Load is a sum of raw `sessionStress` over the matched window (no time decay; see SERVICES.md § Training Load Algorithm → `weekOverWeekComparison`). Sleep is the mean of `totalSleepMinutes` over nights *present* in each matched window (missing nights are skipped, not zero-filled; see SERVICES.md § RecoveryStatusService → `sleepWeekOverWeekComparison`). Both windows are aligned so a single caption describes both rows.
+
+Identifier: `linkedRecoveryLoadDetailSheet_windowComparison`
+
+### Correlation Callout
+
+Single-sentence Muted-Text line (`FortiFitTypography.bodySmall`) rendered inside the Personal Insights card above the per-pattern rows — same visual treatment as the Pattern 1/2/3 rows so the card reads as one coherent insights block. Median-split the user's last N days (N ≥ 14) of paired (sleep, next-day-score) data at the 7h sleep mark (algorithm: SERVICES.md § RecoveryStatusService → `computeSleepLoadCorrelation()`).
+
+`correlationDelta = mean(highSleepScores) − mean(lowSleepScores)` — i.e., the mean next-day TL score after high-sleep nights minus the mean after short-sleep nights.
+
+| Variant | Trigger | Copy |
+|---|---|---|
+| High-sleep → much-lower-score (healthy correlation) | `correlationDelta <= -5` | `"Strong nights (≥ 7h) bring your score down ~{n} points the next day."` |
+| High-sleep → much-higher-score (inverted — rebound training pattern) | `correlationDelta >= +5` | `"Short nights (< 6h) leave your score ~{n} points higher the next day."` |
+| No clear correlation | `|correlationDelta| < 5` OR insufficient data | `"Your sleep and load haven't shown a clear pattern yet."` |
+
+> **Variant naming caveat (BUG-049):** the two non-zero-delta variants are documented for symmetry but capture *opposite* underlying user behaviors. The first (negative delta) is the common pattern — good sleep correlates with lower next-day TL. The second (positive delta) is rare and tends to surface when an athlete trains harder after well-rested nights, raising next-day TL via additional training load. The copy strings are kept distinct so the user reads a phrasing that matches the data direction; the algorithm picks the variant strictly off the delta sign + magnitude.
+
+Hidden if fewer than 14 paired days exist. Identifier: `linkedRecoveryLoadDetailSheet_correlationCallout`. The callout renders above the per-pattern insight rows inside the Personal Insights card (see § Personal Pattern Insights). The Personal Insights card is visible whenever the correlation callout OR ≥ 1 detected pattern is available.
+
+### Personal Pattern Insights
+
+Up to 3 auto-detected patterns from ≥ 21 days of paired data, rendered inside the Personal Insights card below the correlation callout line (see § Correlation Callout). Each pattern is a single italic Muted-Text line. Detection algorithms in SERVICES.md § RecoveryStatusService → Personal Insights.
+
+| Pattern type | Example copy |
+|---|---|
+| Score-by-sleep-bucket | `"Your training load runs ~{n} points lower after 7+ hour nights."` |
+| Sleep-by-workout-type | `"You sleep an average of {n} min less on {workoutType} training days."` |
+| Multi-week aggregate | `"Your most consistent recovery weeks (~{n} points lower load) line up with sleep targets met 5+ nights."` |
+
+| Identifier (block) | `linkedRecoveryLoadDetailSheet_personalInsights` |
+|---|---|
+| Identifier (per-row) | `linkedRecoveryLoadDetailSheet_personalInsights_row_{0..2}` |
+
+### Last 3 Nights Row
+
+Three-cell row below personal insights. Each cell: `{Day}, {Month} {Date} · {h}h {mm}m · {pct}% deep`.
+
+Identifier: `linkedRecoveryLoadDetailSheet_last3Nights`
+
+### Time Since Workout Block
+
+Same structure as unlinked detail sheet (see Recovery Status Detail Sheet § Time Since Last Workout Block). Identifier: `linkedRecoveryLoadDetailSheet_timeSinceWorkout`
+
+### Contributing Workouts Block
+
+Reuses the Phase 8.8 Training Load Detail Sheet contributing-workouts pattern. Lists the workouts inside the 10-day decay window. Identifier: `linkedRecoveryLoadDetailSheet_contributingWorkouts`
+
+### Recovery Readiness Callout
+
+The joint Recovery & Load advisory string returned by `RecoveryStatusService.computeLinkedAdvisory(...)` — see § Training Load Zones → Linked Advisory Copy. When sleep data for last night is missing or sleep met target, the base TL zone advisory (per § Training Load Zones → Advisory Text — Standalone Training Load Widget) renders unchanged.
+
+Identifier: `linkedRecoveryLoadDetailSheet_recoveryCallout`
+
+### Footer Buttons
+
+Reuses the Phase 8.8 detail-sheet footer pattern.
+
+| Button | Action | Identifier |
+|---|---|---|
+| `See Info` | Opens Linked Recovery & Load See Info Modal | `linkedRecoveryLoadDetailSheet_seeInfoButton` |
+| `Configure Settings` | Opens Linked Recovery & Load Settings Modal | `linkedRecoveryLoadDetailSheet_configureSettingsButton` |
+
+### Collapsible Insight Cards
+
+Five secondary body blocks on the Linked Recovery & Load Detail Sheet expose a bottom-aligned chevron toggle that hides their content. Matches the Goals card chevron pattern: `Image(systemName: isExpanded ? "chevron.up" : "chevron.down")`, `.font(.system(size: 12, weight: .semibold))`, `FortiFitColors.mutedText`, full-width plain `Button` with `.frame(height: 24)` and `.contentShape(Rectangle())`, animated with `withAnimation(.easeInOut(duration: 0.1))`. The card title row stays visible when collapsed; everything below it hides. The Window Comparison card uses the static title `Stress Load & Sleep` (added so the collapsed state has a label).
+
+State persists per-card via `UserSettings` UserDefaults flags (registered defaults all `false` → collapsed on first launch and after install).
+
+| Card | UserDefaults key | Default | Chevron accessibility identifier |
+|---|---|---|---|
+| Window comparison (Stress Load & Sleep) | `recoverySheetStressLoadExpanded` | `false` | `linkedRecoveryLoadDetailSheet_windowComparison_chevron` |
+| Personal Pattern Insights | `recoverySheetPersonalInsightsExpanded` | `false` | `linkedRecoveryLoadDetailSheet_personalInsights_chevron` |
+| Last 3 Nights | `recoverySheetLast3NightsExpanded` | `false` | `linkedRecoveryLoadDetailSheet_last3Nights_chevron` |
+| Contributing This Week | `recoverySheetContributingExpanded` | `false` | `linkedRecoveryLoadDetailSheet_contributingWorkouts_chevron` |
+| Time Since Last Workout | `recoverySheetTimeSinceWorkoutExpanded` | `false` | `linkedRecoveryLoadDetailSheet_timeSinceWorkout_chevron` |
+
+### Sheet Identifier
+
+`linkedRecoveryLoadDetailSheet_sheet`

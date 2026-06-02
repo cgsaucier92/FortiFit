@@ -17,6 +17,7 @@ struct FortiFitApp: App {
     @State private var healthKitSyncService: HealthKitSyncService
     @State private var appleActivityService: AppleActivityService
     @State private var watchScheduleService: WatchScheduleService
+    @State private var recoveryStatusService: RecoveryStatusService
     @State private var currentPendingMatch: PendingMatch?
     @State private var showLaunchSplash = true
     @Environment(\.scenePhase) private var scenePhase
@@ -34,6 +35,8 @@ struct FortiFitApp: App {
             ScheduledWorkout.self,
             GoalSnapshot.self,
             WorkoutMatchRejection.self,
+            DailySleepSnapshot.self,
+            DailyTrainingLoadSnapshot.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -76,8 +79,12 @@ struct FortiFitApp: App {
         let client: HealthKitClient = isUITesting ? NoOpHealthKitClient() : DefaultHealthKitClient()
         let matcher = WorkoutMatcher()
         _healthKitMatcher = State(initialValue: matcher)
-        _healthKitSyncService = State(initialValue: HealthKitSyncService(client: client, matcher: matcher))
+        let syncService = HealthKitSyncService(client: client, matcher: matcher)
+        let recovery = RecoveryStatusService(client: client)
+        syncService.recoveryStatusService = recovery
+        _healthKitSyncService = State(initialValue: syncService)
         _appleActivityService = State(initialValue: AppleActivityService(client: client))
+        _recoveryStatusService = State(initialValue: recovery)
         let workoutScheduler: WorkoutSchedulerProtocol = isUITesting ? NoOpWorkoutScheduler() : DefaultWorkoutScheduler()
         _watchScheduleService = State(initialValue: WatchScheduleService(scheduler: workoutScheduler))
     }
@@ -94,6 +101,7 @@ struct FortiFitApp: App {
                     .environment(healthKitSyncService)
                     .environment(appleActivityService)
                     .environment(watchScheduleService)
+                    .environment(recoveryStatusService)
                     .task {
                         let context = sharedModelContainer.mainContext
                         if CommandLine.arguments.contains("--seed-hk-workout") {
@@ -149,11 +157,13 @@ struct FortiFitApp: App {
                     .environment(healthKitSyncService)
                     .environment(appleActivityService)
                     .environment(watchScheduleService)
+                    .environment(recoveryStatusService)
                     .task {
                         let context = sharedModelContainer.mainContext
                         WorkoutService.migrateSprintsToCardioIfNeeded(context: context)
                         HomeWidgetService.migrateWorkoutInfoRemovalIfNeeded(context: context)
                         healthKitSyncService.setContext(context)
+                        recoveryStatusService.setContext(context)
                         if CommandLine.arguments.contains("--seed-hk-workout") {
                             seedHealthKitLinkedWorkout(context: context)
                         }
@@ -180,6 +190,9 @@ struct FortiFitApp: App {
                             appleActivityService.startObserving()
                             appleActivityService.refresh()
                             appleActivityService.refreshWorkoutContributions(context: context)
+                            // Phase 11 — Recovery Status launch refresh.
+                            await recoveryStatusService.refresh(forceCatchUp: false)
+                            await healthKitSyncService.runSleepCatchUpIfNeeded()
                         }
                         if UserSettings.shared.syncPlanToAppleWatchEnabled {
                             await watchScheduleService.refreshAuthState()
@@ -195,6 +208,10 @@ struct FortiFitApp: App {
                                     await watchScheduleService.refreshAuthState()
                                     await watchScheduleService.reconcile(context: context)
                                 }
+                            }
+                            // Phase 11 — 6pm-cutoff sleep catch-up, guarded internally.
+                            Task {
+                                await healthKitSyncService.runSleepCatchUpIfNeeded()
                             }
                         }
                     }

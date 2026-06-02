@@ -75,10 +75,10 @@ struct FortiFitPowerLevelDetailSheet: View {
                 if isColdStart {
                     Text("Steady")
                         .font(.system(size: 22, weight: .black))
-                        .foregroundStyle(FortiFitColors.primaryAccent)
+                        .foregroundStyle(FortiFitColors.mutedText)
                     Text("—")
                         .font(.system(size: 48, weight: .black))
-                        .foregroundStyle(FortiFitColors.primaryAccent)
+                        .foregroundStyle(FortiFitColors.mutedText)
                     Text(AppConstants.WidgetDetail.EmptyState.powerLevelHero)
                         .font(FortiFitTypography.note)
                         .foregroundStyle(FortiFitColors.mutedText)
@@ -112,9 +112,8 @@ struct FortiFitPowerLevelDetailSheet: View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Last 30 days")
-                    .font(FortiFitTypography.labelSmall)
-                    .kerning(FortiFitTypography.labelKerning)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .font(FortiFitTypography.detailSheetItemTitle)
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 if chartEntries.count < 2 {
                     Text(AppConstants.WidgetDetail.EmptyState.powerLevelVolumeChart)
@@ -248,10 +247,9 @@ struct FortiFitPowerLevelDetailSheet: View {
     private var topExercisesBlock: some View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                Text("Driving your trend")
-                    .font(FortiFitTypography.labelSmall)
-                    .kerning(FortiFitTypography.labelKerning)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                Text("Driving Your Trend")
+                    .font(FortiFitTypography.detailSheetItemTitle)
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 if topExercises.isEmpty {
                     Text(AppConstants.WidgetDetail.EmptyState.powerLevelTopExercises)

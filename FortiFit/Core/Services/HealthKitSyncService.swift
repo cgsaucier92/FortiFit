@@ -12,6 +12,11 @@ final class HealthKitSyncService {
     private let settings = UserSettings.shared
     private(set) var isSyncing = false
 
+    /// Phase 11 — non-owning reference to the `RecoveryStatusService` that handles
+    /// sleep observer dispatch, BG refresh, and 6pm-cutoff catch-ups. Wired in
+    /// `FortiFitApp.init()` so this service stays free of cross-imports during init.
+    weak var recoveryStatusService: RecoveryStatusService?
+
     init(client: HealthKitClient, matcher: WorkoutMatcher) {
         self.client = client
         self.matcher = matcher
@@ -35,6 +40,16 @@ final class HealthKitSyncService {
                 await self.backfillMissingEffortScores(context: context)
             }
         }
+        // Phase 11 — sleep observer. Dispatches to RecoveryStatusService after
+        // hopping to MainActor for SwiftData safety. Same enable gating as
+        // the workout observer; sleep-specific scope denial degrades gracefully
+        // when `fetchSleepSamples` simply returns no data.
+        client.observeSleepChanges { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                await self.recoveryStatusService?.handleSleepObserverFire()
+            }
+        }
     }
 
     func registerBackgroundTask() {
@@ -49,6 +64,8 @@ final class HealthKitSyncService {
                     return
                 }
                 await self.importPendingWorkouts(context: context)
+                // Phase 11 — sleep refresh follows workout sync.
+                await self.recoveryStatusService?.refreshFromBackground()
                 refreshTask.setTaskCompleted(success: true)
                 self.scheduleBackgroundRefresh()
             }
@@ -255,6 +272,28 @@ final class HealthKitSyncService {
     func lastSyncDate(for workout: Workout) -> Date? {
         guard workout.healthKitUUID != nil else { return nil }
         return settings.healthKitLastSyncDate
+    }
+
+    // MARK: - Sleep Catch-Up (Phase 11)
+
+    /// Runs a 6pm-cutoff sleep catch-up if (a) it's currently ≥ 6pm local time AND
+    /// (b) we haven't already caught up since the most recent 6pm boundary.
+    /// Bridges any missed sleep observer fires while the app was backgrounded.
+    /// Called from `FortiFitApp` on every `scenePhase == .active` transition;
+    /// guarded internally so it's safe to call repeatedly.
+    func runSleepCatchUpIfNeeded() async {
+        guard settings.healthKitEnabled else { return }
+        guard let recovery = recoveryStatusService else { return }
+
+        let now = Date()
+        let calendar = Calendar.current
+        guard let cutoff6pm = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: now) else { return }
+        guard now >= cutoff6pm else { return } // before 6pm today — wait
+
+        if let last = settings.lastSleepCatchUpDate, last >= cutoff6pm {
+            return // already caught up within this 6pm window
+        }
+        await recovery.refresh(forceCatchUp: true)
     }
 
     // MARK: - Queries

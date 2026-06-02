@@ -197,15 +197,15 @@ struct FortiFitTodaysPlanDetailSheet: View {
         HStack(spacing: FortiFitSpacing.elementSpacing) {
             if let time = row.scheduledTime {
                 Text(time.timeFormatted)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
                 Text("·")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
             }
             if let duration = row.durationMinutes {
                 Text("\(duration) min")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(FortiFitTypography.bodySmall)
                     .foregroundStyle(FortiFitColors.mutedText)
             }
         }
@@ -246,11 +246,11 @@ struct FortiFitTodaysPlanDetailSheet: View {
         FortiFitCard(borderColor: FortiFitColors.border) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text(name)
-                    .font(FortiFitTypography.dataValue)
+                    .font(FortiFitTypography.detailSheetItemTitle)
                     .foregroundStyle(FortiFitColors.primaryText)
                 ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                     Text(setLine(group: group))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(FortiFitTypography.bodySmall)
                         .foregroundStyle(FortiFitColors.mutedText)
                 }
             }

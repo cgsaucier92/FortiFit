@@ -413,6 +413,12 @@ struct FortiFitChartDetailView: View {
             let formatter = DateFormatter()
             let _ = (formatter.dateFormat = "M/d")
             let labelStride = max(1, Int(ceil(Double(points.count) / 6.0)))
+            let rollingAverages: [Double] = points.indices.map { i in
+                let start = max(0, i - 6)
+                let window = points[start...i]
+                return window.map(\.y).reduce(0, +) / Double(window.count)
+            }
+            let lastAvgLabel = points.last.map { formatter.string(from: $0.x) }
 
             detailPlotArea(gradientAnchor: gradientAnchor) {
                 Chart {
@@ -444,6 +450,32 @@ struct FortiFitChartDetailView: View {
                             series: .value("Series", "Load")
                         )
                         .foregroundStyle(FortiFitColors.primaryText.opacity(0.3))
+                    }
+
+                    ForEach(Array(points.enumerated()), id: \.element.id) { index, point in
+                        let label = formatter.string(from: point.x)
+                        LineMark(
+                            x: .value("Day", label),
+                            y: .value("Score", rollingAverages[index]),
+                            series: .value("Series", "Average")
+                        )
+                        .foregroundStyle(FortiFitColors.primaryAccent)
+                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
+                        .interpolationMethod(.catmullRom)
+
+                        if label == lastAvgLabel {
+                            PointMark(
+                                x: .value("Day", label),
+                                y: .value("Score", rollingAverages[index])
+                            )
+                            .foregroundStyle(FortiFitColors.primaryAccent)
+                            .symbol {
+                                Circle()
+                                    .fill(FortiFitColors.primaryAccent)
+                                    .frame(width: 6, height: 6)
+                                    .shadow(color: FortiFitColors.primaryAccent.opacity(0.6), radius: 4)
+                            }
+                        }
                     }
                 }
                 .chartYScale(domain: 0...100)

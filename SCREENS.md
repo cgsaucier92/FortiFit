@@ -113,6 +113,23 @@ Tap-outside dismisses. Does not flip the underlying per-card `syncToAppleWatch` 
 
 **Footer button block (shared across the four new detail sheets and the Activity Detail Sheet retrofit):** When a sheet has both `See Info` and `Configure Settings` entries available, they render as side-by-side text buttons in the sheet footer, separated by a `·`. Primary Accent Blue `#3b82f6`, 13px / 600 weight, ~44pt vertical tap target each. When only one entry applies (e.g., Power Level has no settings modal), that single entry renders alone, centered. Tapping either dismisses the detail sheet and opens the corresponding modal — never stacked sheet-on-sheet. Identifier convention: `{widgetDetailSheetId}_seeInfoButton`, `{widgetDetailSheetId}_configureSettingsButton`.
 
+**Widget Linking (Phase 11):** Two widgets — currently only Recovery Status + Training Load — can render as a single composite when placed adjacent on the Home grid. The composite container is `FortiFitLinkedRecoveryLoadComposite` (Design/Components/); decision logic lives in `HomeWidgetService.isLinkedActive(widgets:settings:)` (SERVICES.md § HomeWidgetService → Widget Linking).
+
+| Property | Behavior |
+|---|---|
+| Adjacency rule | The two widget types must occupy consecutive `sortOrder` slots on the home grid (`|recoveryStatusSortOrder − trainingLoadSortOrder| == 1`). |
+| Gating gate | Recovery Status must be in its `live` gating state. The other three states (`connectAppleHealth`, `sleepAccessDenied`, `noSleepTracker`) prevent linking even when adjacent — the cards render independently. |
+| Manual-unlink flag | `UserSettings.recoveryLoadManuallyUnlinked == true` blocks linking even when adjacency and gating gates pass. The flag is set by the linked composite's combined long-press → "Unlink Widgets" menu item. Cleared on any reorder that changes either widget's `sortOrder`, or when one of the pair is deleted and re-added. See SERVICES.md § HomeWidgetService → Widget Linking. |
+| Shared border | When linked, the composite renders a single Primary Accent Blue `#3b82f6` border around both cards. Each child card's own border is suppressed (`borderColor: .clear`) — no inner divider line at the RS/TL boundary, the pair reads as one seamless card. |
+| Internal padding | Zero padding between the two cards inside the composite — they render edge-to-edge. No inter-card divider, no bridge bar, no LINKED chip (the absence of padding IS the signal). |
+| Animations | Border-color swap and inter-card padding collapse animate together over 0.2s ease (link); 0.2s ease in reverse (unlink). When the Training Load score recomputes on link/unlink, the score number tweens 0.4s and the gradient bar fills in parallel. Reduce Motion: snap. |
+| Tap routing | Both cards open the **same** combined detail sheet (`Linked Recovery & Load Detail Sheet`). See SERVICES.md § HomeWidgetService → Widget Tap Routing. |
+| Long-press | A single combined context menu replaces the two individual menus (See Info / Configure Settings / Unlink Widgets / Reorder Widgets). Anchored to whichever card the user actually long-pressed; both cards lift together via the Long-Press Tease. See § Home Screen → Widget Context Menu (Long Press). |
+| Edit Mode | The composite drags as one unit — dragging either card moves both, dropping them at consecutive `sortOrder` slots. Border and zero-padding treatment is retained throughout the drag. No "x" delete button (see § Home Screen → Widget Edit Mode and BUGS.md doc-drift entry). |
+| Drag preview while linking | When dragging an unlinked Recovery Status card into a slot that would produce adjacency with Training Load (within 12pt drop hit), a 30%-opacity blue shared-border preview renders to telegraph the upcoming link. Symmetric for dragging Training Load adjacent to Recovery Status. |
+
+Visual + animation constants in CONSTANTS.md § Linked Recovery & Load.
+
 ---
 
 **Trends Chart Card Visual Treatment:** Shared visual styling for every chart card on the Trends screen. Implemented via `FortiFitChartCard` (Design/Components/), which wraps `FortiFitCard` and composes a gradient backdrop, inner plot hairline, header summary block, latest-point highlight, rounded bar tops, smoothed line interpolation, donut center label, and tap-to-select state. Per-chart values (gradient anchor, header summary formula, selection availability) live in CONSTANTS.md § Trends Chart Visual Tokens — never hardcoded in views.
@@ -149,7 +166,7 @@ Top: Left: blue ellipsis icon (functional — opens Home ellipsis menu). Right: 
 One option: **"Add Widgets"** with SF Symbol `plus.rectangle.on.rectangle` to the left → opens Add Widgets Menu overlay.
 
 ### Add Widgets Menu
-Per § Standard Patterns: Sortable Card System → Add Menu.
+Per § Standard Patterns: Sortable Card System → Add Menu. The menu's row order follows the canonical sequence in CONSTANTS.md § Add Widgets Menu Order: Today's Plan → Training Load → **Recovery Status** → Activity Rings → Week Streak → Power Level. Recovery Status (Phase 11) sits adjacent to Training Load so users discover the auto-linking behavior when they add the second of the pair onto an adjacent slot. The Add button is always enabled regardless of HK / Watch / sleep-tracker state — gating happens via the in-card states once the widget is on the Home grid (mirrors Activity Rings precedent).
 
 ### Widget Context Menu (Long Press)
 Long-pressing any widget card (uses Standard Long-Press Tease) opens a context menu. Items render top-to-bottom in the order below. "Complete Workout", "See Info", and "Configure Settings" are conditional — they only appear on the widgets and in the states noted.
@@ -164,6 +181,8 @@ Long-pressing any widget card (uses Standard Long-Press Tease) opens a context m
 
 **"Delete Widget":** Standard delete confirmation for the long-pressed widget. Removes the `HomeWidget` record, removes the card, re-indexes remaining `sortOrder`. No underlying workout data affected.
 
+**"Unlink Widgets" (Phase 11):** SF Symbol `rectangle.on.rectangle.slash` to the left of the label. Visible **only on the linked Recovery & Load composite** (when `HomeWidgetService.isLinkedActive(widgets:settings:) == true`). Tapping sets `UserSettings.recoveryLoadManuallyUnlinked = true`; the composite collapses to two independent cards with the 0.2s border-swap + padding-expand animation. Accessibility identifier `linkedMenuItem_unlinkWidgets`.
+
 **Resulting menus by widget type:**
 - **Training Load:** See Info → Configure Settings → Reorder Widgets → Delete Widget (4 items)
 - **Power Level:** See Info → Reorder Widgets → Delete Widget (3 items)
@@ -171,18 +190,34 @@ Long-pressing any widget card (uses Standard Long-Press Tease) opens a context m
 - **Today's Plan (with uncompleted plan today):** Complete Workout → Reorder Widgets → Delete Widget (3 items)
 - **Today's Plan (no uncompleted plan today):** Reorder Widgets → Delete Widget (2 items)
 - **Activity Rings:** See Info → Configure Settings → Reorder Widgets → Delete Widget (4 items)
+- **Recovery Status (unlinked, Phase 11):** See Info → Configure Settings → Reorder Widgets → Delete Widget (4 items)
+- **Linked Recovery & Load composite (Phase 11):** See Info → Configure Settings → Unlink Widgets → Reorder Widgets (4 items). **No `Delete Widget` item** — deletion requires Unlink first, then delete each card individually (see § Widget Edit Mode). Menu is anchored to whichever card the user long-pressed, but both cards lift together via the Long-Press Tease. `See Info` opens the combined Linked Recovery & Load See Info Modal; `Configure Settings` opens the combined Linked Recovery & Load Settings Modal. Identifiers: `linkedMenuItem_seeInfo`, `linkedMenuItem_configureSettings`, `linkedMenuItem_unlinkWidgets`, `linkedMenuItem_reorderWidgets`.
 
 ### Widget Edit Mode
-Entered via the context menu's "Reorder Widgets" item. Unlike the standard reorder pattern, Home combines delete + drag in a single edit mode:
-- "x" button appears in top-right of each widget (24x24pt circular, #2d2d2d bg, #404040 border, muted "×"). Tapping deletes the `HomeWidget` record, removes the card, re-indexes remaining `sortOrder`.
-- Cards are draggable with the same drag physics as Standard Reorder Edit Mode (0.2s ease, sortOrder re-indexed on drop).
+Entered via the context menu's "Reorder Widgets" item. Drag-only edit mode — no inline delete affordance.
+
+- Cards are draggable with the same drag physics as Standard Reorder Edit Mode (0.2s ease, `sortOrder` re-indexed on drop).
 - Cards maintain full styling during edit and drag.
 - Long-press context menu is disabled during edit mode.
-- Exit by tapping outside any widget. "x" buttons fade out (0.15s).
+- Tap-to-open detail sheets is suppressed during edit mode (see § Standard Patterns → Home Widget Tap-to-Open).
+- Exit by tapping outside any widget. No "Done" button, no confirmation dialog.
+- **Deletion path:** exit edit mode → long-press the target widget → "Delete Widget" from the context menu → standard delete confirmation. There is **no "x" button** on widget cards. (BUGS.md tracks the prior doc-drift entry that described an unimplemented "x" button.)
+
+**Phase 11 — Linked pair as composite unit (Widget Linking):** When the Recovery Status + Training Load pair is linked-active (see § Standard Patterns → Widget Linking), the composite drags as **one unit** in edit mode. Dragging either card moves both together; on drop they land at consecutive `sortOrder` positions. The composite retains its shared blue border and zero internal padding throughout the drag. To delete a single card from the linked pair: exit edit mode → long-press the linked composite → "Unlink Widgets" → the cards separate → long-press the specific card → "Delete Widget". Pattern mirrors Apple HomePod stereo-pair UX: paired widgets can be ungrouped but not deleted as a unit.
+
+**Manual-unlink flag clearing on drag:** Any reorder operation that changes either widget's `sortOrder` clears `UserSettings.recoveryLoadManuallyUnlinked` (see SERVICES.md § HomeWidgetService → Widget Linking → Clearing the manual flag). Entering edit mode without dragging does NOT clear the flag.
+
+**Drag preview for upcoming link:** When dragging an unlinked Recovery Status card into a slot that would produce adjacency with Training Load (within 12pt of the snap zone), a 30%-opacity blue shared-border preview renders on the destination pair to telegraph the upcoming link. Symmetric for Training Load. Reduce Motion: hint still renders; commit snaps.
 
 ### Widget Definitions
 
 **Training Load** (`trainingLoad`): Blue-bordered card. "Training Load" header + zone label (e.g., "Moderate") + gradient progress bar (LOW→HIGH) + context-aware advisory below. Advisory uses readiness variant (no workout today) or post-training variant (trained today) — see CONSTANTS § Training Load Zones / Advisory Text. Algorithm: SERVICES § Training Load. **Tap** → Training Load Detail Sheet (§ below). **Long-press** → "See Info" (INFO_COPY § Training Load) or "Configure Settings" → Training Load Settings Modal. Updates in real time on workout log/edit/delete. Tap-to-open is suppressed in Widget Edit Mode (§ Standard Patterns → Home Widget Tap-to-Open).
+
+**Training Load — Linked variant (Phase 11):** When `HomeWidgetService.isLinkedActive(widgets:settings:) == true`, the Training Load card body gains one addition beneath the existing advisory copy:
+
+1. **Sleep Impact Chip** — small chip showing directional magnitude of the sleep-adjustment delta. Format `{↑/↓/—} {±N} from sleep`. Up-arrow + Alert Red `#ef4444` when positive (sleep-adjusted decay slowed → more retained stress); down-arrow + Positive Green `#10b981` when negative (rare); em-dash + Muted Text when zero. Hidden when sleep data for last night is missing. Identifier `homeWidget_trainingLoad_sleepImpactChip`. Computation lives in SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay. Visual spec in CONSTANTS.md § Linked Recovery & Load → Sleep Impact Chip.
+
+The addition is scoped to the linked state only — it disappears when the composite auto-unlinks (gating state degrades) or the user manually unlinks. The advisory text is replaced with a joint Recovery & Load advisory drawn from CONSTANTS.md § Training Load Zones → Linked Advisory Copy (a single coherent sentence keyed on TL zone, `trainedToday`, and sleep bucket — never a concatenation that can contradict itself, see BUG-061). **Tap** routing changes when linked: both Training Load and Recovery Status open the combined `Linked Recovery & Load Detail Sheet` (§ below), not the standalone Training Load Detail Sheet.
 
 **Training Load Settings Modal:** Centered modal, dimmed bg. "Configure Training Load" heading + "?" tooltip. Two slider cards: Training Experience (3-position: Beginner/Intermediate/Advanced) and Target Workout Duration (0–300 min, fallback for the Training Load algorithm). Changes apply immediately; experience change triggers recalc. Bottom action row: full-width **`Done` button** (outlined Primary Accent Blue, copy from CONSTANTS § Settings Modal Done Button) dismisses the modal — same dismiss path as the close X. Dismiss: Done button, close button (top-right `xmark`), or outside tap. ID `trainingLoadSettings_doneButton`.
 
@@ -236,6 +271,51 @@ Included in default widget set; also available via Add Widgets menu.
 | true | true | **Live rings.** Full layout above. IDs: `homeWidget_appleActivity_card`, `homeWidget_appleActivity_moveRing`, `homeWidget_appleActivity_exerciseRing`, `homeWidget_appleActivity_standRing`, `homeWidget_appleActivity_weeklyClosureChip`. |
 
 **Add Widgets row description:** *"Tracks your daily Move, Exercise, and Stand rings. Requires an Apple Watch and Apple Health connected in Settings."* The Add button is always enabled — gating happens via the in-card states.
+
+**Recovery Status** (`recoveryStatus`, Phase 11): Card. "RECOVERY STATUS" header (Primary Accent Blue, standard widget header treatment). Single-column hero stack. Add-only — always offered in the Add Widgets menu regardless of HK / sleep-tracker state.
+
+**Layout (Live state):**
+
+```
+[RECOVERY STATUS]                                  ← header
+                                                    ↑ moon.zzz watermark (20% opacity)
+[SLEEP]              [SINCE LAST WORKOUT]          ← micro-labels, blue uppercase 11/700/2px
+[7h 24m]             [4h 12m]                      ← hero values, 32px / 900 weight
+[34% DEEP · 1h 24m]                                ← deep caption (SLEEP col), Muted 11/700/2px
+```
+
+| Region | Content |
+|---|---|
+| Hero (left column) | `SLEEP` micro-label → hero value `{h}h {mm}m` (32px / 900 weight, Primary Text — matches Weekly Streak count treatment) → deep-sleep caption `{pct}% DEEP · {h}h {mm}m` (uppercase Muted 11/700, dot-separated). |
+| Hero (right column) | `SINCE LAST WORKOUT` micro-label → hero value `{value}` (32px / 900 weight, Primary Text). Per CONSTANTS.md § Recovery Status Widget → Since Last Workout Hero Value: `{n} min` / `{h}h {mm}m` / `{d}d {h}h` / `{d} days` / `NO DATA` (cold start). The sub-label supplies "since last" context; the value itself carries no trailing descriptor. Any workout type counts (manual or HK-imported). Renders in **all 4 gating states** (workout history is independent of HK sleep gating). |
+| Decorative watermark | `moon.zzz` SF Symbol, ~140pt, Muted Text fill, 20% opacity (Live), 10% (degraded states). Centered in the card via `ZStack` (sits behind both hero columns), clipped by card edges. Identical treatment to Today's Plan's silhouette pattern. **No `info.circle` on the card body** — See Info accessed via long-press context menu only. ID: `homeWidget_recoveryStatus_watermark`. |
+| Advisory line | **None on the card.** Confirmed: no contextual advisory copy beneath the hero row. Advisory copy is reserved for the detail sheet contexts. |
+
+**No-sleep-last-night sub-state (Live):** When `hasRecentSleepData == true` but no `.asleep*` samples ended within last night's wake-up window (user didn't wear the tracker), the SLEEP column renders `— h —m` (muted) and the deep caption reads `NO DATA`. The SINCE LAST WORKOUT column and watermark render normally. Linking still supported in this sub-state — the day's sleep adjustment silently falls back to baseline (see SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay).
+
+**States** (gating logic in SERVICES.md § RecoveryStatusService → Derived State → `currentGatingState`):
+
+| `healthKitEnabled` | Sleep scope | `hasRecentSleepData` | What the user sees |
+|---|---|---|---|
+| `false` | (any) | (any) | **Connect Apple Health.** Muted gray SLEEP hero placeholder (no value, no chip). Centered message body. Small `Connect` text button (Primary Accent Blue 13/600). **SINCE LAST WORKOUT column still renders** (workout history is independent of HK). Watermark at 10% opacity. Tap anywhere navigates to in-app Settings → Apple Health section. Copy: *"Connect Apple Health to track your sleep and recovery."* IDs: `homeWidget_recoveryStatus_state_connectAppleHealth`, `homeWidget_recoveryStatus_connectButton`. |
+| `true` | explicitly denied | (any) | **Sleep Access Denied.** Muted gray SLEEP hero placeholder. Centered message. Small CTA text button → deep-links to iOS Settings (`UIApplication.openSettingsURLString`), distinct from the in-app Settings deep-link used in Connect Apple Health state. **SINCE LAST WORKOUT column still renders.** Watermark at 10% opacity. Copy: *"Allow sleep access in Apple Health Settings to use this widget."* IDs: `homeWidget_recoveryStatus_state_sleepAccessDenied`, `homeWidget_recoveryStatus_openIOSSettingsButton`. |
+| `true` | granted | `false` | **No Sleep Tracker.** Muted gray SLEEP hero placeholder. Centered message. No CTA (the app can't pair a sleep tracker for the user). **SINCE LAST WORKOUT column still renders.** Watermark at 10% opacity. Tap is a no-op. Copy: *"Wear a sleep tracking device to display your sleep data."* ID: `homeWidget_recoveryStatus_state_noSleepTracker` (renamed from `pairAppleWatch` to be source-agnostic — supports Oura / Whoop / etc. in addition to Apple Watch). |
+| `true` | granted | `true` | **Live.** Full layout above. IDs: `homeWidget_recoveryStatus_card`, `homeWidget_recoveryStatus_sleepHero`, `homeWidget_recoveryStatus_sleepValue`, `homeWidget_recoveryStatus_deepSleepCaption`, `homeWidget_recoveryStatus_lastWorkoutHero`, `homeWidget_recoveryStatus_lastWorkoutValue`, `homeWidget_recoveryStatus_state_live`. |
+
+**Linking gate:** Linking is available only in **Live state** (including the no-sleep-last-night sub-state). The three degraded states (Connect Apple Health / Sleep Access Denied / No Sleep Tracker) prevent linking even when adjacent to Training Load — the cards render independently. If linked and the gating state degrades, the link breaks immediately (the composite auto-unlinks with the 0.2s animation).
+
+**Tap** routing depends on linked state:
+- Unlinked + Live → opens Recovery Status Detail Sheet (§ below)
+- Linked → opens Linked Recovery & Load Detail Sheet (§ below) — both cards route here
+- Connect Apple Health → in-app deep-link to Settings → Apple Health
+- Sleep Access Denied → iOS Settings deep-link (`UIApplication.openSettingsURLString`)
+- No Sleep Tracker → no-op
+
+**Long-press context menu (unlinked, all states):** See Info, Configure Settings, Reorder Widgets, Delete Widget. Configure Settings is accessible even in degraded states; the "Import from Apple Health" button inside the modal disables when HK is disconnected.
+
+**Long-press context menu (linked):** Combined 4-item menu (See Info → Configure Settings → Unlink Widgets → Reorder Widgets) — see § Widget Context Menu above for the full spec and identifiers. No `Delete Widget` in linked mode; unlink first.
+
+**Add Widgets row description:** *"Tracks your sleep, recovery, and time since your last workout. Requires an Apple Watch and Apple Health connected in Settings."* The Add button is always enabled — gating happens via the in-card states. Per CONSTANTS.md § Add Widgets Menu Order, the row sits adjacent to Training Load so users discover the auto-linking behavior.
 
 ### Activity Rings Settings Modal
 
@@ -301,7 +381,7 @@ Opened by tapping the Today's Plan widget in any state (populated / all-complete
 
 **Header:** Centered title `Today's Plan – {Month Day}` (e.g., `Today's Plan – May 17`). Close button top-right (`xmark`, Muted Text). ID `todaysPlanDetailSheet_closeButton`.
 
-**Body — scrollable stack of mini-cards, one per `ScheduledWorkout` for today.** Sort: `Planned` and `Skipped` rows first, then `Completed` rows (mirrors the Plan tab day-detail stack order — finished work sinks to the bottom). Within each group, rows order by `scheduledTime` ascending (nil times sort last), then by `dateCreated`. Each mini-card is a `FortiFitCard` rendered with a **2pt outer border** (vs. the default 1pt) to create visible contrast against the 1pt inner exercise cards nested inside. **Card border color:** Positive Green on `Completed` rows, default Border token otherwise — matches the Plan tab's `FortiFitScheduledWorkoutCard` border convention. Mini-card contains:
+**Body — scrollable stack of mini-cards, one per `ScheduledWorkout` for today.** Sort: `Planned` and `Skipped` rows first, then `Completed` rows (mirrors the Plan tab day-detail stack order — finished work sinks to the bottom). Within each group, rows order by `scheduledTime` ascending (nil times sort last), then by `dateCreated`. Each mini-card is a `FortiFitCard`. **Card border:** Positive Green on `Completed` rows, default Border token otherwise — matches the Plan tab's `FortiFitScheduledWorkoutCard` border convention. Mini-card contains:
 
 | Slot | Content |
 |---|---|
@@ -342,7 +422,7 @@ Opened by tapping the Training Load widget. Component: `FortiFitTrainingLoadDeta
 
 3. **Contributing workouts block.** Header: `Contributing this week`. List of workouts from the last 7 days that contributed to the current score, sorted by descending stress-load contribution. Each row: workout name (Primary Text 15/700) + date (Muted Text 13px) + percent share of the last-7-day stress-load total (`{percent}%`, Muted Text 13px) + inline horizontal share bar (~56×4pt, Primary Accent Blue fill on Elevated Surface track, capsule shape, filled to `{percent}%`). The absolute stress-load value per row is intentionally suppressed — it created a false expectation that rows sum to the hero score and rendered confusingly as "0 stress load · 5%" after integer rounding. Tap a row → dismiss sheet, navigate to that workout's Workout Detail. Max 5 rows; "See all in Trends →" link at the bottom navigates to Trends → Training Load Trend chart detail. ID `trainingLoadDetailSheet_contributingWorkouts`. Note: user-facing unit is **stress load** (Phase 8.8 rename from "TSS"); internal field is still `tssContribution`.
 
-4. **Week-over-week comparison band.** Single-line `FortiFitCard`: `Stress load · {arrow} {abs(deltaPct)}% vs last week`. `arrow` is `↑` when up, `↓` when down, `—` when flat — matches the directional indicator convention used by the Power Level widget. Delta colored Positive Green when down (less stress), Alert Red when up (more stress) — counter-intuitive but matches recovery framing. The absolute current-week total is intentionally suppressed for consistency with the contributing-workouts rows (which dropped their absolute values for the same reason). ID `trainingLoadDetailSheet_weekComparison`.
+4. **Week-over-week comparison band.** `FortiFitCard` with a single Stress Load row plus a trailing caption — matches the linked Recovery & Load Detail Sheet's Window Comparison treatment (SCREENS.md § Linked Recovery & Load Detail Sheet → block 4). Row: `Stress load · {arrow} {abs(deltaPct)}%` — no "vs last week" suffix; the caption beneath establishes the comparison. `arrow` is `↑` when ≥ 0, `↓` when negative. Delta colored Positive Green when down (less stress), Alert Red when up (more stress) — counter-intuitive but matches recovery framing. Caption (beneath the row, same card): `This week so far ({Mon, MMM d} – today) vs same period last week ({Mon, MMM d} – {matched weekday, MMM d})` — 11pt italic Muted Text, ID `trainingLoadDetailSheet_weekComparisonCaption`. Uses the same day-of-week matched windows as the linked sheet (BUG-066): Mon-through-current-weekday this ISO week vs Mon-through-the-same-weekday last ISO week. When `matchedDayCount < 2` (early Monday) the row renders `Not enough data` in Muted Text. When `matchedDayCount >= 2` and both windows have zero workouts (truly empty), the entire block is hidden. The absolute current-week total is intentionally suppressed for consistency with the contributing-workouts rows. Driven by `ExerciseLoadService.weekOverWeekComparison(context:now:)`. ID `trainingLoadDetailSheet_weekComparison`.
 
 5. **Recovery readiness callout.** Larger format of the existing zone advisory copy (CONSTANTS § Training Load Zones → Advisory Text). Renders the readiness variant when no workout has been logged today; the post-training variant otherwise. ID `trainingLoadDetailSheet_recoveryCallout`.
 
@@ -433,12 +513,165 @@ Opened by tapping the Power Level widget. Component: `FortiFitPowerLevelDetailSh
 
 **Whole-sheet cold-start:** When the user has zero Strength or HIIT workouts ever, the sheet renders the hero + per-block empty states inline. No separate hero replacement. Whole-sheet message — same as the hero empty copy.
 
+### Recovery Status Settings Modal
+
+Opened from the Recovery Status widget's long-press context menu → "Configure Settings", or from the Recovery Status Detail Sheet's footer `Configure Settings` button. Component: `FortiFitRecoveryStatusSettingsModal.swift` in `Design/Components/`. Phase 11.
+
+**Presentation:** Centered modal, dimmed bg. Same visual treatment as Training Load / Weekly Streak / Activity Rings Settings Modals.
+
+**Heading:** `Configure Recovery Status`. Close button top-right (`xmark`, Muted Text). ID `recoveryStatusSettings_closeButton`.
+
+**Body — slider card (single):**
+
+Sleep Target slider card. Range `4.0`–`12.0` hours, 0.5 hr increment, default `7.0`. Track tinted Primary Accent Blue, white thumb. Label updates live as `Sleep Target — {value} hrs` with the value bolded inline. Persists to `UserSettings.targetSleepHours`. When changed while the composite is linked to Training Load, the Sleep Cascade fires (SERVICES.md § Sleep Cascade) so the TL score recomputes immediately. ID `recoveryStatusSettings_targetSleepHoursSlider`.
+
+**Below the slider — `Import from Apple Health` button:** Full-width filled Primary Accent Blue button (`FortiFitButton(..., style: .primary)`), matching the Activity Rings Settings Modal Import button treatment for visual consistency. Tap → `RecoveryStatusService.importSleepGoalFromAppleHealth()`. Disabled when `UserSettings.healthKitEnabled == false` — dimmed to 40% opacity, tap-disabled, with the muted caption *"Connect Apple Health to import your goal."* (`FortiFitTypography.note`) rendered below. HealthKit does not expose a sleep duration goal characteristic in its public API (BUG-048), so this button always emits the *"No sleep goal set in Apple Health."* Toast Style toast in the current build — the implementation is wired for the day Apple ships a real API, and the snap-to-0.5-hr-increment + 4.0–12.0 clamp logic is exercised in unit tests. ID `recoveryStatusSettings_importButton`.
+
+**Bottom action row:** full-width **`Done` button** (outlined Primary Accent Blue, copy from CONSTANTS § Settings Modal Done Button) dismisses the modal — same dismiss path as the close X. ID `recoveryStatusSettings_doneButton`.
+
+**Dismiss paths:** Done button, close button, or outside tap.
+
+**Modal identifier:** `recoveryStatusSettings_modal`.
+
+### Recovery Status Detail Sheet
+
+Opened by tapping the Recovery Status widget (Live state only). Component: `FortiFitRecoveryStatusDetailSheet.swift` in `Design/Components/`. Phase 11.
+
+**Presentation:** iOS modal sheet, `.large` detent, swipe-down dismiss, drag indicator visible, Card Surface bg. Same presentation conventions as the four Phase 8.8 detail sheets.
+
+**Header:** Centered title `Recovery Status Insights`. Close button top-right (`xmark`, Muted Text). ID `recoveryStatusDetailSheet_closeButton`.
+
+**Body — scrollable, top-to-bottom:**
+
+1. **Hero block.** Larger version of the widget hero. `SLEEP` sub-label (Primary Accent Blue 11/700, uppercase) → hero value `{h}h {mm}m` (Primary Text, sheet-hero scale ~48/900 per § Widget Detail Sheet Visual Tokens → Hero Block) → deep-sleep caption `{pct}% DEEP · {h}h {mm}m` (Muted 11/700, uppercase). ID `recoveryStatusDetailSheet_hero`.
+
+2. **Sleep stages bar.** Horizontal stacked bar (12pt tall, 6pt continuous corner radius, edge-to-edge stages with no inter-stage divider) showing the proportion of each stage within last night's wake-up window. Colors: Deep → Chart Purple `#4B2893`, REM → Primary Accent Blue `#3b82f6`, Core → Light Blue `#93c5fd`, Awake → Sleep Awake `#FF6B5B` (Phase 11 token, CONSTANTS § Colors). Legend below the bar (Muted Text 11/700, dot-separated). IDs `recoveryStatusDetailSheet_stagesBar`, `recoveryStatusDetailSheet_stagesLegend`.
+
+3. **Sleep efficiency caption.** Italic Muted Text 13px **rendered inside the sleep-stages-bar card** beneath the legend: `Sleep efficiency: {pct}% ({h}h {mm}m asleep of {h}h {mm}m in bed)`. Hidden when `DailySleepSnapshot.inBedMinutes == nil` — but per BUG-059 the asleep+awake fallback now populates `inBedMinutes` for Apple-Watch-only users, so the caption renders for the common HK source. ID `recoveryStatusDetailSheet_sleepEfficiencyCaption`.
+
+4. **14-day sleep sparkline.** Swift Charts line chart of `DailySleepSnapshot.totalSleepMinutes` over the last 14 days. Window matches the linked Recovery & Load Detail Sheet's sleep sparkline. Line color: Chart Purple `#4B2893`. Smoothed (`.catmullRom`). Y-axis domain `4…10` hours with leading axis marks at `5 / 7 / 9` (dashed gridlines, Muted Text labels). Latest-point highlight: 6pt Primary Accent Blue filled dot (matches Trends chart visual tokens). Caption above: `Last 14 days · Sleep duration`. Reads from `RecoveryStatusService.recent30DaySleep.suffix(14)` (no on-demand HK query — backed by the in-memory cache; the 30-day cache itself is unchanged). **Tap-to-select** highlights a data point and renders the annotation below the chart: `{hours}h · {date}`. IDs `recoveryStatusDetailSheet_sleepSparkline`, `recoveryStatusDetailSheet_sleepSparkline_dataPoint_{index}`, `recoveryStatusDetailSheet_sleepSparkline_selectionAnnotation`.
+
+5. **Last-7-nights stat row.** Three-column stat row (Muted 11/700 label, Primary Text 17/800 value): `AVG SLEEP` / `AVG DEEP` / `NIGHTS ON TARGET`. Computation per CONSTANTS § Recovery Status Detail Sheet → Last-7-Nights Stat Row. ID `recoveryStatusDetailSheet_last7NightsStatRow`.
+
+6. **Time Since Last Workout block.** Header row mirrors the widget's timer line format and is **tappable** → dismiss sheet + navigate to that workout's Workout Detail. Below: per-workout-type rows (one per of the 6 types that has ≥ 1 record), each `{Workout Type Glyph} {Type Name} · {time since last}` (Muted 13px). Sorted most-recent first. Tap a per-type row → dismiss sheet + navigate to Workouts tab with that type's card auto-expanded. IDs `recoveryStatusDetailSheet_timeSinceWorkout`, `recoveryStatusDetailSheet_timeSinceWorkout_headline`, `recoveryStatusDetailSheet_timeSinceWorkout_typeRow_{type}`.
+
+**Footer:** Side-by-side `See Info` · `Configure Settings` per § Standard Patterns → Home Widget Tap-to-Open → Footer button block. IDs `recoveryStatusDetailSheet_seeInfoButton`, `recoveryStatusDetailSheet_configureSettingsButton`. `See Info` opens the Recovery Status See Info Modal (uses the shared `FortiFitSeeInfoModal` with `recoveryStatus` copy from INFO_COPY.md § Widget Info Modal Copy); `Configure Settings` opens the Recovery Status Settings Modal (§ above).
+
+**Cold-start empty state:** When the user has logged zero workouts ever, the Time Since Last Workout block collapses to the cold-start empty: `No workouts logged yet.` (Muted Text 15px, centered) + full-width `Log a Workout` button (filled Primary Accent Blue) → dismiss sheet + navigate to Log Workout. The sleep portion of the sheet still renders normally if sleep data is present. ID `recoveryStatusDetailSheet_emptyState_coldStart`.
+
+**Sparkline empty state:** Fewer than 7 days of `DailySleepSnapshot` records → sparkline replaced with *"Not enough sleep data yet to chart trends."* (Muted Text 13px, centered in the chart area). The last-7-nights stat row degrades gracefully — cells reading `—` when their N-day window has zero qualifying nights.
+
+**Reactivity:** Sheet's ViewModel subscribes to the Sleep Cascade (SERVICES.md § Sleep Cascade) AND the Workout Cascade. Sleep Cascade fires → sparkline, stages bar, efficiency caption, stat row all re-fetch and re-render in place. Workout Cascade fires → time-since-workout block re-renders (sleep portion unaffected). 60-second timer republishes the time-since values while the sheet is presented.
+
+**Sheet identifier:** `recoveryStatusDetailSheet_sheet`.
+
+### Recovery Status See Info Modal
+
+Reuses the existing `FortiFitSeeInfoModal` component (see § Standard Patterns → See Info Modal) with the `recoveryStatus` content key from INFO_COPY.md § Widget Info Modal Copy. Title + intro + 6 sections (A–F per INFO_COPY.md § Widget Info Modal Copy → Recovery Status) explaining: what the widget shows, the four gating states, how sleep is read from Apple Health, the 6pm-to-6pm attribution window, how to import a sleep goal, and what linking with Training Load does. Phase 11.
+
+Opened from the Recovery Status widget's long-press context menu → "See Info", or from the Recovery Status Detail Sheet's footer `See Info` button.
+
+Identifiers: `recoveryStatusSeeInfoModal`, `recoveryStatusSeeInfoModal_closeButton`, `recoveryStatusSeeInfoModal_section_{a..f}` per section.
+
+### Linked Recovery & Load Composite
+
+The container view (`FortiFitLinkedRecoveryLoadComposite.swift` in `Design/Components/`) that wraps Recovery Status + Training Load when `HomeWidgetService.isLinkedActive(widgets:settings:) == true`. Phase 11.
+
+**Decision logic** lives in `HomeWidgetService.isLinkedActive(widgets:settings:)` (SERVICES.md § HomeWidgetService → Widget Linking). The composite renders only when all 5 gates pass (manual-unlink flag false, both widgets present, adjacent in `sortOrder`, Recovery Status in Live state).
+
+**Visual treatment** is fully spec'd in § Standard Patterns → Widget Linking and CONSTANTS § Linked Recovery & Load:
+- Shared Primary Accent Blue `#3b82f6` border (replaces each card's `#404040` border). Each child card's own border is suppressed (`borderColor: .clear`) so the pair reads as a single seamless card with no inner divider.
+- Zero internal padding between cards.
+- **Subtle blue gradient backdrop** spans the full composite — Primary Accent Blue `#3b82f6` at 12% opacity at the top fading to 0% at the bottom, layered over Card Surface `#1a1a1a`. The gradient is owned by the composite container; both child cards render with `fillColor: .clear` (`FortiFitCard` gained a `fillColor` parameter — see CONSTANTS § Linked Recovery & Load → Gradient Backdrop) so the tint shows through both halves. The treatment mirrors the Trends Chart Card single-color gradient pattern but at lower opacity (0.12 vs 0.2) to stay subtle.
+- Both cards retain their existing hero blocks unchanged. RS hero, TL gradient + zone + advisory. The RS `moon.zzz` watermark is suppressed in the linked variant (the shared blue border + Sleep Impact Chip carry the linking signal; the watermark returns the moment the pair unlinks). The linked-variant addition on TL (Sleep Impact Chip) renders inside the TL card per § Widget Definitions → Training Load — Linked variant.
+
+**Long-press** anchors to whichever card the user actually pressed but both cards lift together via the Long-Press Tease. The combined 4-item menu (See Info → Configure Settings → Unlink Widgets → Reorder Widgets) renders per § Home Screen → Widget Context Menu. Light haptic on tease activation (`UIImpactFeedbackGenerator(.light)`).
+
+**Tap** routing: both cards open the combined Linked Recovery & Load Detail Sheet (§ below), not their individual sheets. See SERVICES.md § HomeWidgetService → Widget Tap Routing for the route table.
+
+**Animations:** Border swap + padding collapse over 0.2s ease on link; reverse on unlink. Score number on the TL card tweens 0.4s from baseline → adjusted (and inverse) when `isLinkedActive` flips. Reduce Motion: snap. See CONSTANTS § Linked Recovery & Load → Animation Timing.
+
+**Identifier:** `homeWidget_linkedRecoveryLoad_composite`.
+
+### Linked Recovery & Load Settings Modal
+
+Combined Configure Settings modal for the linked composite. Component: `FortiFitLinkedRecoveryLoadSettingsModal.swift`. Phase 11.
+
+**Presentation:** Centered modal, dimmed bg. Same visual treatment as Training Load / Recovery Status Settings Modals.
+
+**Heading:** `Configure Recovery & Load`. Close button top-right (`xmark`). ID `linkedRecoveryLoadSettings_closeButton`.
+
+**Body — three slider cards, top-to-bottom:**
+
+| # | Slider | Range | Increment | Default | UserSettings field | Identifier |
+|---|---|---|---|---|---|---|
+| 1 | Training Experience (3-position) | Beginner / Intermediate / Advanced | — | Beginner (0) | `experienceLevel` | `linkedRecoveryLoadSettings_experienceLevelSlider` |
+| 2 | Target Workout Duration | 0–300 min | per existing TL spec | 52 min | `targetMinutesPerWorkout` | `linkedRecoveryLoadSettings_targetWorkoutDurationSlider` |
+| 3 | Sleep Target | 4–12 hrs | 0.5 hrs | 7.0 hrs | `targetSleepHours` | `linkedRecoveryLoadSettings_targetSleepHoursSlider` |
+
+Order preserves the existing TL settings modal sequence (Experience → Duration) and appends Sleep Target as the new card. Changes apply immediately; experience or sleep-target changes recompute the Training Load score on the next cascade tick.
+
+**Below the Sleep Target slider — `Import from Apple Health` button.** Full-width filled Primary Accent Blue button (`FortiFitButton(..., style: .primary)`), matching the Activity Rings Settings Modal + unlinked Recovery Status Settings Modal Import button treatment. Same behavior as the unlinked Recovery Status Settings Modal's Import button (always emits the *"No sleep goal set in Apple Health."* toast per BUG-048; scope is limited to Sleep Target only — the other two sliders have no Apple Health equivalent). Disabled when HK not connected (40% opacity + tap-disabled + caption below). ID `linkedRecoveryLoadSettings_importButton`.
+
+**Bottom action row:** full-width **`Done` button** (outlined Primary Accent Blue) — `linkedRecoveryLoadSettings_doneButton`.
+
+**Dismiss paths:** Done, close X, outside tap.
+
+**Modal identifier:** `linkedRecoveryLoadSettings_modal`.
+
+### Linked Recovery & Load See Info Modal
+
+Reuses the existing `FortiFitSeeInfoModal` component with the `linkedRecoveryLoad` content key from INFO_COPY.md § Widget Info Modal Copy. Title + intro + sections explaining what the composite shows, how linking works, sleep-adjusted decay mechanics, the Sleep Impact Chip, and how to unlink.
+
+Opened from the combined long-press context menu → "See Info", or from the Linked Recovery & Load Detail Sheet's footer `See Info` button.
+
+Identifiers: `linkedRecoveryLoadSeeInfoModal`, `linkedRecoveryLoadSeeInfoModal_closeButton`, `linkedRecoveryLoadSeeInfoModal_section_{a..f}` per section.
+
+### Linked Recovery & Load Detail Sheet
+
+Combined Detail Sheet opened when the linked composite is tapped (either card routes here). Component: `FortiFitLinkedRecoveryLoadDetailSheet.swift`. Phase 11.
+
+**Presentation:** iOS modal sheet, `.large` detent, swipe-down dismiss, drag indicator visible, Card Surface bg. Same conventions as the four Phase 8.8 detail sheets.
+
+**Header:** Centered title `Recovery & Load Insights`. Close button top-right (`xmark`). ID `linkedRecoveryLoadDetailSheet_closeButton`.
+
+**Body — scrollable, top-to-bottom:**
+
+1. **Dual hero block.** Two columns side-by-side. Left: `SLEEP` sub-label (Primary Accent Blue 11/700) + hero value `{h}h {mm}m` (Primary Text ~48/900) + deep-sleep caption `{pct}% DEEP · {h}h {mm}m`. Right: `TRAINING LOAD` sub-label + hero value `{score}/100` (color matches zone) + subtext `Adjusted for sleep` (Muted 11/700). IDs `linkedRecoveryLoadDetailSheet_dualHero`, `linkedRecoveryLoadDetailSheet_recoveryHero`, `linkedRecoveryLoadDetailSheet_loadHero`.
+
+2. **Sleep stages bar.** Same component + treatment as the unlinked Recovery Status Detail Sheet's stages bar (Deep / REM / Core / Awake colors; legend below). ID `linkedRecoveryLoadDetailSheet_stagesBar`.
+
+2a. **Sleep efficiency caption.** Same italic Muted-Text caption as the unlinked Recovery Status Detail Sheet — `Sleep efficiency: {pct}% ({h}h {mm}m asleep of {h}h {mm}m in bed)`. **Rendered inside the sleep-stages-bar card** beneath the legend (no separate card). Visible when `inBedMinutes` is available (explicit `.inBed` samples *or* the asleep+awake fallback for Apple-Watch-only users — see BUG-059). Hidden otherwise (e.g., zero-asleep night). ID `linkedRecoveryLoadDetailSheet_sleepEfficiencyCaption`.
+
+3. **Stacked combined chart — 14-day sleep-adjusted TL + sleep.** Two vertically-stacked Swift Charts sparklines sharing an x-axis (calendar day). Top: Training Load (sleep-adjusted) line, color = TL zone of latest score, smoothed (`.catmullRom`), caption `Last 14 days · Training Load (sleep-adjusted)`, data source `DailyTrainingLoadSnapshot` with live fallback for days without a persisted snapshot (see SERVICES.md § Training Load Algorithm → `fourteenDayDailyScores`). Bottom: sleep duration line, Chart Purple `#4B2893`, smoothed, caption `Last 14 days · Sleep duration`, data source `DailySleepSnapshot`. **Synchronized scrubbing:** dragging on either chart highlights the matching day on both. Annotation below the bottom chart: `{date} · {sleepHours}h sleep · {zone} ({score}/100)`. IDs `linkedRecoveryLoadDetailSheet_combinedChart`, `linkedRecoveryLoadDetailSheet_loadSparkline`, `linkedRecoveryLoadDetailSheet_sleepSparkline`.
+
+4. **Window comparison band.** Two-line band + trailing caption. Rows (top): `STRESS LOAD · {↑/↓} {pct}%` and `SLEEP · {↑/↓} {pct}%` — no "vs last week" suffix on the row values; the caption beneath establishes the comparison. When the matched window is fewer than 2 days (i.e. early Monday before any data has accrued), each row renders `Not enough data` in Muted Text instead of a delta. Caption (beneath the two rows, same card): `This week so far ({Mon, MMM d} – today) vs same period last week ({Mon, MMM d} – {matched weekday, MMM d})` — 11pt italic Muted Text, ID `linkedRecoveryLoadDetailSheet_windowComparisonCaption`. Arrow colors: Alert Red for higher stress load / lower sleep, Positive Green for the inverse. **Both rows use day-of-week matched windows** — Mon-through-current-weekday this ISO week vs Mon-through-the-same-weekday last ISO week — so the comparison is apples-to-apples (BUG-066), the row deltas honestly describe matched windows (BUG-058), and the single caption covers both. On Sunday the windows collapse to a full Mon–Sun-vs-Mon–Sun comparison. Sleep mean is computed across **days present in each window only** — missing nights are skipped, not zero-filled, so a single untracked night doesn't drag the mean down. When the prior matched window has no snapshots, the Sleep `deltaPct` is 0 (parallels Stress Load's empty-previous-week branch). Driven by `RecoveryStatusService.sleepWeekOverWeekComparison(now:)` and `ExerciseLoadService.weekOverWeekComparison(context:now:)`. ID `linkedRecoveryLoadDetailSheet_windowComparison`.
+
+5. **Personal Insights card.** A single collapsible card that combines (a) the sleep-load correlation callout — single italic Muted-Text line, three variants per CONSTANTS § Linked Recovery & Load Detail Sheet → Correlation Callout (high-sleep → much-lower-score / low-sleep → much-higher-score / no clear correlation), hidden when fewer than 14 paired days exist, ID `linkedRecoveryLoadDetailSheet_correlationCallout`; and (b) up to 3 auto-detected Personal Pattern Insight rows from ≥ 21 days of paired data, italic Muted Text 13px, detection algorithms in SERVICES.md § RecoveryStatusService → Personal Pattern Insights, IDs `linkedRecoveryLoadDetailSheet_personalInsights_row_{0..2}`. When expanded, the correlation callout renders first, then the per-pattern rows. The card is visible whenever the correlation callout OR ≥ 1 detected pattern is available. ID `linkedRecoveryLoadDetailSheet_personalInsights`.
+
+6. **Last 3 Nights row.** Three-cell row, each `{Day}, {Month} {Date} · {h}h {mm}m · {pct}% deep`. Sourced from `RecoveryStatusService.recent30DaySleep` filtered to last 3 records. ID `linkedRecoveryLoadDetailSheet_last3Nights`.
+
+7. **Contributing workouts block.** Reuses the Phase 8.8 Training Load Detail Sheet contributing-workouts pattern — workouts inside the 10-day decay window with per-row percent-share bars. Section heading uses Primary Text; per-row workout name and percent both use Muted Text so the heading is the only Primary-Text accent in the card. ID `linkedRecoveryLoadDetailSheet_contributingWorkouts`.
+
+8. **Time Since Workout block.** Same structure as the unlinked Recovery Status Detail Sheet (headline + per-type rows). Headline uses `RecoveryStatusService.lastWorkoutHero(context:)` (bare value — no "since your last workout" suffix). Per-type rows iterate `AppConstants.workoutTypes`, fetch the most-recent workout per type, format via `formatLastWorkoutHero`, and sort by most-recent date descending. IDs `linkedRecoveryLoadDetailSheet_timeSinceWorkout` (card), `linkedRecoveryLoadDetailSheet_timeSinceWorkout_headline` (hero value), `linkedRecoveryLoadDetailSheet_timeSinceWorkout_typeRow_{type}` (per-type row).
+
+9. **Recovery readiness callout.** Joint Recovery & Load advisory drawn from CONSTANTS § Training Load Zones → Linked Advisory Copy via `RecoveryStatusService.computeLinkedAdvisory(...)`. Met-target and missing-data nights pass the base TL zone advisory through unchanged (CONSTANTS § Training Load Zones → Advisory Text — Standalone Training Load Widget). ID `linkedRecoveryLoadDetailSheet_recoveryCallout`.
+
+**Collapsible insight cards.** Five of the body blocks — Window comparison (4), Personal Insights (5), Last 3 Nights (6), Contributing workouts (7), and Time Since Workout (8) — render their content behind a per-card bottom chevron toggle that matches the Goals card pattern (`Image(systemName: isExpanded ? "chevron.up" : "chevron.down")`, size 12 semibold, Muted Text, full-width plain Button, 24pt high, `withAnimation(.easeInOut(duration: 0.1))`). For Personal Insights, Last 3 Nights, Contributing workouts, and Time Since Workout the card's title row stays visible when collapsed; everything below it (correlation callout, pattern rows, sparklines, captions) hides. The Window comparison card omits the title entirely — its two rows (`Stress Load` and `Sleep`) stay visible at all collapse states and serve as the card's visible identity, while only the matched-window caption (`This week so far …`) hides behind the chevron. **Default state: collapsed.** State persists per-card via `UserSettings` UserDefaults flags and survives sheet dismissal and app relaunch — see CONSTANTS § Linked Recovery & Load Detail Sheet → Collapsible Insight Cards. Chevron IDs: `linkedRecoveryLoadDetailSheet_windowComparison_chevron`, `_personalInsights_chevron`, `_last3Nights_chevron`, `_contributingWorkouts_chevron`, `_timeSinceWorkout_chevron`.
+
+**Footer:** Side-by-side `See Info` · `Configure Settings` per § Standard Patterns → Home Widget Tap-to-Open → Footer button block. IDs `linkedRecoveryLoadDetailSheet_seeInfoButton`, `linkedRecoveryLoadDetailSheet_configureSettingsButton`. `See Info` opens the Linked Recovery & Load See Info Modal; `Configure Settings` opens the Linked Recovery & Load Settings Modal.
+
+**Reactivity:** Sheet subscribes to both the Workout Cascade and the Sleep Cascade. Either firing re-fetches the relevant helpers (per SERVICES.md § Sleep Cascade and § Workout Cascade) and re-renders in place.
+
+**Sheet identifier:** `linkedRecoveryLoadDetailSheet_sheet`.
+
 ### States
 | State | What the User Sees |
 |-------|-------------------|
-| Empty | All widgets at default/empty: Training Load 0% "Resting", Streak 0 dormant flame, Power Level "No data" message, Today's Plan "No workout planned for today.", Activity Rings shows the appropriate State 1 or State 2 message based on HealthKit + Watch availability. Tapping any widget still opens its detail sheet (which renders its own per-block empty state). |
-| Populated | Full dashboard with live data. Tapping any widget opens its detail sheet. |
-| Edit Mode | All widgets show "x" buttons; cards draggable; tap outside exits. **Tap-to-open is suppressed** — taps reach only the delete-and-drag chrome. |
+| Empty | All widgets at default/empty: Training Load 0% "Resting", Streak 0 dormant flame, Power Level "No data" message, Today's Plan "No workout planned for today.", Activity Rings shows the appropriate State 1 or State 2 message based on HealthKit + Watch availability, Recovery Status (if added) shows its appropriate gating state per § Recovery Status widget. Tapping any widget still opens its detail sheet (which renders its own per-block empty state) — exceptions: Connect Apple Health / Sleep Access Denied / No Sleep Tracker on Recovery Status route per their state-specific tap behavior. |
+| Populated | Full dashboard with live data. Tapping any widget opens its detail sheet. When Recovery Status + Training Load are linked-active, both cards render inside the shared-border composite and route to the combined Linked Recovery & Load Detail Sheet. |
+| Edit Mode | Cards draggable; long-press disabled; tap-to-open suppressed. **No "x" delete buttons** — deletion happens via long-press → context menu → "Delete Widget" after exiting edit mode (BUGS.md doc-drift entry). Tap outside to exit. |
+| Linked composite — Edit Mode (Phase 11) | When the Recovery Status + Training Load pair is linked-active, dragging either card moves the composite as one unit. Border + zero-padding treatment retained throughout. To delete one card: exit edit mode → long-press composite → "Unlink Widgets" → long-press the specific card → "Delete Widget". |
 | All Widgets Removed | Centered muted message: "Tap the menu to add widgets to your Home screen." Ellipsis, Log Workout, and Recent Workouts remain accessible. |
 
 ---
@@ -1403,7 +1636,7 @@ Back chevron (§ Standard Patterns → Back Navigation Chevron) · "Settings" he
 
 Toggle: "Connect to Apple Health" — FortiFitSegmentedToggle styled like the General toggles but functionally on/off, not a unit selector. ID `settings_appleHealthToggle`.
 
-Description below toggle (muted, 13/700): *"Import workouts from Apple Watch and other Health-connected apps. Linked workouts appear automatically and can't be fully unlinked in bulk."*
+Description below toggle (muted, 13/700): *"Import Apple Fitness workouts and sleep data from Apple Health."*
 
 Status line below description (muted, 11/700, uppercase, 2px spacing) and conditional buttons — content per the state table below.
 

@@ -31,6 +31,9 @@ enum FortiFitColors {
     static let activityExerciseRing = Color(hex: "10b981")
     static let activityStandRing = Color(hex: "0845AD")
 
+    // MARK: - Sleep (Phase 11)
+    static let sleepAwake = Color(hex: "FF6B5B")         // Awake segment of the sleep stages bar (Recovery Status / Linked Detail Sheets)
+
     // MARK: - Chart Colors
     static let chartPink = Color(hex: "BB2BC0")
     static let chartOrange = Color(hex: "FFBF51")

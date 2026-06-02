@@ -18,7 +18,11 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
             HKQuantityType(.distanceSwimming),
             HKQuantityType(.flightsClimbed),
             HKQuantityType(.appleExerciseTime),
-            HKCategoryType(.appleStandHour)
+            HKCategoryType(.appleStandHour),
+            HKCategoryType(.sleepAnalysis)
+            // NOTE (BUG-048): HEALTHKIT.md § 17 names `HKCharacteristicTypeIdentifierSleepDurationGoal`
+            // as an additional read type. That characteristic does NOT exist in HealthKit's public
+            // API. Removed from the read set; `fetchSleepDurationGoal()` returns nil.
         ]
         if #available(iOS 18.0, *) {
             types.insert(HKQuantityType(.workoutEffortScore))
@@ -338,5 +342,107 @@ final class DefaultHealthKitClient: HealthKitClient, @unchecked Sendable {
             indoor: isIndoor,
             workoutPlanId: planId
         )
+    }
+
+    // MARK: - Sleep (Phase 11)
+
+    func fetchSleepSamples(from start: Date, to end: Date) async throws -> [HKSleepSampleSnapshot] {
+        let sleepType = HKCategoryType(.sleepAnalysis)
+        let datePredicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+
+        let samples: [HKCategorySample] = try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: sleepType,
+                predicate: datePredicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            ) { _, samplesOrNil, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: (samplesOrNil as? [HKCategorySample]) ?? [])
+            }
+            healthStore.execute(query)
+        }
+
+        return samples.compactMap(makeSleepSnapshot(from:))
+    }
+
+    func observeSleepChanges(handler: @escaping @Sendable () -> Void) {
+        let sleepType = HKCategoryType(.sleepAnalysis)
+        let query = HKObserverQuery(sampleType: sleepType, predicate: nil) { _, _, error in
+            guard error == nil else { return }
+            handler()
+        }
+        healthStore.execute(query)
+        healthStore.enableBackgroundDelivery(for: sleepType, frequency: .immediate) { _, _ in }
+    }
+
+    func fetchSleepDurationGoal() async throws -> TimeInterval? {
+        // BUG-048: HEALTHKIT.md / SERVICES.md describe this method as reading
+        // `HKCharacteristicTypeIdentifierSleepDurationGoal`. That characteristic
+        // does NOT exist in HealthKit's public API (verified against Apple Developer
+        // Documentation). Returning nil unconditionally so `RecoveryStatusService.
+        // importSleepGoalFromAppleHealth()` emits the documented "No sleep goal set
+        // in Apple Health." toast in every case. Awaiting Step 8 spec reconciliation
+        // to formalize either dropping the Import affordance or wiring a different
+        // signal (e.g., a heuristic from the user's bedtime schedule).
+        return nil
+    }
+
+    func hasRecentSleepData(within days: Int = 14) async throws -> Bool {
+        let calendar = Calendar.current
+        let cutoff = calendar.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        let datePredicate = HKQuery.predicateForSamples(withStart: cutoff, end: Date(), options: [])
+
+        // Cheap first-match aggregate: limit 1, sorted by end date descending, then
+        // filter for any `.asleep*` stage value.
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: HKCategoryType(.sleepAnalysis),
+                predicate: datePredicate,
+                limit: 50,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]
+            ) { _, samplesOrNil, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let samples = (samplesOrNil as? [HKCategorySample]) ?? []
+                let asleepValues: Set<Int> = [
+                    HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
+                    HKCategoryValueSleepAnalysis.asleepREM.rawValue,
+                    HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+                    HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
+                ]
+                let hasAsleep = samples.contains { asleepValues.contains($0.value) }
+                continuation.resume(returning: hasAsleep)
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    private func makeSleepSnapshot(from sample: HKCategorySample) -> HKSleepSampleSnapshot? {
+        guard let stage = sleepStage(forRawValue: sample.value) else { return nil }
+        return HKSleepSampleSnapshot(
+            uuid: sample.uuid,
+            stage: stage,
+            startDate: sample.startDate,
+            endDate: sample.endDate,
+            sourceBundleID: sample.sourceRevision.source.bundleIdentifier
+        )
+    }
+
+    private func sleepStage(forRawValue raw: Int) -> HKSleepStage? {
+        switch raw {
+        case HKCategoryValueSleepAnalysis.asleepDeep.rawValue: return .asleepDeep
+        case HKCategoryValueSleepAnalysis.asleepREM.rawValue: return .asleepREM
+        case HKCategoryValueSleepAnalysis.asleepCore.rawValue: return .asleepCore
+        case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue: return .asleepUnspecified
+        case HKCategoryValueSleepAnalysis.awake.rawValue: return .awake
+        case HKCategoryValueSleepAnalysis.inBed.rawValue: return .inBed
+        default: return nil
+        }
     }
 }

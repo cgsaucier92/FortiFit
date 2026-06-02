@@ -6,6 +6,7 @@ struct CreateTemplateView: View {
     @Environment(\.modelContext) private var modelContext
 
     let editingTemplate: WorkoutTemplate?
+    var onTemplateCreated: (() -> Void)? = nil
 
     @State private var viewModel = WorkoutTemplateViewModel()
     @State private var showDeleteAlert = false
@@ -19,7 +20,7 @@ struct CreateTemplateView: View {
         ZStack(alignment: .top) {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: FortiFitSpacing.gapLarge) {
-                FortiFitScreenHeading(viewModel.isEditMode ? "Edit Template" : "Create Workout Template")
+                FortiFitScreenHeading(viewModel.isEditMode ? "Edit Workout Template" : "Create Workout Template")
 
                 // Template Name
                 FortiFitLabel("Template Name", color: FortiFitColors.primaryText)
@@ -61,10 +62,15 @@ struct CreateTemplateView: View {
                     #endif
                     if viewModel.isEditMode {
                         viewModel.updateTemplate(context: modelContext)
+                        dismiss()
                     } else {
                         viewModel.saveTemplate(context: modelContext)
+                        if let onTemplateCreated {
+                            onTemplateCreated()
+                        } else {
+                            dismiss()
+                        }
                     }
-                    dismiss()
                 }
             }
             .padding(.horizontal, FortiFitSpacing.screenHorizontal)

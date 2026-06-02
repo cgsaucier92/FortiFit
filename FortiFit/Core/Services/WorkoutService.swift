@@ -3,6 +3,38 @@ import SwiftData
 
 struct WorkoutService {
 
+    // MARK: - Phase 11 — Workout Cascade Hooks
+
+    /// Fires the Phase 11 portions of the Workout Cascade — capture today's
+    /// `DailyTrainingLoadSnapshot` + bump the Recovery Status widget's timer
+    /// line and smart workout suggestion. Other cascade work (PRs, streak,
+    /// Power Level, goals, etc.) is composed by individual call sites per the
+    /// existing pattern; see SERVICES.md § Workout Cascade.
+    @MainActor
+    private static func firePhase11WorkoutCascadeHooks(context: ModelContext, affectedDate: Date? = nil) {
+        let recovery = RecoveryStatusService.current
+        let isLinked = recovery?.isLinkedActive ?? false
+        let snapshotMap: [Date: DailySleepSnapshot]? = isLinked ? recovery?.cachedSnapshotsByDay() : nil
+
+        // Phase 11 — backdated invalidation. When a workout's date is not today (or when
+        // an edit/delete affects a past day), historical `DailyTrainingLoadSnapshot`s
+        // within ±14 days of the affected day are no longer accurate and must recompute
+        // on next chart access. Today's snapshot is rewritten by `captureTodaySnapshot`
+        // below; historical days regenerate lazily on read.
+        if let affected = affectedDate,
+           !Calendar.current.isDate(affected, inSameDayAs: Date()) {
+            ExerciseLoadService.invalidateSnapshotsAroundDate(affected, context: context)
+        }
+
+        ExerciseLoadService.captureTodaySnapshot(
+            context: context,
+            sleepAdjusted: isLinked,
+            sleepSnapshotsByDay: snapshotMap,
+            targetSleepHours: UserSettings.shared.targetSleepHours
+        )
+        recovery?.refreshTimerLine(context: context)
+    }
+
     // MARK: - Create
 
     /// Logs a new workout with optional exercise sets.
@@ -11,8 +43,14 @@ struct WorkoutService {
         context: ModelContext
     ) {
         workout.lastModifiedDate = .now
+        let workoutDate = workout.date
         context.insert(workout)
         try? context.save()
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                firePhase11WorkoutCascadeHooks(context: context, affectedDate: workoutDate)
+            }
+        }
     }
 
     // MARK: - Read
@@ -114,6 +152,15 @@ struct WorkoutService {
         }
 
         try? context?.save()
+        if let context, Thread.isMainThread {
+            MainActor.assumeIsolated {
+                // Invalidate around BOTH the prior date (if changed) and the new date.
+                if let priorDate {
+                    ExerciseLoadService.invalidateSnapshotsAroundDate(priorDate, context: context)
+                }
+                firePhase11WorkoutCascadeHooks(context: context, affectedDate: date)
+            }
+        }
         return (allAffectedNames, priorDate)
     }
 
@@ -128,10 +175,16 @@ struct WorkoutService {
     ) -> [String] {
         let exerciseNames = workout.exerciseSets.map { $0.exerciseName }
         let workoutId = workout.id
+        let workoutDate = workout.date
         context.delete(workout)
         try? context.save()
         // Revert any ScheduledWorkout linked to this workout
         PlanService.revertScheduledWorkoutsForDeletedWorkout(workoutId: workoutId, context: context)
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                firePhase11WorkoutCascadeHooks(context: context, affectedDate: workoutDate)
+            }
+        }
         return exerciseNames
     }
 
@@ -150,9 +203,11 @@ struct WorkoutService {
 
         var allExerciseNames: [String] = []
         var workoutIds: [UUID] = []
+        var workoutDates: [Date] = []
         for workout in workouts {
             allExerciseNames.append(contentsOf: workout.exerciseSets.map { $0.exerciseName })
             workoutIds.append(workout.id)
+            workoutDates.append(workout.date)
         }
 
         for workout in workouts {
@@ -162,6 +217,14 @@ struct WorkoutService {
         // Revert any ScheduledWorkouts linked to deleted workouts
         for workoutId in workoutIds {
             PlanService.revertScheduledWorkoutsForDeletedWorkout(workoutId: workoutId, context: context)
+        }
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                for date in workoutDates {
+                    ExerciseLoadService.invalidateSnapshotsAroundDate(date, context: context)
+                }
+                firePhase11WorkoutCascadeHooks(context: context, affectedDate: Date())
+            }
         }
         return Array(Set(allExerciseNames))
     }
