@@ -4,7 +4,7 @@ import SwiftData
 
 /// Phase 11 Step 7 — exercises the `RealisticUserScenarioBuilder` end-to-end against
 /// the full Phase 11 surface: derived state from the scenario, gating, smart
-/// suggestion, correlation, personal insights, and snapshot reads.
+/// suggestion, correlation, and snapshot reads.
 @MainActor
 final class RealisticUserScenarioBuilderTests: XCTestCase {
 

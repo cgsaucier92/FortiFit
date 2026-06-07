@@ -129,23 +129,23 @@ struct WorkoutDetailView: View {
         .background(FortiFitColors.background)
 
             // Share error toast
-            if viewModel.showShareError {
-                VStack {
-                    Text("Couldn't generate image. Try again.")
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, FortiFitSpacing.cardPadding)
-                        .padding(.vertical, FortiFitSpacing.elementSpacing)
-                        .background(
-                            Capsule()
-                                .fill(FortiFitColors.primaryAccent)
-                        )
-                        .padding(.top, FortiFitSpacing.screenTop)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .allowsHitTesting(false)
+            VStack {
+                Text("Couldn't generate image. Try again.")
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, FortiFitSpacing.cardPadding)
+                    .padding(.vertical, FortiFitSpacing.elementSpacing)
+                    .background(
+                        Capsule()
+                            .fill(FortiFitColors.primaryAccent)
+                    )
+                    .padding(.top, FortiFitSpacing.screenTop)
+                Spacer()
             }
+            .opacity(viewModel.showShareError ? 1 : 0)
+            .offset(y: viewModel.showShareError ? 0 : -60)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.2), value: viewModel.showShareError)
 
             // "Showing on Plan." toast
             VStack {
@@ -167,23 +167,23 @@ struct WorkoutDetailView: View {
             .animation(.easeInOut(duration: 0.2), value: showShowOnPlanToast)
 
             // "Template saved!" toast
-            if showTemplateSavedToast {
-                VStack {
-                    Text("Template saved!")
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, FortiFitSpacing.cardPadding)
-                        .padding(.vertical, FortiFitSpacing.elementSpacing)
-                        .background(
-                            Capsule()
-                                .fill(FortiFitColors.primaryAccent)
-                        )
-                        .padding(.top, FortiFitSpacing.screenTop)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .allowsHitTesting(false)
+            VStack {
+                Text("Template saved!")
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, FortiFitSpacing.cardPadding)
+                    .padding(.vertical, FortiFitSpacing.elementSpacing)
+                    .background(
+                        Capsule()
+                            .fill(FortiFitColors.primaryAccent)
+                    )
+                    .padding(.top, FortiFitSpacing.screenTop)
+                Spacer()
             }
+            .opacity(showTemplateSavedToast ? 1 : 0)
+            .offset(y: showTemplateSavedToast ? 0 : -60)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.2), value: showTemplateSavedToast)
         }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
@@ -290,18 +290,22 @@ struct WorkoutDetailView: View {
             if !cards.isEmpty {
                 FortiFitWidgetHeader(title: "Summary")
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(cards, id: \.identifier) { card in
-                        FortiFitStatCard(
-                            symbolName: card.symbol,
-                            label: card.label,
-                            value: card.value,
-                            unit: card.unit,
-                            iconColor: card.iconColor,
-                            valueColor: card.valueColor,
-                            accessibilityIdentifier: card.identifier,
-                            onTap: { activeMetric = card.metric }
-                        )
+                // BUG-077: do not replace with LazyVGrid. Lazy rendering inside this
+                // ScrollView's GeometryReader-driven top padding caused cells to commit
+                // layout slots without rendering content until the user scrolled.
+                VStack(spacing: 8) {
+                    ForEach(Array(stride(from: 0, to: cards.count, by: 2)), id: \.self) { rowStart in
+                        HStack(spacing: 8) {
+                            statCardView(for: cards[rowStart])
+                                .frame(maxWidth: .infinity)
+                            if rowStart + 1 < cards.count {
+                                statCardView(for: cards[rowStart + 1])
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Color.clear
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
                     }
                 }
             }
@@ -346,6 +350,35 @@ struct WorkoutDetailView: View {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func statCardView(for card: StatCardData) -> some View {
+        if card.metric == .effort, let rpe = workout.rpe {
+            FortiFitStatCard(
+                label: card.label,
+                value: card.value,
+                unit: card.unit,
+                valueColor: card.valueColor,
+                accessibilityIdentifier: card.identifier,
+                onTap: { activeMetric = card.metric },
+                icon: {
+                    FortiFitEffortBars(rpe: rpe)
+                        .accessibilityIdentifier(AccessibilityID.workoutDetail_summaryCard_effortBars)
+                }
+            )
+        } else {
+            FortiFitStatCard(
+                symbolName: card.symbol,
+                label: card.label,
+                value: card.value,
+                unit: card.unit,
+                iconColor: card.iconColor,
+                valueColor: card.valueColor,
+                accessibilityIdentifier: card.identifier,
+                onTap: { activeMetric = card.metric }
+            )
         }
     }
 

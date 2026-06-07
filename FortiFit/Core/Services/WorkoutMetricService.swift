@@ -73,21 +73,75 @@ enum WorkoutMetricService {
         return values.reduce(0, +) / Double(values.count)
     }
 
-    static func sparklineData(for metric: WorkoutMetric, workout: Workout, days: Int = 30, context: ModelContext) -> [(date: Date, value: Double)] {
+    enum SparklineMode: Equatable {
+        /// Trailing N-day window ending at the workout's date.
+        case trailingWindow(days: Int, anchorDate: Date)
+        /// Last N same-type sessions at-or-before the workout's date — used when the
+        /// trailing window doesn't have enough points (sparse cadence types like a
+        /// once-a-month long run).
+        case recentFallback(sessionCount: Int)
+    }
+
+    struct SparklineResult: Equatable {
+        var points: [(date: Date, value: Double)]
+        var mode: SparklineMode
+
+        static func == (lhs: SparklineResult, rhs: SparklineResult) -> Bool {
+            guard lhs.mode == rhs.mode, lhs.points.count == rhs.points.count else { return false }
+            for (a, b) in zip(lhs.points, rhs.points) where a.date != b.date || a.value != b.value {
+                return false
+            }
+            return true
+        }
+    }
+
+    /// Returns sparkline points and the mode used to compute them, or nil if fewer than 3
+    /// same-type sessions with this metric exist at-or-before the workout's date.
+    ///
+    /// The window is anchored to `workout.date` (not `Date()`), so opening the detail sheet
+    /// for an older workout shows the 30 days *leading up to that workout* rather than the
+    /// last 30 days relative to today (see BUG-072).
+    static func sparklineData(for metric: WorkoutMetric, workout: Workout, days: Int = 30, fallbackSessionCount: Int = 5, context: ModelContext) -> SparklineResult? {
         let workoutType = workout.workoutType
-        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-        let descriptor = FetchDescriptor<Workout>(
+        let anchor = workout.date
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: anchor) ?? anchor
+
+        let windowDescriptor = FetchDescriptor<Workout>(
             predicate: #Predicate { w in
-                w.workoutType == workoutType && w.date >= cutoff
+                w.workoutType == workoutType && w.date >= cutoff && w.date <= anchor
             },
             sortBy: [SortDescriptor(\.date)]
         )
-        guard let workouts = try? context.fetch(descriptor) else { return [] }
-        let points: [(date: Date, value: Double)] = workouts.compactMap { w in
+        if let windowWorkouts = try? context.fetch(windowDescriptor) {
+            let windowPoints: [(date: Date, value: Double)] = windowWorkouts.compactMap { w in
+                guard let val = metric.value(from: w) else { return nil }
+                return (date: w.date, value: val)
+            }
+            if windowPoints.count >= 3 {
+                return SparklineResult(
+                    points: windowPoints,
+                    mode: .trailingWindow(days: days, anchorDate: anchor)
+                )
+            }
+        }
+
+        var fallbackDescriptor = FetchDescriptor<Workout>(
+            predicate: #Predicate { w in
+                w.workoutType == workoutType && w.date <= anchor
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        fallbackDescriptor.fetchLimit = fallbackSessionCount
+        guard let recent = try? context.fetch(fallbackDescriptor) else { return nil }
+        let fallbackPoints: [(date: Date, value: Double)] = recent.reversed().compactMap { w in
             guard let val = metric.value(from: w) else { return nil }
             return (date: w.date, value: val)
         }
-        return points.count >= 3 ? points : []
+        guard fallbackPoints.count >= 3 else { return nil }
+        return SparklineResult(
+            points: fallbackPoints,
+            mode: .recentFallback(sessionCount: fallbackPoints.count)
+        )
     }
 
     static func isPersonalBest(for metric: WorkoutMetric, workout: Workout, context: ModelContext) -> Bool {

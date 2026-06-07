@@ -1,30 +1,27 @@
 import SwiftUI
 
-struct FortiFitStatCard: View {
-    let symbolName: String
+struct FortiFitStatCard<Icon: View>: View {
+    let icon: Icon
     let label: String
     let value: String
     let unit: String?
-    let iconColor: Color
     let valueColor: Color
     let accessibilityID: String
     let onTap: () -> Void
 
     init(
-        symbolName: String,
         label: String,
         value: String,
         unit: String? = nil,
-        iconColor: Color = FortiFitColors.mutedText,
         valueColor: Color = FortiFitColors.primaryText,
         accessibilityIdentifier: String,
-        onTap: @escaping () -> Void
+        onTap: @escaping () -> Void,
+        @ViewBuilder icon: () -> Icon
     ) {
-        self.symbolName = symbolName
+        self.icon = icon()
         self.label = label
         self.value = value
         self.unit = unit
-        self.iconColor = iconColor
         self.valueColor = valueColor
         self.accessibilityID = accessibilityIdentifier
         self.onTap = onTap
@@ -34,9 +31,7 @@ struct FortiFitStatCard: View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Image(systemName: symbolName)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(iconColor)
+                    icon
                     Text(label)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(FortiFitColors.primaryText)
@@ -69,6 +64,40 @@ struct FortiFitStatCard: View {
         .buttonStyle(StatCardButtonStyle())
         .accessibilityIdentifier(accessibilityID)
         .accessibilityHint("Opens metric details")
+    }
+}
+
+extension FortiFitStatCard where Icon == SymbolStatCardIcon {
+    init(
+        symbolName: String,
+        label: String,
+        value: String,
+        unit: String? = nil,
+        iconColor: Color = FortiFitColors.mutedText,
+        valueColor: Color = FortiFitColors.primaryText,
+        accessibilityIdentifier: String,
+        onTap: @escaping () -> Void
+    ) {
+        self.init(
+            label: label,
+            value: value,
+            unit: unit,
+            valueColor: valueColor,
+            accessibilityIdentifier: accessibilityIdentifier,
+            onTap: onTap,
+            icon: { SymbolStatCardIcon(symbolName: symbolName, color: iconColor) }
+        )
+    }
+}
+
+struct SymbolStatCardIcon: View {
+    let symbolName: String
+    let color: Color
+
+    var body: some View {
+        Image(systemName: symbolName)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(color)
     }
 }
 

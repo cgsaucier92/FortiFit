@@ -109,12 +109,21 @@ struct FortiFitLinkedRecoveryLoadSettingsModal: View {
                 )
                 .tint(FortiFitColors.primaryAccent)
                 .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadSettings_experienceLevelSlider)
+                // BUG-081: .lineLimit(1) + .fixedSize keep INTERMEDIATE on a single line
+                // on 393pt-class devices (HStack would otherwise propose ~⅓ width per Text
+                // and force the middle label to wrap mid-word).
                 HStack {
                     Text("BEGINNER")
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     Spacer()
                     Text("INTERMEDIATE")
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     Spacer()
                     Text("ADVANCED")
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .font(FortiFitTypography.labelSmall)
                 .kerning(FortiFitTypography.labelKerning)

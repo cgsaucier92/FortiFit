@@ -359,7 +359,7 @@ Goals → Reorder Goals (long-press → context menu → "Reorder Goals" → edi
 | recurrenceRule | String? | No | "weekly" / "biweekly" / nil |
 | recurrenceGroupId | UUID? | No | Shared UUID linking all instances of a recurring schedule |
 | dateCreated | Date | Yes | Auto-set on creation |
-| syncToAppleWatch | Bool | Yes | Default: `false`. Per-instance user intent flag for Apple Watch push. Captured at scheduling time by the Schedule Workout sheet's "Push to Apple Watch" toggle (Phase 8.7.1+, primary entry point); also toggleable post-creation via the `FortiFitWatchSyncGlyph` on the Plan card or the "Push to Apple Watch" toggle on the Edit Planned Workout screen. Gated by master `UserSettings.syncPlanToAppleWatchEnabled`, WorkoutKit auth, `scheduledDate >= today`, and ≥1 exercise in the snapshot. Internal field name retains "sync" for code-level continuity; user-facing copy uses "Push." See WORKOUTKIT.md § 7. |
+| syncToAppleWatch | Bool | Yes | Default: `false`. Per-instance user intent flag for Apple Watch push. Set at scheduling time (Schedule Workout sheet, Phase 8.7.1+ primary entry point) and toggleable later via the Plan card glyph or Edit Planned Workout. Gating conditions, sync lifecycle, and the "Sync"→"Push" copy note (internal field name keeps "sync"): WORKOUTKIT.md § 7. |
 | appleWorkoutPlanId | UUID? | No | Stable plan UUID stamped on first sync, retained for the lifetime of the record across off/on cycles, edits, and master-toggle bounces. Used as the `WorkoutPlan.id` and round-trips through HealthKit via `HKWorkout.workoutPlan?.id` (WorkoutKit extension) for deterministic completion matching (see WORKOUTKIT.md § 8). Cleared only on `ScheduledWorkout` deletion. |
 
 #### HomeWidget
@@ -479,11 +479,11 @@ Standalone entity (no `@Relationship`). Lookups by `date`. Written by the Traini
 | Today's Plan Detail Sheet (Phase 8.8) | Tap-to-open detail of today's planned workouts with per-row Complete action (SCREENS § Today's Plan Detail Sheet) |
 | Training Load Detail Sheet (Phase 8.8) | Tap-to-open breakdown of training load with 14-day chart, contributing workouts, week comparison, recovery callout (SCREENS § Training Load Detail Sheet) |
 | Weekly Streak Insights Sheet (Phase 8.8) | Tap-to-open streak insights with typographic hero, stat row, this-week ring, 26-week heatmap, milestone shelf — no flame (SCREENS § Weekly Streak Insights Sheet) |
-| Power Level Breakdown Sheet (Phase 8.8) | Tap-to-open breakdown with 30-day volume chart, top exercises driving trend, window comparison, calculated nudge (SCREENS § Power Level Breakdown Sheet) |
+| Power Level Breakdown Sheet (Phase 8.8) | Tap-to-open breakdown with top exercises driving trend, window comparison, calculated nudge (SCREENS § Power Level Breakdown Sheet) |
 | Recovery Status Settings Modal (Phase 11) | Configure unlinked Recovery Status widget: Sleep Target slider (4–12h, 0.5 step), Import from Apple Health, Done (SCREENS § Recovery Status Settings Modal) |
 | Recovery Status Detail Sheet (Phase 11) | Tap-to-open detail for the unlinked Recovery Status widget: stages bar, sleep efficiency, 14-day sparkline, last-7-nights stat row, time-since-workout breakdown, See Info / Configure Settings footer (SCREENS § Recovery Status Detail Sheet) |
 | Linked Recovery & Load Settings Modal (Phase 11) | Combined Configure Settings modal for the linked composite: Training Experience, Target Workout Duration, Sleep Target sliders + Import from Apple Health (SCREENS § Linked Recovery & Load Settings Modal) |
-| Linked Recovery & Load Detail Sheet (Phase 11) | Combined detail sheet for the linked composite: dual hero, stacked 14-day sleep + sleep-adjusted TL charts, synchronized scrubbing, window comparison, correlation callout, personal pattern insights, contributing workouts, last-3-nights row, time-since-workout, recovery readiness callout (SCREENS § Linked Recovery & Load Detail Sheet) |
+| Linked Recovery & Load Detail Sheet (Phase 11) | Combined detail sheet for the linked composite: dual hero, single 14-day dual-axis sleep + sleep-adjusted TL chart with one scrubber, window comparison, contributing workouts, last-3-nights row, time-since-workout, recovery readiness callout (SCREENS § Linked Recovery & Load Detail Sheet) |
 | Recovery Status / Linked Recovery & Load See Info Modal (Phase 11) | Reuses the existing `FortiFitSeeInfoModal` component; copy keyed by `recoveryStatus` and `linkedRecoveryLoad` in INFO_COPY § Widget Info Modal Copy |
 
 ---

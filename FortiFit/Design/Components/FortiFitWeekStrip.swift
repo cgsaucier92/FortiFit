@@ -77,7 +77,7 @@ struct FortiFitWeekStrip: View {
                     ForEach(Array(dates.enumerated()), id: \.offset) { _, date in
                         dayCellView(date: date, dayLabel: dayAbbreviation(for: date))
                             .frame(width: cellWidth)
-                            .frame(minHeight: 72)
+                            .frame(minHeight: 84)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selectedDate = date
@@ -97,7 +97,7 @@ struct FortiFitWeekStrip: View {
                         }
                 )
             }
-            .frame(minHeight: 72)
+            .frame(minHeight: 84)
             .clipped()
         }
     }
@@ -130,15 +130,45 @@ struct FortiFitWeekStrip: View {
                         )
                 )
 
-            HStack(spacing: 4) {
-                ForEach(Array(dots.prefix(3).enumerated()), id: \.offset) { _, color in
+            VStack(spacing: 2) {
+                dotRowCentered(dots: dots)
+                dotRowSlotted(dots: dots)
+            }
+            .frame(height: 14)
+        }
+    }
+
+    /// Row 1 — naturally centered under the day number. With 1 dot the dot sits
+    /// directly under the number; with 2 it straddles center; with 3 the row fills.
+    private func dotRowCentered(dots: [Color]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(0..<min(dots.count, 3), id: \.self) { index in
+                Circle()
+                    .fill(dots[index])
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .frame(height: 6)
+    }
+
+    /// Row 2 — fixed 3-slot layout so dot 4 sits under dot 1, 5 under 2, 6 under 3.
+    /// Row 1 is always full (3 dots) whenever row 2 has any content, so slot
+    /// alignment between the rows is exact.
+    private func dotRowSlotted(dots: [Color]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { column in
+                let index = 3 + column
+                if index < dots.count {
                     Circle()
-                        .fill(color)
+                        .fill(dots[index])
+                        .frame(width: 6, height: 6)
+                } else {
+                    Color.clear
                         .frame(width: 6, height: 6)
                 }
             }
-            .frame(height: 6)
         }
+        .frame(height: 6)
     }
 
     private func dayNumberColor(isSelected: Bool, isToday: Bool) -> Color {

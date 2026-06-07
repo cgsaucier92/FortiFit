@@ -424,3 +424,369 @@ struct UserSettingsTrendsChartTests {
         UserSettings.shared.hasSeededDefaultTrendsCharts = original
     }
 }
+
+// MARK: - BUG-073: hasEnoughData Threshold Alignment
+
+/// Regression suite for BUG-073. Each chart type asserts that the new
+/// `TrendsChartService.hasEnoughData(...)` returns false at the just-below-threshold
+/// fixture (the card-empty case the detail view was previously ignoring) and true at
+/// the at-threshold fixture. The detail view's per-renderer empty-state gate now calls
+/// this function, so a passing card → passing detail and an empty card → empty detail.
+@Suite(.serialized)
+struct HasEnoughDataThresholdTests {
+
+    // MARK: Strength Tracker — ≥ 2 weighted points for the selected exercise
+
+    @Test func strengthTracker_singlePoint_isEmpty() throws {
+        let context = try makeTestContext()
+        let workout = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Strength Training")
+        context.insert(workout)
+        let set = ExerciseSet(exerciseName: "Arnold Press", sets: 1, reps: 5, weightKg: 22.5, workout: workout)
+        context.insert(set)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(
+            for: "strengthTracker",
+            exerciseName: "Arnold Press",
+            range: .ninetyDays,
+            context: context
+        )
+        #expect(result == false)
+    }
+
+    @Test func strengthTracker_twoPoints_hasEnough() throws {
+        let context = try makeTestContext()
+        let w1 = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 10), workoutType: "Strength Training")
+        let w2 = Workout(name: "W2", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Strength Training")
+        context.insert(w1)
+        context.insert(w2)
+        context.insert(ExerciseSet(exerciseName: "Arnold Press", sets: 1, reps: 5, weightKg: 22.5, workout: w1))
+        context.insert(ExerciseSet(exerciseName: "Arnold Press", sets: 1, reps: 5, weightKg: 25.0, workout: w2))
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(
+            for: "strengthTracker",
+            exerciseName: "Arnold Press",
+            range: .ninetyDays,
+            context: context
+        )
+        #expect(result == true)
+    }
+
+    // MARK: Workout Volume — ≥ 2 qualifying workouts (Strength or HIIT with sets) in range
+
+    @Test func workoutVolume_singleWorkout_isEmpty() throws {
+        let context = try makeTestContext()
+        let w = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Strength Training")
+        context.insert(w)
+        context.insert(ExerciseSet(exerciseName: "Bench Press", sets: 3, reps: 5, weightKg: 80, workout: w))
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "workoutVolume", range: .ninetyDays, context: context)
+        #expect(result == false)
+    }
+
+    @Test func workoutVolume_twoWorkouts_hasEnough() throws {
+        let context = try makeTestContext()
+        let w1 = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 10), workoutType: "Strength Training")
+        let w2 = Workout(name: "W2", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Strength Training")
+        context.insert(w1)
+        context.insert(w2)
+        context.insert(ExerciseSet(exerciseName: "Bench Press", sets: 3, reps: 5, weightKg: 80, workout: w1))
+        context.insert(ExerciseSet(exerciseName: "Bench Press", sets: 3, reps: 5, weightKg: 82.5, workout: w2))
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "workoutVolume", range: .ninetyDays, context: context)
+        #expect(result == true)
+    }
+
+    // MARK: Personal Records — ≥ 1 exercise with a PR event
+
+    @Test func personalRecords_singleLogNoIncrease_isEmpty() throws {
+        let context = try makeTestContext()
+        let w = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 5), workoutType: "Strength Training")
+        context.insert(w)
+        context.insert(ExerciseSet(exerciseName: "Deadlifts", sets: 1, reps: 1, weightKg: 100, workout: w))
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "personalRecords", range: .allTime, context: context)
+        #expect(result == false)
+    }
+
+    @Test func personalRecords_oneWeightIncrease_hasEnough() throws {
+        let context = try makeTestContext()
+        let w1 = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 10), workoutType: "Strength Training")
+        let w2 = Workout(name: "W2", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Strength Training")
+        context.insert(w1)
+        context.insert(w2)
+        context.insert(ExerciseSet(exerciseName: "Deadlifts", sets: 1, reps: 1, weightKg: 100, workout: w1))
+        context.insert(ExerciseSet(exerciseName: "Deadlifts", sets: 1, reps: 1, weightKg: 110, workout: w2))
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "personalRecords", range: .allTime, context: context)
+        #expect(result == true)
+    }
+
+    // MARK: Training Load Trend — ≥ 3 days with workouts in last 14 days
+
+    @Test func trainingLoadTrend_twoDaysWithWorkouts_isEmpty() throws {
+        let context = try makeTestContext()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        for daysAgo in [1, 4] {
+            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today) ?? today
+            let w = Workout(name: "W\(daysAgo)", date: date, workoutType: "Strength Training", durationMinutes: 45)
+            context.insert(w)
+        }
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "trainingLoadTrend", range: .thirtyDays, context: context)
+        #expect(result == false)
+    }
+
+    @Test func trainingLoadTrend_threeDaysWithWorkouts_hasEnough() throws {
+        let context = try makeTestContext()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        for daysAgo in [1, 4, 7] {
+            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today) ?? today
+            let w = Workout(name: "W\(daysAgo)", date: date, workoutType: "Strength Training", durationMinutes: 45)
+            context.insert(w)
+        }
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "trainingLoadTrend", range: .thirtyDays, context: context)
+        #expect(result == true)
+    }
+
+    // MARK: Workout Type Breakdown — total ≥ 2 in range
+
+    @Test func workoutTypeBreakdown_singleWorkout_isEmpty() throws {
+        let context = try makeTestContext()
+        let w = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Cardio")
+        context.insert(w)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "workoutTypeBreakdown", range: .ninetyDays, context: context)
+        #expect(result == false)
+    }
+
+    @Test func workoutTypeBreakdown_twoWorkouts_hasEnough() throws {
+        let context = try makeTestContext()
+        let w1 = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 10), workoutType: "Cardio")
+        let w2 = Workout(name: "W2", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Strength Training")
+        context.insert(w1)
+        context.insert(w2)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "workoutTypeBreakdown", range: .ninetyDays, context: context)
+        #expect(result == true)
+    }
+
+    // MARK: Training Frequency — ≥ 1 *completed* prior week with count > 0
+
+    @Test func trainingFrequency_onlyCurrentWeekHasWorkouts_isEmpty() throws {
+        let context = try makeTestContext()
+        // A workout earlier in the current ISO week shouldn't satisfy the threshold,
+        // because the current week is still in progress.
+        let now = Date()
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.firstWeekday = 2
+        let currentWeekStart = now.startOfWeek
+        // Place the workout just after the week start (which is guaranteed in-progress).
+        let inWeek = calendar.date(byAdding: .hour, value: 6, to: currentWeekStart) ?? currentWeekStart
+        let w = Workout(name: "W1", date: inWeek, workoutType: "Strength Training", durationMinutes: 40)
+        context.insert(w)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "trainingFrequency", range: .eightWeeks, context: context)
+        #expect(result == false)
+    }
+
+    @Test func trainingFrequency_oneCompletedPriorWeek_hasEnough() throws {
+        let context = try makeTestContext()
+        let now = Date()
+        // Two weeks back guarantees a completed prior week regardless of weekday.
+        let priorWeekDate = Calendar.current.date(byAdding: .day, value: -14, to: now) ?? now
+        let w = Workout(name: "W1", date: priorWeekDate, workoutType: "Strength Training", durationMinutes: 40)
+        context.insert(w)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "trainingFrequency", range: .eightWeeks, context: context)
+        #expect(result == true)
+    }
+
+    // MARK: RPE Trend & Session Duration — ≥ 1 completed prior week with data
+
+    @Test func rpeTrend_onlyCurrentWeekRPE_isEmpty() throws {
+        let context = try makeTestContext()
+        let now = Date()
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.firstWeekday = 2
+        let currentWeekStart = now.startOfWeek
+        let inWeek = calendar.date(byAdding: .hour, value: 6, to: currentWeekStart) ?? currentWeekStart
+        let w = Workout(name: "W1", date: inWeek, workoutType: "Strength Training", rpe: 7)
+        context.insert(w)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "rpeTrend", range: .eightWeeks, context: context)
+        #expect(result == false)
+    }
+
+    @Test func rpeTrend_oneCompletedPriorWeekWithRPE_hasEnough() throws {
+        let context = try makeTestContext()
+        let priorWeekDate = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+        let w = Workout(name: "W1", date: priorWeekDate, workoutType: "Strength Training", rpe: 7)
+        context.insert(w)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "rpeTrend", range: .eightWeeks, context: context)
+        #expect(result == true)
+    }
+
+    @Test func sessionDuration_oneCompletedPriorWeekWithDuration_hasEnough() throws {
+        let context = try makeTestContext()
+        let priorWeekDate = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+        let w = Workout(name: "W1", date: priorWeekDate, workoutType: "Strength Training", durationMinutes: 55)
+        context.insert(w)
+        try context.save()
+
+        let result = TrendsChartService.hasEnoughData(for: "sessionDuration", range: .eightWeeks, context: context)
+        #expect(result == true)
+    }
+
+    // MARK: Card-vs-Detail Parity — the exact screenshot scenario from BUG-073
+
+    @Test func cardAndDetailAgreeWhenStrengthHasOnlyOnePoint() throws {
+        let context = try makeTestContext()
+        // Exactly the screenshot fixture: Arnold Press logged once.
+        let workout = Workout(name: "W1", date: Date().addingTimeInterval(-86400 * 3), workoutType: "Strength Training")
+        context.insert(workout)
+        context.insert(ExerciseSet(exerciseName: "Arnold Press", sets: 1, reps: 5, weightKg: 22.5, workout: workout))
+        try context.save()
+
+        // Detail view at each eligible range — all must report empty, mirroring the card.
+        for range in DetailTimeRange.eligibleRanges(for: "strengthTracker") {
+            let detailEmpty = !TrendsChartService.hasEnoughData(
+                for: "strengthTracker",
+                exerciseName: "Arnold Press",
+                range: range,
+                context: context
+            )
+            #expect(detailEmpty == true, "Detail view should be empty for range \(range.rawValue)")
+        }
+    }
+}
+
+// MARK: - BUG-079: Effort Trend Card Empty-State Parity
+
+/// Regression suite for BUG-079. The compact Effort Trend card on the Trends
+/// list was rendering an axes-only chart instead of the empty-state caption when
+/// no workouts had `rpe` recorded — diverging from the detail view's behavior.
+/// Root cause: `ProgressViewModel.computeRPETrend()` appended a zero-RPE
+/// placeholder entry for every week iterated by `forEachRecentWeek`, so
+/// `hasRPEData` (which checks "any completed past week exists in cached array")
+/// returned true even when no week actually had RPE data. Fix mirrors
+/// `computeDurationTrend`'s `guard !weekWorkouts.isEmpty else { return }`.
+@Suite(.serialized)
+struct EffortTrendCardEmptyStateTests {
+
+    @Test func test_workoutsWithoutRPE_hasRPEDataReturnsFalse() throws {
+        let context = try makeTestContext()
+        // A workout in a prior completed week, but no RPE recorded.
+        let priorWeekDate = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+        let w = Workout(name: "W1", date: priorWeekDate, workoutType: "Strength Training")
+        context.insert(w)
+        try context.save()
+
+        let vm = ProgressViewModel()
+        vm.loadData(context: context)
+
+        #expect(vm.hasRPEData == false)
+        #expect(vm.rpeWeeklyData.isEmpty, "Empty weeks must not be appended as zero-RPE placeholders")
+    }
+
+    @Test func test_oneCompletedWeekWithRPE_hasRPEDataReturnsTrue() throws {
+        let context = try makeTestContext()
+        let priorWeekDate = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+        let w = Workout(name: "W1", date: priorWeekDate, workoutType: "Strength Training", rpe: 7)
+        context.insert(w)
+        try context.save()
+
+        let vm = ProgressViewModel()
+        vm.loadData(context: context)
+
+        #expect(vm.hasRPEData == true)
+        #expect(vm.rpeWeeklyData.contains { $0.averageRPE == 7 })
+    }
+
+    @Test func test_cardAndDetailAgreeWhenNoRPEData() throws {
+        let context = try makeTestContext()
+        // Workouts exist but none have RPE — card and detail must both report empty.
+        let priorWeekDate = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+        let w = Workout(name: "W1", date: priorWeekDate, workoutType: "Strength Training")
+        context.insert(w)
+        try context.save()
+
+        let vm = ProgressViewModel()
+        vm.loadData(context: context)
+        let cardEmpty = !vm.hasRPEData
+
+        let detailEmpty = !TrendsChartService.hasEnoughData(
+            for: "rpeTrend",
+            range: .eightWeeks,
+            context: context
+        )
+
+        #expect(cardEmpty == true)
+        #expect(detailEmpty == true)
+        #expect(cardEmpty == detailEmpty, "Card and detail must agree on emptiness")
+    }
+}
+
+// MARK: - BUG-076 Padded Y-Axis Domain
+
+/// Covers `TrendsChartService.paddedYDomain` — the helper that gives every
+/// non-domain-pinned Trends chart top-edge headroom so a steep data jump
+/// (e.g. Strength Tracker 20 → 80 lb) plus `.monotone`/`.catmullRom`
+/// smoothing can't clip through the plot-frame stroke.
+struct PaddedYDomainTests {
+
+    @Test func test_emptyValues_returnsSafeFallback() {
+        let domain = TrendsChartService.paddedYDomain(for: [])
+        #expect(domain.lowerBound == 0)
+        #expect(domain.upperBound > 0, "Empty array must still produce a renderable domain")
+    }
+
+    @Test func test_allZeroValues_returnsSafeFallback() {
+        let domain = TrendsChartService.paddedYDomain(for: [0, 0, 0])
+        #expect(domain.lowerBound == 0)
+        #expect(domain.upperBound > 0, "All-zero series must still produce a renderable domain")
+    }
+
+    @Test func test_singleValue_givesHeadroomAboveMax() {
+        let domain = TrendsChartService.paddedYDomain(for: [80])
+        #expect(domain.lowerBound == 0)
+        #expect(domain.upperBound > 80, "Single value 80 must leave room above (got \(domain.upperBound))")
+    }
+
+    @Test func test_mixedValues_topAtLeastTenPercentAboveMax() {
+        // Strength Tracker reproducer: 20 → 80 lb jump.
+        let domain = TrendsChartService.paddedYDomain(for: [20, 22, 25, 30, 80])
+        let max = 80.0
+        #expect(domain.upperBound >= max * 1.10, "Top should be ≥ 10% above max (got \(domain.upperBound))")
+        #expect(domain.lowerBound == 0)
+    }
+
+    @Test func test_smallValues_topNeverEqualToMax() {
+        // Training Frequency reproducer: small integer counts like 1, 2, 3.
+        let domain = TrendsChartService.paddedYDomain(for: [1, 2, 3])
+        #expect(domain.upperBound > 3.0, "Top must exceed max even for small int-like series")
+    }
+
+    @Test func test_customHeadroom_isHonored() {
+        let small = TrendsChartService.paddedYDomain(for: [100], headroomFraction: 0.0)
+        let large = TrendsChartService.paddedYDomain(for: [100], headroomFraction: 0.5)
+        #expect(large.upperBound > small.upperBound, "Larger headroom must yield larger upper bound")
+    }
+}

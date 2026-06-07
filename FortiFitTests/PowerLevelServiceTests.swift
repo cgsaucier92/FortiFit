@@ -208,4 +208,68 @@ struct PowerLevelServiceTests {
         let result = PowerLevelService.calculatePowerLevel(context: context, now: now)
         #expect(result.status == .rising)
     }
+
+    // MARK: - BUG-075 — Empty Exercise-Set Exclusion
+
+    /// Regression test for BUG-075. A Strength Training workout with no logged
+    /// ExerciseSets — the shape an HK-imported Apple Watch strength session
+    /// takes before the user links it to logged sets — must not enter the
+    /// 30-day Power Level average. Pre-fix the shell drags `current_avg` to
+    /// 500 (one 1000-volume workout averaged with one 0-volume shell), which
+    /// against a baseline of 1000 clears the −10% threshold and flips the
+    /// status to Deloading. With the empty-set filter the shell is dropped,
+    /// `current_avg` stays at 1000, and the status correctly classifies as
+    /// Steady.
+    @Test func emptyExerciseSetWorkoutsDoNotSkewAverage() throws {
+        let context = try makeTestContext()
+        let now = Date()
+
+        // Baseline (40 days ago): one Strength workout with volume 1000.
+        createWorkout(daysAgo: 40, exercises: [("Bench", 4, 5, 50.0)], now: now, context: context)
+
+        // Current window: one logged Strength workout with volume 1000…
+        createWorkout(daysAgo: 5, exercises: [("Bench", 4, 5, 50.0)], now: now, context: context)
+
+        // …and one HK-shell Strength workout with no logged sets at all.
+        let calendar = Calendar.current
+        let shell = Workout(name: "HK Shell", workoutType: "Strength Training")
+        shell.date = calendar.date(byAdding: .day, value: -10, to: calendar.startOfDay(for: now))!
+        context.insert(shell)
+        try context.save()
+
+        let result = PowerLevelService.calculatePowerLevel(context: context, now: now)
+        let comparison = PowerLevelService.windowComparison(context: context, now: now)
+
+        #expect(result.status == .steady, "shell workouts must not pull the average down — pre-fix this would classify Deloading")
+        #expect(abs(comparison.current30dAvg - 1000.0) < 0.001, "current30dAvg must equal the lone logged workout's volume (1000), not 500")
+        #expect(abs(comparison.deltaPct) < 0.001, "deltaPct must be 0 — logged-set averages match the baseline")
+    }
+
+    /// Regression test for BUG-075. HK-shell workouts must also be excluded
+    /// from the qualifying count fed into the cold-start guard. A user with
+    /// exactly two genuinely-logged workouts in the current window and three
+    /// HK shells still has only two logged sessions of training to talk
+    /// about — the nudge must surface the cold-start copy, not pretend the
+    /// shells are real volume.
+    @Test func emptyExerciseSetWorkoutsExcludedFromColdStartCount() throws {
+        let context = try makeTestContext()
+        let now = Date()
+        let calendar = Calendar.current
+
+        // 2 logged Strength workouts in current window.
+        createWorkout(daysAgo: 3, exercises: [("Squat", 4, 5, 60.0)], now: now, context: context)
+        createWorkout(daysAgo: 12, exercises: [("Squat", 4, 5, 60.0)], now: now, context: context)
+
+        // 3 HK shells in current window — pre-fix this would push the
+        // qualifying count past the cold-start guard.
+        for offset in [6, 9, 20] {
+            let shell = Workout(name: "HK Shell", workoutType: "Strength Training")
+            shell.date = calendar.date(byAdding: .day, value: -offset, to: calendar.startOfDay(for: now))!
+            context.insert(shell)
+        }
+        try context.save()
+
+        let nudge = PowerLevelService.computeNudge(context: context, now: now)
+        #expect(nudge.archetype == .coldStart, "two logged workouts + three shells must still register as cold-start (logged count < 3)")
+    }
 }

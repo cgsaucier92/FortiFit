@@ -141,14 +141,7 @@ When `WatchScheduleService.schedule(_:)` is called, it builds a `WorkoutPlan` wr
 
 ### Activity Type (Outbound HK Mapping)
 
-The `WorkoutComposition` is stamped with a single `HKWorkoutActivityType` derived from the `ScheduledWorkout.workoutType` via the lookup in HK_MAPPING.md § Outbound Mapping:
-
-| FortiFit `workoutType` | `HKWorkoutActivityType` |
-|---|---|
-| Strength Training | `.traditionalStrengthTraining` |
-| HIIT | `.highIntensityIntervalTraining` |
-
-No per-template override in MVP. See HK_MAPPING.md § Outbound Mapping for rationale.
+The `WorkoutComposition` is stamped with a single `HKWorkoutActivityType` derived from `ScheduledWorkout.workoutType` via the lookup in **HK_MAPPING.md § Outbound Mapping** (Strength Training / HIIT only). No per-template override in MVP — see HK_MAPPING.md for the table and rationale.
 
 ### Block Structure (one block per exercise)
 
@@ -187,7 +180,7 @@ The `WorkoutComposition` is wrapped in a `WorkoutPlan(id: appleWorkoutPlanId, ..
 
 ### Schedule Time
 
-`WorkoutScheduler.shared.schedule(plan, at:)` requires a real `Date`. Computed as `combined(scheduledDate, scheduledTime)` when `scheduledTime` is set, or noon (12:00 PM) on `scheduledDate` when `scheduledTime` is nil. See § 7 Sync Lifecycle Gates.
+`WorkoutScheduler.shared.schedule(plan, at:)` requires a real `Date`: `combined(scheduledDate, scheduledTime)`, or noon on `scheduledDate` when `scheduledTime` is nil. Rationale (time is not a gate) in § 7.
 
 ---
 
@@ -206,7 +199,7 @@ When any gate fails, the glyph renders disabled (muted, 0.4 opacity) and tap sho
 
 **Scheduled time is not a gate.** `scheduledTime` is optional. When nil, `WatchScheduleService` falls back to noon (12:00 PM) on the scheduled date for the WorkoutKit `schedule(_:at:)` call. Apple Watch does not surface the scheduled time to users, and the writeback uses the actual start time from iOS/watchOS — the value is purely an API formality.
 
-**Phase 8.7.1 entry-point refinement:** The primary configuration moment for `syncToAppleWatch` moves upstream to the Plan Workout sheet. A new "Push to Apple Watch" toggle there captures the user's intent at scheduling time, defaulting to `true` when master is on and auth granted. The Plan card glyph and Edit Planned Workout toggle remain (status indicator + quick-toggle on Plan; modification on Edit), but are no longer the discovery surface. User-facing copy renamed from "Sync" → "Push" everywhere; internal field names (`syncToAppleWatch`, `syncPlanToAppleWatchEnabled`) unchanged.
+**Phase 8.7.1 entry-point refinement:** The primary configuration moment for `syncToAppleWatch` is the Plan Workout sheet's "Push to Apple Watch" toggle (defaults `true` when master on + auth granted). The Plan card glyph and Edit Planned Workout toggle remain as status/quick-toggle, not the discovery surface. ("Sync" → "Push" is a user-facing copy rename only; internal identifiers unchanged — see CONSTANTS.md § Apple Watch Strings.)
 
 ### On Per-Card Toggle On
 
@@ -510,16 +503,7 @@ The Settings → Apple Watch section description includes the static caveat: "Re
 
 ## 15. Reconciliation Triggers (Consolidated)
 
-`WatchScheduleService.reconcile()` runs on:
-
-- App foreground (defensive sweep)
-- Master Settings toggle on (after auth grant)
-- WorkoutKit auth state change (granted ↔ denied)
-- After "this and future" recurrence edits (PlanService.editScheduledWorkout)
-- After 12-week recurrence regeneration creates new instances (PlanService → WatchScheduleService hook)
-- After auth restored from a previously-denied state
-
-Each trigger runs the same loop described in § 7 Reconciliation.
+Canonical trigger list and the loop they run: **§ 7 Reconciliation** (also tabulated in SERVICES.md § WatchScheduleService → Triggers). Not restated here, to avoid drift.
 
 ---
 
@@ -551,47 +535,16 @@ See TESTING.md for target structure and conventions, and TESTING.md § WorkoutKi
 
 ## 17. Accessibility Identifiers
 
-Add to `AccessibilityIdentifiers.swift`:
-
-- `settings_appleWatchToggle`
-- `settings_appleWatchOpenSettingsButton`
-- `scheduledWorkoutCard_{index}_watchSyncGlyph`
-- `editScheduledWorkout_watchSyncToggle`
-- `editScheduledWorkout_watchSyncInfoPopover`
-- `editScheduledWorkout_recurrencePrompt_thisOnly`
-- `editScheduledWorkout_recurrencePrompt_thisAndFuture`
-- `editScheduledWorkout_saveButton`
-- `editScheduledWorkout_backButton`
-- `editScheduledWorkout_dateField`
-- `editScheduledWorkout_timeField`
-- `exerciseCard_{index}_restPerSetField`
-- `exerciseCard_{index}_restPerSetInfoPopover`
-- `exerciseCard_{index}_repsTimeToggle`
-- `masterSyncOff_popover`
-- `masterSyncOff_openSettingsButton`
-- `watchSyncErrorToast`
-- `watchSyncErrorToast_retryButton`
+Canonical inventory: **TESTING.md § Accessibility Identifiers → "Apple Watch push (Phase 8.7 + 8.7.1)" row** (`settings_appleWatch*`, `scheduledWorkoutCard_{index}_watchSyncGlyph`, `editScheduledWorkout_*`, `exerciseCard_{index}_restPerSet*` / `_repsTimeToggle`, `masterSyncOff_*`, `watchSyncErrorToast*`). Add new identifiers there, not here.
 
 ---
 
 ## 18. Future Phases (Scope-Only)
 
-### Sync Entire Series Toggle
+Deferred enhancements (all already listed as out of scope in § 2):
 
-When creating a recurring `ScheduledWorkout`, offer a "Sync all instances to Apple Watch" toggle that flips all 12 instances at once. Currently, users opt in per instance. Out of scope for MVP — flagged as a polish enhancement.
-
-### Per-Template Functional vs Traditional Strength Training Override
-
-Add a `WorkoutTemplate.appleHealthSubtype: HKWorkoutActivityType?` field letting users specify Functional vs Traditional. Currently, Strength Training defaults to Traditional. Out of scope for MVP — flagged as a power-user enhancement.
-
-### Watch-Side Editing
-
-Allow users to modify a scheduled workout from the Watch's Workout app. Currently read/start only. Likely requires a watchOS companion app and deeper WorkoutKit integration. Indefinitely deferred.
-
-### Heuristic watchOS Version Detection
-
-Detect "no plans completed via Watch in the last 30 days even though several have been scheduled" → surface a heuristic warning. Out of scope; static caveat is sufficient.
-
-### Sync Diagnostics UI
-
-Settings sub-page showing currently scheduled plans on Watch, plan-ID round-trip success rate, last reconciliation timestamp. Out of scope; debug-log only for MVP.
+- **Sync entire series toggle** — flip all 12 recurring instances at once instead of per-instance opt-in.
+- **Per-template Functional vs Traditional override** — `WorkoutTemplate.appleHealthSubtype`; rationale in HK_MAPPING.md § No Per-Template Override.
+- **Watch-side editing** — modify a scheduled workout from the Watch; needs a watchOS companion app. Indefinitely deferred.
+- **Heuristic watchOS-version detection** — warn when synced plans never complete via Watch; the static caveat (§ 14) is sufficient for now.
+- **Sync diagnostics UI** — Settings sub-page of registered plans / round-trip success; debug-log only for MVP.

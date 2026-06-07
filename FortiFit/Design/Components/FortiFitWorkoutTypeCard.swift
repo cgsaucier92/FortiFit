@@ -59,29 +59,35 @@ struct FortiFitWorkoutTypeCard: View {
 
                 Spacer()
 
-                // Count badge
-                Text(countLabel)
-                    .font(FortiFitTypography.label)
-                    .kerning(FortiFitTypography.labelKerning)
-                    .foregroundStyle(FortiFitColors.mutedText)
-                    .fixedSize()
-
-                // Sort indicator
-                if isNonDefaultSort {
-                    Image(systemName: "list.number")
-                        .font(.system(size: 11, weight: .semibold))
+                // BUG-080: stack count + sort/filter indicators vertically so
+                // the trailing chrome can't crowd long titles like
+                // "Strength Training" off the leading slot. Count sits on top;
+                // indicator row drops in below when sort or filter is active.
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(countLabel)
+                        .font(FortiFitTypography.label)
+                        .kerning(FortiFitTypography.labelKerning)
                         .foregroundStyle(FortiFitColors.mutedText)
-                }
+                        .fixedSize()
 
-                // Filter indicator
-                if activeFilterCount > 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: "line.3.horizontal.decrease")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(FortiFitColors.mutedText)
-                        Text("\(activeFilterCount)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(FortiFitColors.mutedText)
+                    if isNonDefaultSort || activeFilterCount > 0 {
+                        HStack(spacing: 6) {
+                            if isNonDefaultSort {
+                                Image(systemName: "list.number")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(FortiFitColors.mutedText)
+                            }
+                            if activeFilterCount > 0 {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "line.3.horizontal.decrease")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(FortiFitColors.mutedText)
+                                    Text("\(activeFilterCount)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(FortiFitColors.mutedText)
+                                }
+                            }
+                        }
                     }
                 }
 

@@ -375,6 +375,90 @@ final class HealthKitIntegrationTests: XCTestCase {
 
     // MARK: - Upstream Update
 
+    // MARK: - Foreground Refresh Broadcast (BUG-078)
+    //
+    // Regression coverage for BUG-078: HK observer fires while the app is
+    // foregrounded but `HomeViewModel` snapshots derived state instead of using
+    // `@Query`, so the UI didn't update until the user navigated away and
+    // back. The fix posts `Notification.Name.fortiFitHealthKitDidImport` from
+    // `importPendingWorkouts` (after `context.save()`) and from
+    // `backfillMissingEffortScores` (only when at least one rpe was filled).
+    // These tests pin the broadcast contract — if the post sites move or get
+    // accidentally guarded, listeners go stale again.
+
+    func test_importPendingWorkouts_postsImportNotification_whenWorkoutLanded() async throws {
+        let stubClient = StubHealthKitClient()
+        let matcher = WorkoutMatcher()
+        let syncService = HealthKitSyncService(client: stubClient, matcher: matcher)
+        syncService.setContext(context)
+        UserSettings.shared.healthKitEnabled = true
+
+        let snapshot = TestFixtures.makeHKWorkoutFixture(durationMinutes: 30)
+        stubClient.workoutsToReturn = [snapshot]
+
+        let expectation = expectation(forNotification: .fortiFitHealthKitDidImport, object: nil)
+        await syncService.importPendingWorkouts(context: context)
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+
+    func test_importPendingWorkouts_postsImportNotification_onDeleteOnlySync() async throws {
+        let hkUUID = UUID()
+        TestFixtures.makeLinkedWorkout(
+            name: "HK Run",
+            workoutType: "Cardio",
+            healthKitUUID: hkUUID,
+            in: context
+        )
+
+        let stubClient = StubHealthKitClient()
+        let matcher = WorkoutMatcher()
+        let syncService = HealthKitSyncService(client: stubClient, matcher: matcher)
+        syncService.setContext(context)
+        UserSettings.shared.healthKitEnabled = true
+
+        stubClient.deletedUUIDsToReturn = [hkUUID]
+        stubClient.workoutsToReturn = []
+
+        let expectation = expectation(forNotification: .fortiFitHealthKitDidImport, object: nil)
+        await syncService.importPendingWorkouts(context: context)
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+
+    func test_backfillMissingEffortScores_postsImportNotification_whenScoresChanged() async throws {
+        let hkUUID = UUID()
+        TestFixtures.makeLinkedWorkout(
+            name: "HK Workout",
+            healthKitUUID: hkUUID,
+            in: context
+        )
+
+        let stubClient = StubHealthKitClient()
+        stubClient.effortScoreToReturn = 6
+        let matcher = WorkoutMatcher()
+        let syncService = HealthKitSyncService(client: stubClient, matcher: matcher)
+        syncService.setContext(context)
+
+        let expectation = expectation(forNotification: .fortiFitHealthKitDidImport, object: nil)
+        await syncService.backfillMissingEffortScores(context: context)
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+
+    func test_backfillMissingEffortScores_doesNotPost_whenNothingChanged() async throws {
+        // No HK-linked workouts → backfill finds nothing → must not post.
+        // Guards against a future refactor that posts unconditionally and
+        // wastes downstream recomputes.
+        let stubClient = StubHealthKitClient()
+        stubClient.effortScoreToReturn = 6
+        let matcher = WorkoutMatcher()
+        let syncService = HealthKitSyncService(client: stubClient, matcher: matcher)
+        syncService.setContext(context)
+
+        let expectation = expectation(forNotification: .fortiFitHealthKitDidImport, object: nil)
+        expectation.isInverted = true
+        await syncService.backfillMissingEffortScores(context: context)
+        await fulfillment(of: [expectation], timeout: 0.5)
+    }
+
     func test_upstreamUpdate_HKWinsOnOwnedFields() async throws {
         let hkUUID = UUID()
         let workout = TestFixtures.makeLinkedWorkout(

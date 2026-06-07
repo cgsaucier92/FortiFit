@@ -81,7 +81,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
                 .frame(maxWidth: .infinity)
 
             Text("WEEK STREAK")
-                .font(.system(size: 13, weight: .heavy))
+                .font(FortiFitTypography.bodySmall)
                 .kerning(2)
                 .foregroundStyle(FortiFitColors.primaryAccent)
                 .frame(maxWidth: .infinity)
@@ -190,7 +190,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Last 26 weeks")
                     .font(FortiFitTypography.bodySmall)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 if heatmap.allSatisfy({ $0.isUntracked }) {
                     Text(AppConstants.WidgetDetail.EmptyState.weeklyStreakHeatmap)
@@ -284,7 +284,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Milestones")
                     .font(FortiFitTypography.bodySmall)
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .foregroundStyle(FortiFitColors.primaryText)
 
                 HStack(spacing: FortiFitSpacing.gapSmall) {
                     ForEach(StreakService.milestoneMarks, id: \.self) { mark in
@@ -316,7 +316,7 @@ struct FortiFitWeeklyStreakDetailSheet: View {
             }
             Text(mark == 1 ? "1 WK" : "\(mark) WKS")
                 .font(FortiFitTypography.bodySmall)
-                .foregroundStyle(FortiFitColors.mutedText)
+                .foregroundStyle(FortiFitColors.primaryAccent)
         }
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier(AccessibilityID.weeklyStreakDetailSheet_milestone(mark))

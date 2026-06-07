@@ -31,7 +31,6 @@ final class UserSettings {
         static let recoveryLoadManuallyUnlinked = "recoveryLoadManuallyUnlinked"
         static let lastSleepCatchUpDate = "lastSleepCatchUpDate"
         static let recoverySheetStressLoadExpanded = "recoverySheetStressLoadExpanded"
-        static let recoverySheetPersonalInsightsExpanded = "recoverySheetPersonalInsightsExpanded"
         static let recoverySheetLast3NightsExpanded = "recoverySheetLast3NightsExpanded"
         static let recoverySheetContributingExpanded = "recoverySheetContributingExpanded"
         static let recoverySheetTimeSinceWorkoutExpanded = "recoverySheetTimeSinceWorkoutExpanded"
@@ -160,10 +159,6 @@ final class UserSettings {
         didSet { defaults.set(recoverySheetStressLoadExpanded, forKey: Keys.recoverySheetStressLoadExpanded) }
     }
 
-    var recoverySheetPersonalInsightsExpanded: Bool {
-        didSet { defaults.set(recoverySheetPersonalInsightsExpanded, forKey: Keys.recoverySheetPersonalInsightsExpanded) }
-    }
-
     var recoverySheetLast3NightsExpanded: Bool {
         didSet { defaults.set(recoverySheetLast3NightsExpanded, forKey: Keys.recoverySheetLast3NightsExpanded) }
     }
@@ -196,7 +191,6 @@ final class UserSettings {
             Keys.targetSleepHours: 7.0,
             Keys.recoveryLoadManuallyUnlinked: false,
             Keys.recoverySheetStressLoadExpanded: false,
-            Keys.recoverySheetPersonalInsightsExpanded: false,
             Keys.recoverySheetLast3NightsExpanded: false,
             Keys.recoverySheetContributingExpanded: false,
             Keys.recoverySheetTimeSinceWorkoutExpanded: false
@@ -226,7 +220,6 @@ final class UserSettings {
         self.recoveryLoadManuallyUnlinked = defaults.bool(forKey: Keys.recoveryLoadManuallyUnlinked)
         self.lastSleepCatchUpDate = defaults.object(forKey: Keys.lastSleepCatchUpDate) as? Date
         self.recoverySheetStressLoadExpanded = defaults.bool(forKey: Keys.recoverySheetStressLoadExpanded)
-        self.recoverySheetPersonalInsightsExpanded = defaults.bool(forKey: Keys.recoverySheetPersonalInsightsExpanded)
         self.recoverySheetLast3NightsExpanded = defaults.bool(forKey: Keys.recoverySheetLast3NightsExpanded)
         self.recoverySheetContributingExpanded = defaults.bool(forKey: Keys.recoverySheetContributingExpanded)
         self.recoverySheetTimeSinceWorkoutExpanded = defaults.bool(forKey: Keys.recoverySheetTimeSinceWorkoutExpanded)

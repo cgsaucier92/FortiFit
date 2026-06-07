@@ -146,7 +146,7 @@ One entry per "See Info"-eligible widget (Training Load, Power Level, Activity R
 
 **Title:** About Training Load
 
-**Intro:** Training Load is a 0–100 score that summarizes how much training stress you've accumulated over the past 10 days. The zone label and advisory beneath it suggest whether to push, ease off, or rest today.
+**Intro:** Training Load is a 0–100 score that summarizes how much training stress you've accumulated over the past 10 days. The gradient bar and advisory beneath it suggest whether to push, ease off, or rest today.
 
 **How it's calculated:** Each workout you've logged in the last 10 days contributes a stress value based on your Effort rating for that session, how long it lasted, the workout type, and the volume you put in (sets × reps for Strength and HIIT). Recent sessions count more than older ones — stress decays over about 10 days.
 
@@ -172,7 +172,7 @@ One entry per "See Info"-eligible widget (Training Load, Power Level, Activity R
 
 **Title:** About Power Level
 
-**Intro:** Power Level shows whether your strength training volume is rising, holding steady, or trending down compared to where you were a month ago. It answers "am I progressing?" at a glance.
+**Intro:** Power Level shows whether your strength training volume is rising, holding steady, or trending down compared to where you were a month ago. It answers "am I getting stronger?" at a glance.
 
 **How it's calculated:** FitNavi averages your workout volume across the last 30 days and compares it to your average across the prior 30 days. Volume per workout is sets × reps × weight, summed across every exercise in the session.
 
@@ -182,7 +182,7 @@ One entry per "See Info"-eligible widget (Training Load, Power Level, Activity R
 
 **Status thresholds:**
 - Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days
-- Steady (—, blue): within 10% in either direction — your volume is holding consistent
+- Steady (—, grey): within 10% in either direction — your volume is holding consistent
 - Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days
 
 **Empty state:** If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.
@@ -260,48 +260,40 @@ The detail sheet's sparkline starts to fill out after about three nights of slee
 
 **Title:** About Recovery & Load
 
-**Intro:** You've linked your Recovery Status and Training Load widgets. When linked, last night's sleep is factored into your Training Load score — poor sleep slows your stress decay, so your score reflects how recovered you actually are, not just how much time has passed since your last workout.
+**Intro:** When linked, last night's sleep feeds into your Training Load. Poor sleep slows your recovery, so the score reflects how rested you actually are — not just time since your last workout.
 
-**How linking changes Training Load:** Without linking, Training Load decays at a fixed rate over about 10 days. Each workout's stress contribution fades smoothly regardless of how rested you are.
+**How linking changes Training Load:** Without linking, Training Load decays at a fixed rate over ~10 days regardless of how rested you are.
 
-With linking, last night's sleep slows that decay. After a poor night, your score sits higher than it otherwise would — yesterday's training is still "with you." After a strong night, decay returns to normal.
+With linking, a poor night slows that decay, so your score sits higher until you recover. A few rough nights can push the score 10–25% higher than the unlinked version.
 
-The effect is meaningful. Linking won't push your score from Moderate into Peak overnight, but several nights of poor sleep can nudge your score 10–25% higher than the unlinked calculation.
+**How sleep slows stress decay:** FitNavi compares last night's sleep to your target. *(Long-press either card → "Configure Settings" to change it.)*
 
-**How sleep slows stress decay:** FitNavi compares your previous night's sleep to your target. *(To change your sleep target, long-press either linked card and tap "Configure Settings.")*
+- **At or above target** — normal decay.
+- **Below target** — decay slows proportionally, up to ~40%.
+- **No data** — that day falls back to the unlinked rate. The link stays active.
 
-- Sleep met or exceeded your target → decay proceeds normally.
-- Sleep fell below target → decay slows proportionally. The further below, the more it slows, up to a maximum slowdown of about 40%.
-- Sleep data missing for the night → decay falls back to the unlinked rate for that day. The link itself stays active; only that single day's calculation is unaffected.
+**About sleep data:** FitNavi reads sleep from Apple Health. Apple Watch, Oura, Whoop, AutoSleep, and others all contribute.
 
-**About sleep data:** FitNavi reads sleep data from Apple Health. Any device that writes sleep to Apple Health contributes — Apple Watch, Oura Ring, Whoop, AutoSleep, and others.
+Sleep is attributed to your wake-up day, using a 6pm-to-6pm window so late nights and naps land where you'd expect.
 
-Sleep is attributed to your wake-up day. A session ending Tuesday morning belongs to Tuesday's data. FitNavi uses a 6pm-to-6pm window so late-evening naps and overnight sessions land on the day you'd expect.
+Trackers classify sleep into four stages:
 
-Modern sleep trackers classify sleep into four stages:
+- **Deep** — physical recovery
+- **REM** — cognitive recovery
+- **Core** — lighter sleep, the bulk of the night
+- **Awake** — brief wake-ups
 
-- **Deep** — slow-wave sleep that drives physical recovery
-- **REM** — dream sleep that drives cognitive recovery
-- **Core** — lighter sleep, the bulk of a typical night
-- **Awake** — brief periods of wakefulness during the sleep window
+Stage accuracy varies by device — treat it as directional, not clinical.
 
-Apple Watch's sleep stage classification is meaningfully less accurate than clinical polysomnography. Other sources may classify stages with different accuracy. Treat stage data as directional.
+**How time-since-workout is calculated:** The timer starts from your most recent workout, whether logged manually or imported from Apple Health.
 
-**How time-since-workout is calculated:** The timer counts from the start time of your most recently logged workout, regardless of type. Manual logs and workouts imported from Apple Health both count.
+Format scales with time: `12 min` → `4h 12m` → `1d 4h` → `4 days`. Open the detail sheet for per-type timers.
 
-Format shifts as time passes: under an hour as `12 min`, hours to a day as `4h 12m`, one to three days as `1d 4h`, beyond three days as `4 days`.
+**Unlinking these widgets:** Long-press either card → "Unlink Widgets." You can also unlink by reordering them apart or deleting one. To re-link, drag them back into adjacent positions.
 
-Tap into the linked detail sheet to see how long it's been since your last workout of each type.
+**What to expect when you're starting out:** Your linked score updates once last night's sleep syncs from Apple Health, usually within a few hours of waking. Missed a night? That day falls back to the unlinked rate; the link resumes the next night with data.
 
-**Unlinking these widgets:** Long-press either card and tap "Unlink Widgets" to break the link. The cards stay where they are but render as independent widgets again. Training Load returns to its standard calculation.
-
-You can also unlink by reordering the widgets so they're no longer adjacent, or by deleting either one.
-
-Re-link by long-pressing either card and choosing "Reorder Widgets," then dragging them back into an adjacent position. The link reforms automatically.
-
-**What to expect when you're starting out:** The linked score updates as soon as last night's sleep data syncs from Apple Health — usually within a few hours of waking. If you forgot your sleep tracking device, your score for that day falls back to the unlinked calculation; the link stays active and resumes its effect the next night you have data.
-
-The Training Load detail chart inside the linked detail sheet shows your 14-day score history. Linking changes only how the *current* score is calculated — past days' scores in the chart use the calculation that was active at the time. You may notice a small visual step at the moment you linked.
+The 14-day chart shows current-calculation history — older days use whatever method was active then, so you may see a small step where you linked.
 
 ---
 
@@ -323,7 +315,7 @@ Constant: `AppConstants.AppleWatch.restPerSetPopover`.
 
 Anchor: `info.circle` icon trailing the "Push to Apple Watch" toggle on the **Plan Workout sheet** (SCREENS.md § Plan → Push to Apple Watch Toggle) and the **Edit Planned Workout screen** (SCREENS.md § Edit Planned Workout). Single string, reused on both surfaces.
 
-> Pushes this workout to your Apple Watch's Workout app. Appears in the Scheduled section on the workout's day.
+> Pushes this workout to your Apple Watch's Fitness app. Appears in the Scheduled section on the workout's day. Rest timers defined in your workout template will appear as a countdown timer on Apple Watch between sets.
 
 Constant: `AppConstants.AppleWatch.watchSyncInfoPopover`.
 
@@ -432,7 +424,6 @@ Per-block empty-state copy for the four new detail sheets. Stored in `AppConstan
 | Key | Copy |
 |---|---|
 | `powerLevel.empty.hero` | `Log a few more Strength or HIIT workouts to see your power level.` |
-| `powerLevel.empty.volumeChart` | `Log more Strength or HIIT workouts to display volume trends.` (matches `workoutVolume` Trends chart threshold) |
 | `powerLevel.empty.topExercises` | `Log a few more sessions on the same exercises to surface your top drivers.` |
 | `powerLevel.empty.nudge` | (reuses `coldStart` from § Power Level Nudge Copy above) |
 
@@ -457,8 +448,6 @@ Per-block empty-state copy for the Recovery Status and Linked Recovery & Load de
 
 | Key | Copy |
 |---|---|
-| `linkedRecoveryLoad.empty.correlation` | (Block hidden entirely when fewer than 14 paired days exist — see SCREENS.md § Linked Recovery & Load Detail Sheet → block 5) |
-| `linkedRecoveryLoad.empty.personalInsights` | (Block hidden entirely when fewer than 21 paired days exist) |
 | `linkedRecoveryLoad.empty.contributingWorkouts` | `No workouts in the last 7 days.` (reuses Training Load Detail Sheet copy) |
 | `linkedRecoveryLoad.toast.hkRevoked` | `Recovery Status disconnected from Apple Health.` (Toast Style — fires when the user revokes sleep scope via iOS Settings while the linked detail sheet is presented; the sheet auto-dismisses) |
 
@@ -492,35 +481,35 @@ The standalone Training Load widget and the standalone Training Load Detail Shee
 ```swift
 AppConstants.TrainingLoad.linkedAdvisoryText = [
     // Resting
-    "Resting|untrained|strong":              "No recent training stress and sleep was strong — a great day to push hard.",
+    "Resting|untrained|strong":              "No recent training stress and sleep was solid — a great day to push hard.",
     "Resting|untrained|moderatelyBelow":     "No recent training stress, but sleep was short. Favor a moderate session over a hard one.",
     "Resting|untrained|significantlyBelow":  "No recent training stress, but sleep was significantly short. Keep today light or rest.",
     // Low
-    "Low|untrained|strong":                  "Well recovered and sleep was strong — a great day to train hard.",
+    "Low|untrained|strong":                  "Well recovered and sleep was solid — a great day to train hard.",
     "Low|untrained|moderatelyBelow":         "Your body is recovered, but sleep was short. Favor a moderate session over a hard one.",
     "Low|untrained|significantlyBelow":      "Your body is recovered, but sleep was significantly short. Keep today light or rest.",
-    "Low|trained|strong":                    "Session logged. Sleep was strong — you have capacity for more if you choose.",
+    "Low|trained|strong":                    "Session logged. Sleep was solid — you have capacity for more if you choose.",
     "Low|trained|moderatelyBelow":           "Session logged, but sleep was short. Wrap up your day and let your body recover.",
     "Low|trained|significantlyBelow":        "Session logged, but sleep was significantly short. Stop here and prioritize recovery.",
     // Moderate
-    "Moderate|untrained|strong":             "Some muscle fatigue, but sleep was strong — a moderate session is well within reach.",
+    "Moderate|untrained|strong":             "Some muscle fatigue, but sleep was solid — a moderate session is well within reach.",
     "Moderate|untrained|moderatelyBelow":    "Some muscle fatigue and sleep was short. Favor a light session today.",
     "Moderate|untrained|significantlyBelow": "Some muscle fatigue and sleep was significantly short. Keep today light or rest.",
     "Moderate|trained|strong":               "Good work today. Sleep was strong — recovery should come quickly.",
-    "Moderate|trained|moderatelyBelow":      "Good work today. Sleep was short — rest is especially important tonight.",
-    "Moderate|trained|significantlyBelow":   "Good work today. Sleep was significantly short — make rest the priority tonight.",
+    "Moderate|trained|moderatelyBelow":      "Good work today. Sleep was short — rest is especially important.",
+    "Moderate|trained|significantlyBelow":   "Good work today. Sleep was significantly short — make rest the priority.",
     // High
-    "High|untrained|strong":                 "Significant muscle fatigue. Sleep was strong — a lighter session or active recovery still fits.",
+    "High|untrained|strong":                 "Significant muscle fatigue. Sleep was solid — a lighter session or active recovery still fits.",
     "High|untrained|moderatelyBelow":        "Significant muscle fatigue and sleep was short. Active recovery or rest today.",
     "High|untrained|significantlyBelow":     "Significant muscle fatigue and sleep was significantly short. Rest today.",
-    "High|trained|strong":                   "Recovery is the priority. Sleep was strong — that helps.",
-    "High|trained|moderatelyBelow":          "Recovery is the priority. Sleep was short — more reason to rest tonight.",
-    "High|trained|significantlyBelow":       "Recovery is the priority. Sleep was significantly short — full rest tonight.",
+    "High|trained|strong":                   "Rest is the priority. Sleep was solid — that'll help with muscle recovery.",
+    "High|trained|moderatelyBelow":          "Recovery is the priority. Sleep was short — prioritize resting if you're able.",
+    "High|trained|significantlyBelow":       "Recovery is the priority. Sleep was significantly short — prioritize rest.",
     // Peak
-    "Peak|untrained|strong":                 "High physical stress. Sleep was strong, but keep today to rest or very light activity.",
+    "Peak|untrained|strong":                 "High physical stress. Sleep was solid, but keep today to rest or very light activity.",
     "Peak|untrained|moderatelyBelow":        "High physical stress and sleep was short. Rest today.",
     "Peak|untrained|significantlyBelow":     "High physical stress and sleep was significantly short. Full rest today.",
-    "Peak|trained|strong":                   "You've been pushing hard. Time to rest — sleep was strong, recovery should come quickly.",
+    "Peak|trained|strong":                   "You've been pushing hard. Time to rest — sleep was solid, recovery should come quickly.",
     "Peak|trained|moderatelyBelow":          "You've been pushing hard. Time to rest — sleep was short, recovery needs the time.",
     "Peak|trained|significantlyBelow":       "You've been pushing hard. Time to rest — sleep was significantly short, your body needs it."
 ]

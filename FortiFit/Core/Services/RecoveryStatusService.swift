@@ -22,9 +22,8 @@ enum RecoveryStatusGatingState {
 }
 
 /// Single owner of all sleep data orchestration: 30-day cache, gating, sleep efficiency,
-/// sleep-load correlation, smart workout suggestions, personal pattern insights, and the
-/// Sleep Cascade entry point. Sits between `HealthKitClient` (sleep methods) and the
-/// widget / detail-sheet view layer.
+/// sleep-load correlation, smart workout suggestions, and the Sleep Cascade entry point.
+/// Sits between `HealthKitClient` (sleep methods) and the widget / detail-sheet view layer.
 ///
 /// See SERVICES.md § RecoveryStatusService, § Sleep Cascade, HEALTHKIT.md § 21,
 /// SCREENS.md § Home Screen → Recovery Status widget.
@@ -55,6 +54,10 @@ final class RecoveryStatusService {
     /// SINCE LAST WORKOUT hero column (e.g. `4h 12m`, `1d 5h`, `NO DATA`). Refreshed on the
     /// same cascade events as `timeSinceLastWorkoutFormatted`.
     var lastWorkoutHeroFormatted: String = ""
+    /// Latest workout's `name` (falls back to `workoutType` when name is empty; `""` when
+    /// no workout has ever been logged). Powers the caption line beneath the SINCE LAST
+    /// WORKOUT hero value. Refreshed on the same cascade events as `lastWorkoutHeroFormatted`.
+    var lastWorkoutNameHeroFormatted: String = ""
     var currentSleepEfficiencyPercent: Int?
 
     /// Last toast message produced by `importSleepGoalFromAppleHealth()`. The view
@@ -154,6 +157,7 @@ final class RecoveryStatusService {
     func refreshTimerLine(context: ModelContext) {
         timeSinceLastWorkoutFormatted = timeSinceLastWorkout(context: context)
         lastWorkoutHeroFormatted = lastWorkoutHero(context: context)
+        lastWorkoutNameHeroFormatted = lastWorkoutNameHero(context: context)
     }
 
     /// Exposes the 30-day cache as a `[wakeUpDate: snapshot]` lookup. Used by
@@ -538,6 +542,18 @@ final class RecoveryStatusService {
         return formatLastWorkoutHero(latestDate: workout?.date, now: Date())
     }
 
+    /// Latest workout's display name for the caption beneath the SINCE LAST WORKOUT
+    /// hero value. Prefers user-entered `name`; falls back to `workoutType` (raw enum
+    /// rawValue) when `name` is empty; returns `""` when no workout has been logged so
+    /// the widget can suppress the caption row entirely.
+    func lastWorkoutNameHero(context: ModelContext) -> String {
+        var descriptor = FetchDescriptor<Workout>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+        descriptor.fetchLimit = 1
+        guard let workout = (try? context.fetch(descriptor))?.first else { return "" }
+        let trimmedName = workout.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? workout.workoutType : trimmedName
+    }
+
     /// Pure formatter for the SINCE LAST WORKOUT hero value. Same time-bucket boundaries
     /// as `formatTimeSinceLastWorkout` but without the trailing "since your last workout"
     /// descriptor (the label above the value supplies that context). Returns `NO DATA`
@@ -701,9 +717,9 @@ final class RecoveryStatusService {
     /// Median-split the user's last N days of paired (sleep, next-day-score) data at
     /// the 7h sleep mark. Returns `(delta, copyVariantKey)` where:
     ///   - `delta = mean(highSleepScores) - mean(lowSleepScores)`
-    ///   - copy key per CONSTANTS.md § Linked Recovery & Load Detail Sheet → Correlation Callout:
+    ///   - copy key selected by sign + magnitude:
     ///     `delta <= -5` → `highSleepBetter`; `delta >= +5` → `lowSleepWorse`; else `noPattern`.
-    /// Returns nil when fewer than 14 paired days exist (block hidden in UI).
+    /// Returns nil when fewer than 14 paired days exist.
     ///
     /// BUG-070 — the next-day score is recomputed from raw workouts via
     /// `ExerciseLoadService.calculateLoad(..., now: nextDay)` rather than read from
@@ -771,147 +787,6 @@ final class RecoveryStatusService {
             variant = "noPattern"
         }
         return (delta, variant)
-    }
-
-    // MARK: - Personal Pattern Insights (Phase 11 Step 3)
-
-    /// Up to 3 auto-detected patterns from ≥ 21 days of paired (sleep, next-day-score)
-    /// data. Three detection types per CONSTANTS.md § Linked Recovery & Load Detail
-    /// Sheet → Personal Pattern Insights:
-    ///   1. Score-by-sleep-bucket — TL score difference between 7+h and <7h nights
-    ///   2. Sleep-by-workout-type — workout-type effect on next-night sleep
-    ///   3. Multi-week aggregate — consistency of recovery weeks vs. sleep-target nights
-    func computePersonalInsights(context: ModelContext) -> [String] {
-        let calendar = Calendar.current
-        let snapshotsByDay = cachedSnapshotsByDay()
-        guard snapshotsByDay.count >= 21 else { return [] }
-
-        var insights: [String] = []
-
-        // Pattern 1: Score-by-sleep-bucket
-        if let corr = computeSleepLoadCorrelation(context: context), abs(corr.delta) >= 3 {
-            let n = Int(abs(corr.delta).rounded())
-            if corr.delta <= -3 {
-                insights.append("Your training load runs ~\(n) points lower after 7+ hour nights.")
-            } else if corr.delta >= 3 {
-                insights.append("Your training load runs ~\(n) points higher after short nights.")
-            }
-        }
-
-        // Pattern 2: Sleep-by-workout-type — workout days where the next night's sleep
-        // differs noticeably from the user's baseline. Compute mean sleep across all
-        // wake-up days first, then per workout-type subset.
-        let oldestSnapshot = calendar.date(byAdding: .day, value: -45, to: Date()) ?? Date()
-        let recentWorkouts = WorkoutService.fetchWorkouts(from: oldestSnapshot, to: Date(), context: context)
-
-        if !recentWorkouts.isEmpty {
-            let baselineMinutes = snapshotsByDay.values.reduce(0) { $0 + $1.totalSleepMinutes }
-            let baselineMean = Double(baselineMinutes) / Double(snapshotsByDay.count)
-
-            // Build typeKey -> [next-night sleep minutes].
-            var byType: [String: [Int]] = [:]
-            for workout in recentWorkouts {
-                let workoutDay = calendar.startOfDay(for: workout.date)
-                guard let nextDay = calendar.date(byAdding: .day, value: 1, to: workoutDay) else { continue }
-                if let snap = snapshotsByDay[nextDay] {
-                    byType[workout.workoutType, default: []].append(snap.totalSleepMinutes)
-                }
-            }
-            // Find the type with the largest delta from baseline (≥ 5 minutes) and ≥ 3 samples.
-            var bestType: String?
-            var bestDeltaMinutes: Double = 0
-            for (type, minutes) in byType where minutes.count >= 3 {
-                let mean = Double(minutes.reduce(0, +)) / Double(minutes.count)
-                let delta = baselineMean - mean
-                if delta >= 5 && delta > bestDeltaMinutes {
-                    bestDeltaMinutes = delta
-                    bestType = type
-                }
-            }
-            if let type = bestType, bestDeltaMinutes >= 5 {
-                let nMinutes = Int(bestDeltaMinutes.rounded())
-                insights.append("You sleep an average of \(nMinutes) min less on \(type) training days.")
-            }
-        }
-
-        // Pattern 3: Multi-week aggregate — weeks where the user hit `targetSleepHours`
-        // on ≥ 5 nights tend to coincide with a lower-load (better-recovery) week.
-        // Emits only when the comparison has data on both sides AND the load delta
-        // between under-rested and well-rested weeks clears 5 points (BUG-071).
-        if let pattern3 = computePattern3MultiWeekAggregate(context: context) {
-            insights.append(pattern3)
-        }
-
-        return Array(insights.prefix(3))
-    }
-
-    /// BUG-071 — real multi-week aggregate detection. Buckets the user's sleep + raw
-    /// workouts into ISO weeks (Mon–Sun), labels each week as well-rested (≥ 5 nights
-    /// meeting `targetSleepHours`) or under-rested (< 5), and compares the mean
-    /// baseline TL score across the two buckets. Returns the templated insight string
-    /// only when both buckets have ≥ 2 weeks AND under-rested mean exceeds well-rested
-    /// mean by ≥ 5 points — otherwise nil so the row is suppressed.
-    private func computePattern3MultiWeekAggregate(context: ModelContext) -> String? {
-        let calendar = Calendar.current
-        let snapshotsByDay = cachedSnapshotsByDay()
-        let settings = UserSettings.shared
-        let targetMinutes = Int((settings.targetSleepHours * 60).rounded())
-        let now = Date()
-        let today = calendar.startOfDay(for: now)
-
-        // Fetch workouts across the same 55-day window the correlation uses, so per-day
-        // baseline scores are computed consistently with Pattern 1.
-        let workoutsFetchStart = calendar.date(byAdding: .day, value: -55, to: today) ?? today
-        let allWorkouts = WorkoutService.fetchWorkouts(from: workoutsFetchStart, to: now, context: context)
-
-        // Group sleep snapshots by ISO week start (Mon 00:00:00).
-        var nightsMetByWeek: [Date: Int] = [:]
-        var daysInWeek: [Date: [Date]] = [:]
-        for (wakeUpDay, snap) in snapshotsByDay {
-            let weekStart = wakeUpDay.startOfWeek
-            if snap.totalSleepMinutes >= targetMinutes {
-                nightsMetByWeek[weekStart, default: 0] += 1
-            } else {
-                nightsMetByWeek[weekStart, default: 0] += 0 // ensure key exists
-            }
-            daysInWeek[weekStart, default: []].append(wakeUpDay)
-        }
-
-        // Compute per-week mean baseline load across the week's wake-up days. Skip
-        // the current (in-progress) week to avoid bucket assignment on partial data.
-        let currentWeekStart = today.startOfWeek
-        var wellRestedLoads: [Double] = []
-        var underRestedLoads: [Double] = []
-        for (weekStart, nightsMet) in nightsMetByWeek where weekStart < currentWeekStart {
-            guard let days = daysInWeek[weekStart], !days.isEmpty else { continue }
-            let perDayScores: [Int] = days.map { day in
-                let endOfDay = calendar.date(byAdding: .day, value: 1, to: day) ?? day
-                let windowStart = calendar.date(byAdding: .day, value: -10, to: day) ?? day
-                let workoutsInWindow = allWorkouts.filter { $0.date > windowStart && $0.date < endOfDay }
-                let result = ExerciseLoadService.calculateLoad(
-                    workouts: workoutsInWindow,
-                    experienceLevel: settings.experienceLevel,
-                    targetMinutesPerWorkout: settings.targetMinutesPerWorkout,
-                    now: endOfDay
-                )
-                return Int(result.score.rounded())
-            }
-            let weekMeanLoad = Double(perDayScores.reduce(0, +)) / Double(perDayScores.count)
-            if nightsMet >= 5 {
-                wellRestedLoads.append(weekMeanLoad)
-            } else {
-                underRestedLoads.append(weekMeanLoad)
-            }
-        }
-
-        // Both buckets need ≥ 2 weeks for a genuine comparison.
-        guard wellRestedLoads.count >= 2, underRestedLoads.count >= 2 else { return nil }
-        let wellMean = wellRestedLoads.reduce(0, +) / Double(wellRestedLoads.count)
-        let underMean = underRestedLoads.reduce(0, +) / Double(underRestedLoads.count)
-        let delta = underMean - wellMean
-        guard delta >= 5 else { return nil }
-        let n = Int(delta.rounded())
-        return "Your most consistent recovery weeks (~\(n) points lower load) line up with sleep targets met 5+ nights."
     }
 
     // MARK: - Apple Health Sleep Goal Import

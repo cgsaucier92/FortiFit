@@ -89,6 +89,15 @@ struct PowerLevelService {
     // MARK: - Private
 
     /// Fetches Strength Training and HIIT workouts within a date range.
+    ///
+    /// BUG-075 — the empty-`exerciseSets` filter mirrors the eligibility rule
+    /// already enforced by `TrendsChartService.workoutVolumeSummary` /
+    /// `workoutVolumePoints`. HealthKit-imported Strength Training / HIIT
+    /// sessions that haven't been linked to logged sets are zero-volume
+    /// placeholders — including them dragged `current30dAvg` toward zero on
+    /// Apple-Watch users and disagreed with the Workout Volume Trend hero
+    /// for the same window. Filter applied in-memory after the SwiftData fetch
+    /// (same post-fetch pattern as `TrendsChartService`).
     private static func fetchQualifyingWorkouts(
         from startDate: Date, to endDate: Date, context: ModelContext
     ) -> [Workout] {
@@ -98,7 +107,8 @@ struct PowerLevelService {
                 (workout.workoutType == "Strength Training" || workout.workoutType == "HIIT")
             }
         )
-        return (try? context.fetch(descriptor)) ?? []
+        let fetched = (try? context.fetch(descriptor)) ?? []
+        return fetched.filter { !$0.exerciseSets.isEmpty }
     }
 
     /// Computes the average volume per workout for a list of workouts.
@@ -150,7 +160,6 @@ struct PowerLevelService {
         let previousWindowVolume: Double
         let deltaPct: Double
         let sessionCountInWindow: Int
-        let sparkline30d: [Double]
 
         var id: String { exerciseName.lowercased() }
     }
@@ -200,12 +209,11 @@ struct PowerLevelService {
         let currentWorkouts = fetchQualifyingWorkouts(from: currentStart, to: currentEnd, context: context)
         let previousWorkouts = fetchQualifyingWorkouts(from: previousStart, to: previousEnd, context: context)
 
-        // Aggregate per-exercise volume + session count + sparkline (current window) and per-exercise volume (previous window)
+        // Aggregate per-exercise volume + session count (current window) and per-exercise volume (previous window)
         struct Aggregate {
             var displayName: String
             var currentVolume: Double = 0
             var sessionsCurrent: Set<UUID> = []
-            var sparkline: [Double] = Array(repeating: 0.0, count: 30)
             var previousVolume: Double = 0
         }
         var aggregates: [String: Aggregate] = [:]
@@ -219,12 +227,6 @@ struct PowerLevelService {
                 let setVolume = Double(set.sets) * Double(set.reps) * weight
                 entry.currentVolume += setVolume
                 entry.sessionsCurrent.insert(workout.id)
-                if let dayIndex = calendar.dateComponents([.day], from: calendar.startOfDay(for: workout.date), to: today).day {
-                    let bucket = 29 - dayIndex
-                    if bucket >= 0 && bucket < 30 {
-                        entry.sparkline[bucket] += setVolume
-                    }
-                }
                 aggregates[key] = entry
             }
         }
@@ -267,8 +269,7 @@ struct PowerLevelService {
                 currentWindowVolume: entry.currentVolume,
                 previousWindowVolume: entry.previousVolume,
                 deltaPct: delta,
-                sessionCountInWindow: entry.sessionsCurrent.count,
-                sparkline30d: entry.sparkline
+                sessionCountInWindow: entry.sessionsCurrent.count
             )
         }
     }

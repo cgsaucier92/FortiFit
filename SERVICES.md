@@ -152,7 +152,7 @@ func contributingWorkouts(daysBack: Int = 7, limit: Int = 5) -> [TrainingLoadCon
 
 - Returns up to 5 entries sorted by `tssContribution` descending, ties broken by `date` descending (most recent first).
 - Drives the Contributing Workouts block (SCREENS.md § Training Load Detail Sheet → block 3).
-- The stress-load (`tssContribution`) per workout is the per-session stress × time-decay factor already computed in `§ Step 5 — Time-Decayed Contribution`. The helper surfaces those intermediates rather than recomputing. Internal field name retains `tss` for code-level continuity; user-facing copy says "stress load" (Phase 8.8 rename).
+- The training-load (`tssContribution`) per workout is the per-session stress × time-decay factor already computed in `§ Step 5 — Time-Decayed Contribution`. The helper surfaces those intermediates rather than recomputing. Internal field name retains `tss` for code-level continuity; user-facing copy says "training load" (Phase 8.8 renamed from "TSS" → "stress load"; Phase 11 renamed "stress load" → "training load" for consistency with the widget name).
 
 ```swift
 struct TrainingLoadWeekComparison {
@@ -166,9 +166,8 @@ func weekOverWeekComparison() -> TrainingLoadWeekComparison
 ```
 
 - Drives the Week-over-Week Comparison band (SCREENS.md § Training Load Detail Sheet → block 4) and the Linked Recovery & Load Detail Sheet's Window Comparison band (SCREENS.md § Linked Recovery & Load Detail Sheet → block 4).
-- Uses the same Mon-through-current-weekday window on both sides — Mon–Thu vs Mon–Thu on a Thursday, Mon–Sun vs Mon–Sun on a Sunday. Prevents the partial-week-vs-full-week asymmetry that made a Thursday-morning user see "↑ 420% vs last week" simply because 4 days of stress were being divided by 7 (BUG-066).
-- Uses the same ISO Mon definition as `StreakService` (consistency).
-- **Sums raw `session_stress`, not the time-decayed `tssContribution`.** Time decay is appropriate for live readiness/fatigue (the Training Load score and the Contributing Workouts breakdown), but applying it to a week-over-week comparison would make the prior week's contributions arbitrarily smaller than the current week's purely because of the 7–13 day age offset relative to `now`, producing absurd deltas (BUG-057). The week-over-week band describes *workload performed*, so it uses the un-decayed per-session stress totals.
+- Uses the same Mon-through-current-weekday window on both sides (Mon–Thu vs Mon–Thu on a Thursday; Mon–Sun vs Mon–Sun on a Sunday) — avoids the partial-vs-full-week asymmetry that produced inflated deltas (BUG-066). Same ISO Monday definition as `StreakService`.
+- **Sums raw `session_stress`, not the time-decayed `tssContribution`** — the band describes *workload performed*; time decay would shrink the prior week purely from its age offset relative to `now` and produce absurd deltas (BUG-057).
 - Callers should render `Not enough data` instead of a delta when `matchedDayCount < 2` (early Monday) to avoid showing a single-data-point comparison as a confident delta.
 
 **Cache invalidation:** All three helpers are pure reads. The sheet's ViewModel computes them on appear and re-computes when the Workout Cascade fires while the sheet is presented.
@@ -276,7 +275,7 @@ Mirrors the Workout Cascade pattern but for sleep-input changes. Documented sepa
 2. **Refresh in-memory 30-day cache** — append/replace the affected day(s).
 3. **Refresh Recovery Status widget view-model** — hero value, deep caption, no-sleep-last-night sub-state detection.
 4. **If `HomeWidgetService.isLinkedActive(...) == true`:** recompute today's `computeCurrentScore(...)` on the sleep-adjusted path → upsert today's `DailyTrainingLoadSnapshot` (`wasSleepAdjusted = true`) → refresh the Training Load widget's score display and Sleep Impact Chip.
-5. **If a detail sheet is currently presented** (unlinked OR linked): the sheet's ViewModel re-fetches `RecoveryStatusService.recent30DaySleep`, `RecoveryStatusService.computeSleepLoadCorrelation()`, `RecoveryStatusService.computePersonalInsights()`, plus (linked only) `ExerciseLoadService.fourteenDayDailyScores(sleepAdjusted: true)`. Re-render in place. Sheets that are not presented do nothing.
+5. **If a detail sheet is currently presented** (unlinked OR linked): the sheet's ViewModel re-fetches `RecoveryStatusService.recent30DaySleep` plus (linked only) `ExerciseLoadService.fourteenDayDailyScores(sleepAdjusted: true)`. Re-render in place. Sheets that are not presented do nothing.
 
 **Debounce:** 500ms across all triggers. Implementation: a single `Timer` reset on each trigger; the cascade body runs at the trailing edge. Prevents thrash when HK fires multiple observer callbacks in rapid succession (common at end-of-night when a Watch syncs a long sleep session in chunks).
 
@@ -360,7 +359,7 @@ func historySummary() -> StreakHistorySummary
 
 **Purpose:** Status (Deloading/Steady/Rising) reflecting average strength volume trend over 30 days vs. prior 30-day baseline. Answers: "Is my training volume trending up, down, or steady?"
 
-**Scope:** Only **Strength Training** and **HIIT** workouts. All others excluded.
+**Scope:** Only **Strength Training** and **HIIT** workouts with **at least one logged `ExerciseSet`**. HealthKit-imported sessions that haven't been linked to logged sets are excluded — matches the eligibility rule used by the Workout Volume Trend chart (§ TrendsChartService → `workoutVolumeSummary` / `workoutVolumePoints`) so the Power Level "Current 30D Avg" and the Workout Volume chart's "avg per session" stay in agreement. All other workout types are excluded regardless of set count. See BUG-075.
 
 ### Volume Formula — Per Workout
 ```
@@ -411,6 +410,17 @@ Else: pct_change = ((current_avg - baseline_avg) / baseline_avg) × 100
 
 **No dependency on UserSettings.** Purely data-driven.
 
+### Widget & Hero Gauge Position (Phase 12)
+
+The Power Level widget card and the Breakdown Sheet hero render a continuous gauge (visual tokens in CONSTANTS.md § Power Level Gauge; layout in SCREENS.md § Home Screen → Power Level widget and § Power Level Breakdown Sheet → block 1). The gauge surfaces the **existing** `pct_change` (§ Step 3) — no new computation:
+
+- **Thumb position** maps the clamped percentage change to the track: `position = (clamp(pct_change, −30, +30) + 30) / 60`, where `0.0` = left end (−30%) and `1.0` = right end (+30%).
+- **Zone / thumb color** is the current `status` color (Deloading red / Steady gray / Rising green) from § Step 4.
+- **Delta caption** uses the raw `pct_change` (rounded to a whole percent), surfaced via the existing `PowerLevelService.windowComparison().deltaPct` — so the true magnitude is shown even when the thumb is clamped.
+- **Empty / No-data:** when `baseline_avg == 0` or fewer than 3 qualifying workouts exist in the current window, `pct_change` is undefined → render the gauge's no-data state (Steady track, `—` indicator, "No data" copy). Mirrors the existing Steady-on-no-baseline classification.
+
+No service-API change is required; the widget/sheet view-models read `status` and `windowComparison().deltaPct`, both already public.
+
 ### Top Contributing Exercises (Phase 8.8)
 
 Used exclusively by the Power Level Breakdown Sheet (SCREENS.md § Power Level Breakdown Sheet → block 3).
@@ -422,7 +432,6 @@ struct PowerLevelTopExercise: Hashable {
     let previousWindowVolume: Double  // same for the previous 30d window
     let deltaPct: Double              // (current - previous) / previous × 100; nil-coalesced to 0 when previous == 0
     let sessionCountInWindow: Int     // number of distinct in-scope workouts containing this exercise in the current 30d window
-    let sparkline30d: [Double]        // 30 entries (today inclusive), one per calendar day; days with no session = 0
 }
 
 func topContributingExercises(limit: Int = 3) -> [PowerLevelTopExercise]
@@ -601,7 +610,7 @@ Any time a workout is logged, edited, deleted, or batch-deleted via workout type
 - **Widget Detail Sheet derived data (Phase 8.8)** — when any of the four new detail sheets (Today's Plan, Training Load, Weekly Streak, Power Level) is currently presented, its ViewModel re-fetches its helpers (`StreakService.fetchHeatmap`, `StreakService.thisWeekProgress`, `StreakService.historySummary`, `ExerciseLoadService.fourteenDayDailyScores`, `ExerciseLoadService.contributingWorkouts`, `ExerciseLoadService.weekOverWeekComparison`, `PowerLevelService.topContributingExercises`, `PowerLevelService.windowComparison`, `PowerLevelService.computeNudge`, `PlanService.fetchTodaysScheduledWorkouts`) and re-renders. No caching at the service level; ViewModels recompute on each cascade fire while presented. Sheets that are not presented do nothing — no global recompute.
 - **`DailyTrainingLoadSnapshot` for today (Phase 11)** — after the Training Load score recomputes, `ExerciseLoadService.captureDailySnapshot()` upserts today's `DailyTrainingLoadSnapshot` with the new score and the current `wasSleepAdjusted` flag (true iff `HomeWidgetService.isLinkedActive(widgets:settings:) == true` at capture time). Historical snapshots are immutable — only today's record is rewritten by cascade. Powers the Trends `trainingLoadTrend` chart and the linked Recovery & Load detail sheet's 14-day TL chart. See § Training Load Algorithm → Daily Snapshot Capture.
 - **Recovery Status widget (Phase 11)** — the widget's timer line bumps on every cascade (the time-since-last-workout calculation depends on the latest workout's date). The widget hero block (`SLEEP {h}h {mm}m`) does **not** refresh — sleep inputs flow through the Sleep Cascade, not the Workout Cascade. The `Workout.lastModifiedDate` change does trigger `RecoveryStatusService.refreshTimerLine()` for any presented widget instance.
-- **Linked Recovery & Load detail sheet (Phase 11)** — when presented, the sheet's ViewModel re-fetches `ExerciseLoadService.fourteenDayDailyScores(sleepAdjusted: true)`, `RecoveryStatusService.recent30DaySleep`, `RecoveryStatusService.computeSleepLoadCorrelation()`, and `RecoveryStatusService.computePersonalInsights()`.
+- **Linked Recovery & Load detail sheet (Phase 11)** — when presented, the sheet's ViewModel re-fetches `ExerciseLoadService.fourteenDayDailyScores(sleepAdjusted: true)` and `RecoveryStatusService.recent30DaySleep`.
 - **Sleep Impact Chip on Training Load widget (Phase 11)** — recomputes only when linked. If `isLinkedActive == false`, the chip is hidden and no recompute fires. The chip value derives from `currentLinkedScore - whatBaselineWouldBe`, both of which depend on the same workout inputs that just changed.
 
 ### Workout Deletion
@@ -903,7 +912,7 @@ Callers pass the enum case rather than a field name string. Each case maps to a 
 | Method | Purpose |
 |---|---|
 | `comparativeAverage(for metric: WorkoutMetric, workoutType: String, context: ModelContext) → Double?` | Returns the all-time average of the metric across all logged `Workout` records of `workoutType` where the metric is non-nil. Returns nil when fewer than 3 such workouts exist (the data-sufficiency threshold — see SCREENS.md § Metric Detail Sheet → Empty States). |
-| `sparklineData(for metric: WorkoutMetric, workoutType: String, days: Int = 30, context: ModelContext) → [(date: Date, value: Double)]` | Returns time-series data points for the metric across the last `days` days of same-`workoutType` workouts where the metric is non-nil. Sorted ascending by date. Empty array if fewer than 3 data points exist. |
+| `sparklineData(for metric: WorkoutMetric, workout: Workout, days: Int = 30, fallbackSessionCount: Int = 5, context: ModelContext) → SparklineResult?` | Returns sparkline points and the mode used to compute them, or nil if fewer than 3 same-type sessions with this metric exist at-or-before `workout.date`. The trailing window is anchored to `workout.date` (not `Date()`) so opening the detail sheet for an older workout shows the 30 days *leading up to that workout*, not the last 30 days relative to today (BUG-072). When the trailing window yields fewer than 3 points (sparse-cadence types like a once-a-month long run), the service falls back to the most-recent `fallbackSessionCount` same-type sessions at-or-before `workout.date` so the chart can still render. The returned `mode` (`.trailingWindow(days:anchorDate:)` vs `.recentFallback(sessionCount:)`) lets the UI render an accurate caption. |
 | `isPersonalBest(for metric: WorkoutMetric, workout: Workout, context: ModelContext) → Bool` | Returns true when `workout`'s value for `metric` is the maximum across all in-scope same-`workoutType` workouts. Returns false for PR-ineligible metrics regardless of value (see § PR Eligibility below). Returns false when fewer than 2 workouts of that type have the metric set (need at least one comparison point). |
 
 ### PR Eligibility
@@ -1337,7 +1346,7 @@ Local midnight. At rollover, the next observer-query fire (or the next foregroun
 | `healthKitEnabled` | `appleWatchDetected` | State |
 |---|---|---|
 | false | (any) | "Connect Apple Health" — see SCREENS.md § Activity Rings widget States |
-| true | false | "Pair an Apple Watch" — see SCREENS.md |
+| true | false | "No Recent Apple Watch Activity" — see SCREENS.md |
 | true | true | Live rings — see SCREENS.md |
 
 
@@ -1406,6 +1415,10 @@ For each `range`, the prior period is the immediately preceding window of the sa
 ### Data Point Fetch (Detail View)
 
 - **`func dataPoints(for chartType: ChartType, exerciseName: String? = nil, range: TimeRange) -> [ChartDataPoint]`** — returns the chart's plot data at any supported `TimeRange`. `ChartDataPoint` carries `(x: Date, y: Double, label: String)`. Identical computation rules to the compact card but parameterized over `TimeRange` instead of fixed 30D / 60D / 90D / 8-week. Out-of-eligible-range pairs (e.g., `(.personalRecords, .d)`) return an empty array — the view gates eligible toggles up-front so this should never fire in production.
+
+### Enough-Data Predicate (BUG-073)
+
+- **`func hasEnoughData(for chartType: ChartType, exerciseName: String? = nil, range: TimeRange) -> Bool`** — single source of truth for the "does this chart have enough data to render?" question, shared by the compact card (`FortiFitChartCard.isEmpty`) and the expanded detail view (`FortiFitChartDetailView`'s per-renderer empty-state gate). Encodes the thresholds in the table above (Header Summary Computation → Per-Chart Calculation, Notes column). Both surfaces must call this so they never disagree about emptiness — without it the detail view's weaker `points.isEmpty` gate let a single data point render a meaningless dot while the card correctly showed the empty state. `personalRecords` and `trainingLoadTrend` are range-independent (PRs are lifetime; load uses the fixed last-14-days window). All other chart types respect the active `range`.
 
 ### PR Timeline Fetch (Personal Records detail only)
 
@@ -1618,7 +1631,7 @@ The app must register `fitnavi` as a custom URL scheme in Info.plist. In `FortiF
 
 ## RecoveryStatusService (RecoveryStatusService.swift) — Phase 11
 
-**Purpose:** Single owner of all sleep data orchestration, the Recovery Status widget's gating state, the 30-day sleep cache, sleep efficiency, sleep-load correlation, smart workout suggestions, and personal pattern insights. Sits between `HealthKitClient` (sleep methods, see § HealthKitClient) and the widget / detail-sheet view layer. Does not own the sleep observer subscription itself — `HealthKitSyncService` owns that and dispatches into this service. Does own everything downstream.
+**Purpose:** Single owner of all sleep data orchestration, the Recovery Status widget's gating state, the 30-day sleep cache, sleep efficiency, sleep-load correlation, and smart workout suggestions. Sits between `HealthKitClient` (sleep methods, see § HealthKitClient) and the widget / detail-sheet view layer. Does not own the sleep observer subscription itself — `HealthKitSyncService` owns that and dispatches into this service. Does own everything downstream.
 
 ### Responsibilities
 
@@ -1626,8 +1639,7 @@ The app must register `fitnavi` as a custom URL scheme in Info.plist. In `FortiF
 - **30-day in-memory cache.** Rolling cache of `DailySleepSnapshot` records loaded from the SwiftData store on launch and kept current via observer fires + 6pm-cutoff catch-ups. Drives the detail sheet's sparkline + last-7-nights stat row without on-demand HK queries.
 - **Gating state computation.** `RecoveryStatusGatingState` enum (`connectAppleHealth`, `sleepAccessDenied`, `noSleepTracker`, `live`) — see SCREENS.md § Home Screen → Recovery Status widget → States for derivation rules. Computed from `UserSettings.healthKitEnabled`, `HealthKitClient.authorizationStatus()` for sleep scope, and `hasRecentSleepData(within: 14)`.
 - **Sleep efficiency.** Compute and cache `sleepEfficiencyPercent = round(asleepDuration / inBedDuration × 100)`. When the source writes explicit `.inBed` samples (Oura, Whoop, AutoSleep, manual logging), `inBedDuration` is the Σ of those samples. When the source omits them — Apple Watch's native sleep tracker on watchOS 9+ does, see BUG-059 — `inBedDuration` falls back to `totalSleepMinutes + awakeMinutes` so efficiency surfaces for the most common HK source. Nil only when neither path yields data (e.g., zero asleep minutes). `reloadCacheFromStore` also backfills the same fallback into legacy snapshots written before BUG-059 shipped, so pre-fix data repairs on next launch instead of waiting for a fresh HK ingest.
-- **Personal Pattern Insights.** `computePersonalInsights()` returns up to 3 auto-detected patterns from ≥ 21 days of paired (sleep, next-day-score) data. Detection types: score-by-sleep-bucket, sleep-by-workout-type, multi-week aggregates. Per-pattern detection thresholds and selection priority are defined inline in the service implementation.
-- **Sleep-Load correlation.** `computeSleepLoadCorrelation()` — median-split paired data at the 7h sleep mark; return `correlationDelta = mean(highSleepScores) - mean(lowSleepScores)` and a copy variant (high-sleep / low-sleep / no-pattern). Copy variants live in CONSTANTS.md § Linked Recovery & Load Detail Sheet → Correlation Callout; the three variants are selected by sign + magnitude (`correlationDelta <= -5` / `correlationDelta >= +5` / `|correlationDelta| < 5`).
+- **Sleep-Load correlation.** `computeSleepLoadCorrelation()` — median-split paired data at the 7h sleep mark; return `correlationDelta = mean(highSleepScores) - mean(lowSleepScores)` and a copy variant (high-sleep / low-sleep / no-pattern). The three variants are selected by sign + magnitude (`correlationDelta <= -5` / `correlationDelta >= +5` / `|correlationDelta| < 5`).
 - **Linked Recovery & Load advisory.** `computeLinkedAdvisory(baseAdvisory:zone:trainedToday:sleepHours:targetSleepHours:)` returns a single coherent sentence drawn from `AppConstants.TrainingLoad.linkedAdvisoryText`, keyed on the TL zone, whether the user trained today, and the sleep-to-target ratio bucket. Met-target (`0.85–0.99`) and missing-data nights pass `baseAdvisory` through unchanged. Used **only** by the linked Recovery & Load composite (TL widget body in the linked pair + Linked Recovery & Load Detail Sheet's Recovery Readiness callout); the standalone TL widget keeps rendering `LoadResult.advisory` directly. Replaces the prior `computeSleepQualifier` concat pattern that produced contradictions (BUG-061). Copy in CONSTANTS.md § Training Load Zones → Linked Advisory Copy.
 - **Time-since-last-workout.** `timeSinceLastWorkout()` reads the most recent `Workout.date` across all workouts (manual or HK-imported, any of the 6 types), formats with the trailing "since your last workout" descriptor used by the detail sheet's headline row. Per-type variant `timeSinceLastWorkout(for type: String)` for the detail sheet's per-type rows. The bare-value variant `lastWorkoutHero()` (no trailing descriptor — `4h 12m` / `NO DATA` on cold start) drives the Recovery Status widget's SINCE LAST WORKOUT hero column per CONSTANTS.md § Recovery Status Widget → Since Last Workout Hero Value.
 - **Apple Health sleep goal import.** `importSleepGoalFromAppleHealth()` reads `HealthKitClient.fetchSleepDurationGoal()`. If non-nil, write the value (rounded to 0.5 hr increment) into `UserSettings.targetSleepHours`. If nil, emit a Toast Style toast: `"No sleep goal set in Apple Health."` Called only from the "Import from Apple Health" actions in the Recovery Status Settings Modal and the Linked Recovery & Load Settings Modal.

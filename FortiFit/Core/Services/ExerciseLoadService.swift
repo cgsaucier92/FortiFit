@@ -381,7 +381,7 @@ struct ExerciseLoadService {
     }
 
     /// Returns up to `limit` workouts from the last `daysBack` days that contribute to today's score,
-    /// sorted by descending stress-load contribution (rendered as "stress load" in user-facing copy).
+    /// sorted by descending stress-load contribution (rendered as "training load" in user-facing copy).
     static func contributingWorkouts(
         context: ModelContext,
         now: Date = Date(),

@@ -703,7 +703,7 @@ struct LinkedAdvisoryTests {
             sleepHours: 8.0,
             targetSleepHours: 7.0
         )
-        #expect(copy == "Well recovered and sleep was strong — a great day to train hard.")
+        #expect(copy == "Well recovered and sleep was solid — a great day to train hard.")
     }
 
     @Test func test_highZone_trained_strong_returnsJointSentence() {
@@ -714,7 +714,7 @@ struct LinkedAdvisoryTests {
             sleepHours: 8.0,
             targetSleepHours: 7.0
         )
-        #expect(copy == "Recovery is the priority. Sleep was strong — that helps.")
+        #expect(copy == "Rest is the priority. Sleep was solid — that'll help with muscle recovery.")
     }
 
     @Test func test_peakZone_trained_strong_returnsJointSentence() {
@@ -725,7 +725,7 @@ struct LinkedAdvisoryTests {
             sleepHours: 8.0,
             targetSleepHours: 7.0
         )
-        #expect(copy == "You've been pushing hard. Time to rest — sleep was strong, recovery should come quickly.")
+        #expect(copy == "You've been pushing hard. Time to rest — sleep was solid, recovery should come quickly.")
     }
 
     // MARK: Pass-through cases — base advisory unchanged
@@ -771,7 +771,6 @@ struct CorrelationVariantTests {
 
     /// Helper — insert a single `Strength Training` workout on the given offset
     /// (today − offset days, anchored at noon) so it isn't filtered as empty.
-    /// Used by `PersonalInsightsTests` as well — keep visibility default.
     static func insertWorkout(daysAgo offset: Int, context: ModelContext, now: Date = Date()) {
         let calendar = Calendar.current
         let day = calendar.date(byAdding: .day, value: -offset, to: calendar.startOfDay(for: now)) ?? now
@@ -902,114 +901,6 @@ struct CorrelationVariantTests {
         let result = svc.computeSleepLoadCorrelation(context: context)
         #expect(result?.copyVariant == "noPattern")
         #expect(abs(result?.delta ?? -1) < 5)
-    }
-}
-
-// MARK: - Personal Insights — threshold + detection
-
-@MainActor
-struct PersonalInsightsTests {
-
-    @Test func returnsEmptyBelow21Days() throws {
-        let context = try makeAlgorithmContext()
-        let svc = RecoveryStatusService(client: FoundationStubHealthKitClient())
-        svc.setContext(context)
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        for offset in 0..<14 {
-            let day = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
-            svc.recent30DaySleep.append(DailySleepSnapshot(wakeUpDate: day, totalSleepMinutes: 7 * 60))
-        }
-        let result = svc.computePersonalInsights(context: context)
-        #expect(result.isEmpty)
-    }
-
-    /// Seeds 6 historical weeks (offsets 7..48) where alternating weeks pair
-    /// `targetSleepHours`-meeting nights with no workouts (well-rested) against
-    /// short-sleep nights paired with daily heavy workouts (under-rested). Strong
-    /// signal — Pattern 1 and Pattern 3 should both surface, producing ≥ 1 insight.
-    @Test func returnsAtLeastOneInsightWith21PairedDays() throws {
-        let context = try makeAlgorithmContext()
-        let svc = RecoveryStatusService(client: FoundationStubHealthKitClient())
-        svc.setContext(context)
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        for offset in 7..<49 {
-            let day = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
-            let weekIsUnderRested = ((offset - 7) / 7).isMultiple(of: 2)
-            let minutes = weekIsUnderRested ? 5 * 60 : 8 * 60
-            svc.recent30DaySleep.append(DailySleepSnapshot(wakeUpDate: day, totalSleepMinutes: minutes))
-            if weekIsUnderRested {
-                CorrelationVariantTests.insertWorkout(daysAgo: offset, context: context)
-            }
-        }
-        try context.save()
-        let result = svc.computePersonalInsights(context: context)
-        #expect(!result.isEmpty)
-        #expect(result.count <= 3)
-    }
-
-    /// BUG-071 — Pattern 3 must emit only when there's a real cross-week signal.
-    /// 6 weeks: 3 well-rested (8h + light) vs 3 under-rested (5h + heavy). The
-    /// under-rested mean load should exceed the well-rested mean by ≥ 5 points.
-    @Test func pattern3EmitsWhenWellRestedWeeksHaveLowerLoad() throws {
-        let context = try makeAlgorithmContext()
-        let svc = RecoveryStatusService(client: FoundationStubHealthKitClient())
-        svc.setContext(context)
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        for offset in 7..<49 {
-            let day = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
-            let weekIsUnderRested = ((offset - 7) / 7).isMultiple(of: 2)
-            let minutes = weekIsUnderRested ? 5 * 60 : 8 * 60
-            svc.recent30DaySleep.append(DailySleepSnapshot(wakeUpDate: day, totalSleepMinutes: minutes))
-            if weekIsUnderRested {
-                CorrelationVariantTests.insertWorkout(daysAgo: offset, context: context)
-            }
-        }
-        try context.save()
-        let result = svc.computePersonalInsights(context: context)
-        let pattern3 = result.first(where: { $0.contains("most consistent recovery weeks") })
-        #expect(pattern3 != nil)
-        #expect(pattern3?.contains("points lower load") == true)
-    }
-
-    /// BUG-071 — Pattern 3 must suppress when every week falls in the same bucket.
-    /// Uniform 8h sleep across 6 weeks → all weeks are well-rested → under-rested
-    /// bucket is empty → no comparison possible → no row.
-    @Test func pattern3SuppressedWhenAllWeeksWellRested() throws {
-        let context = try makeAlgorithmContext()
-        let svc = RecoveryStatusService(client: FoundationStubHealthKitClient())
-        svc.setContext(context)
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        for offset in 7..<49 {
-            let day = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
-            svc.recent30DaySleep.append(DailySleepSnapshot(wakeUpDate: day, totalSleepMinutes: 8 * 60))
-        }
-        try context.save()
-        let result = svc.computePersonalInsights(context: context)
-        #expect(!result.contains(where: { $0.contains("most consistent recovery weeks") }))
-    }
-
-    /// BUG-071 — Pattern 3 must suppress when both buckets have data but the load
-    /// delta is below 5 points. Sleep alternates by week (so both buckets are
-    /// populated) but no workouts exist → all weekly mean loads are 0 → delta = 0.
-    @Test func pattern3SuppressedWhenDeltaBelowThreshold() throws {
-        let context = try makeAlgorithmContext()
-        let svc = RecoveryStatusService(client: FoundationStubHealthKitClient())
-        svc.setContext(context)
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        for offset in 7..<49 {
-            let day = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
-            let weekIsUnderRested = ((offset - 7) / 7).isMultiple(of: 2)
-            let minutes = weekIsUnderRested ? 5 * 60 : 8 * 60
-            svc.recent30DaySleep.append(DailySleepSnapshot(wakeUpDate: day, totalSleepMinutes: minutes))
-        }
-        try context.save()
-        let result = svc.computePersonalInsights(context: context)
-        #expect(!result.contains(where: { $0.contains("most consistent recovery weeks") }))
     }
 }
 
@@ -1249,7 +1140,7 @@ struct SleepEfficiencyBackfillTests {
 
 // MARK: - Linked Recovery & Load Detail Sheet — Window Comparison Caption (BUG-065, BUG-066)
 
-/// Regression coverage for BUG-065 + BUG-066. The detail sheet's Stress Load / Sleep
+/// Regression coverage for BUG-065 + BUG-066. The detail sheet's Training Load / Sleep
 /// "vs last week" rows previously left users guessing which week (BUG-065), and the
 /// underlying algorithms compared a partial in-progress week to a full prior week
 /// (BUG-066). The caption now names the day-of-week matched windows on both sides.

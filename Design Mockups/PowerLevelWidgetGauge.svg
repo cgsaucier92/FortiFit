@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 204" font-family="-apple-system, SF Pro Text, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="360" height="204" fill="#0a0a0a"/>
+  <text x="16" y="20" fill="#737373" font-size="11" letter-spacing="0.5">Power Level widget — gauge (Phase 12)</text>
+
+  <rect x="16" y="32" width="328" height="156" rx="12" fill="#1a1a1a" stroke="#3b82f6" stroke-width="1"/>
+
+  <text x="32" y="62" fill="#3b82f6" font-size="15" font-weight="600">Power Level</text>
+
+  <text x="32" y="104" fill="#10b981" font-size="26" font-weight="600">&#8593;</text>
+  <text x="328" y="100" text-anchor="end" fill="#737373" font-size="13">+14% vs prior 30d</text>
+
+  <rect x="32" y="126" width="96" height="8" rx="4" fill="#ef4444"/>
+  <rect x="132" y="126" width="94" height="8" rx="4" fill="#404040"/>
+  <rect x="230" y="126" width="98" height="8" rx="4" fill="#10b981"/>
+  <circle cx="249" cy="130" r="9" fill="#10b981" stroke="#1a1a1a" stroke-width="2"/>
+
+  <text x="32" y="156" fill="#737373" font-size="11">&#8722;30%</text>
+  <text x="130" y="156" text-anchor="middle" fill="#737373" font-size="11">&#8722;10%</text>
+  <text x="228" y="156" text-anchor="middle" fill="#737373" font-size="11">+10%</text>
+  <text x="328" y="156" text-anchor="end" fill="#737373" font-size="11">+30%</text>
+</svg>

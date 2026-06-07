@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 392" font-family="-apple-system, SF Pro Text, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="360" height="392" fill="#0a0a0a"/>
+  <text x="16" y="20" fill="#737373" font-size="11" letter-spacing="0.5">Power Level Breakdown Sheet (Phase 12)</text>
+
+  <!-- Hero block (block 1) -->
+  <rect x="16" y="32" width="328" height="158" rx="12" fill="#1a1a1a" stroke="#404040" stroke-width="1"/>
+  <text x="36" y="92" fill="#10b981" font-size="36" font-weight="600">&#8593;</text>
+  <text x="80" y="82" fill="#e5e5e5" font-size="22" font-weight="600">14,150</text>
+  <text x="172" y="82" fill="#737373" font-size="13">avg volume</text>
+  <text x="80" y="104" fill="#737373" font-size="13">+14% vs prior 30 days</text>
+
+  <rect x="32" y="132" width="96" height="8" rx="4" fill="#ef4444"/>
+  <rect x="132" y="132" width="94" height="8" rx="4" fill="#404040"/>
+  <rect x="230" y="132" width="98" height="8" rx="4" fill="#10b981"/>
+  <circle cx="249" cy="136" r="9" fill="#10b981" stroke="#1a1a1a" stroke-width="2"/>
+
+  <text x="32" y="162" fill="#737373" font-size="11">&#8722;30%</text>
+  <text x="130" y="162" text-anchor="middle" fill="#737373" font-size="11">&#8722;10%</text>
+  <text x="228" y="162" text-anchor="middle" fill="#737373" font-size="11">+10%</text>
+  <text x="328" y="162" text-anchor="end" fill="#737373" font-size="11">+30%</text>
+
+  <!-- Window comparison bars (block 4) -->
+  <rect x="16" y="206" width="328" height="158" rx="12" fill="#1a1a1a" stroke="#404040" stroke-width="1"/>
+  <text x="32" y="238" fill="#e5e5e5" font-size="15" font-weight="600">Window comparison</text>
+  <rect x="276" y="222" width="52" height="22" rx="6" fill="#10b98122"/>
+  <text x="302" y="238" text-anchor="middle" fill="#10b981" font-size="12" font-weight="600">&#8593; 14%</text>
+
+  <text x="32" y="276" fill="#737373" font-size="11" letter-spacing="1">PREVIOUS 30D</text>
+  <text x="328" y="276" text-anchor="end" fill="#a3a3a3" font-size="12">12,400</text>
+  <rect x="32" y="284" width="296" height="10" rx="5" fill="#2d2d2d"/>
+  <rect x="32" y="284" width="259" height="10" rx="5" fill="#737373"/>
+
+  <text x="32" y="322" fill="#10b981" font-size="11" letter-spacing="1">CURRENT 30D</text>
+  <text x="328" y="322" text-anchor="end" fill="#e5e5e5" font-size="12">14,150</text>
+  <rect x="32" y="330" width="296" height="10" rx="5" fill="#2d2d2d"/>
+  <rect x="32" y="330" width="296" height="10" rx="5" fill="#10b981"/>
+</svg>

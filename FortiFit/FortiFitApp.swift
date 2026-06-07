@@ -13,6 +13,7 @@ struct FortiFitApp: App {
     @State private var importPayload: TemplatePayload?
     @State private var showImportPrompt = false
     @State private var showImportError = false
+    @State private var showTemplateSavedToast = false
     @State private var healthKitMatcher: WorkoutMatcher
     @State private var healthKitSyncService: HealthKitSyncService
     @State private var appleActivityService: AppleActivityService
@@ -263,13 +264,42 @@ struct FortiFitApp: App {
                     .overlay {
                         if showImportPrompt {
                             TemplateImportView(
-                                payload: showImportError ? nil : importPayload
-                            ) {
-                                showImportPrompt = false
-                                importPayload = nil
-                                showImportError = false
-                            }
+                                payload: showImportError ? nil : importPayload,
+                                onDismiss: {
+                                    showImportPrompt = false
+                                    importPayload = nil
+                                    showImportError = false
+                                },
+                                onSaved: {
+                                    showImportPrompt = false
+                                    importPayload = nil
+                                    showImportError = false
+                                    showTemplateSavedToast = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        showTemplateSavedToast = false
+                                    }
+                                }
+                            )
                         }
+                    }
+                    .overlay {
+                        // "Template saved!" toast — hoisted above the import modal so
+                        // the modal can dismiss immediately while the toast fades out
+                        // over the underlying screen.
+                        VStack {
+                            Text("Template saved!")
+                                .font(FortiFitTypography.bodySmall)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, FortiFitSpacing.cardPadding)
+                                .padding(.vertical, FortiFitSpacing.elementSpacing)
+                                .background(Capsule().fill(FortiFitColors.primaryAccent))
+                                .padding(.top, FortiFitSpacing.screenTop)
+                            Spacer()
+                        }
+                        .opacity(showTemplateSavedToast ? 1 : 0)
+                        .offset(y: showTemplateSavedToast ? 0 : -60)
+                        .allowsHitTesting(false)
+                        .animation(.easeInOut(duration: 0.2), value: showTemplateSavedToast)
                     }
             }
 

@@ -57,7 +57,7 @@ struct TodayCalendarSquareView: View {
 
                 dotIndicators
             }
-            .padding(.bottom, 4)
+            .padding(.bottom, 8)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
                 UnevenRoundedRectangle(
@@ -79,29 +79,53 @@ struct TodayCalendarSquareView: View {
     private var dotIndicators: some View {
         let totalDots = plannedCount + completedCount
         if totalDots > 0 {
-            HStack(spacing: 4) {
-                let maxVisible = 3
-                let visibleCompleted = min(completedCount, maxVisible)
-                let remainingSlots = maxVisible - visibleCompleted
-                let visiblePlanned = min(plannedCount, remainingSlots)
-                let overflow = totalDots - (visibleCompleted + visiblePlanned)
+            let dots = dotColors()
+            VStack(spacing: 2) {
+                dotRowCentered(dots: dots)
+                dotRowSlotted(dots: dots)
+            }
+            .frame(height: 14)
+        }
+    }
 
-                ForEach(0..<visibleCompleted, id: \.self) { _ in
+    private func dotColors() -> [Color] {
+        let maxTotal = 6
+        let visibleCompleted = min(completedCount, maxTotal)
+        let visiblePlanned = min(plannedCount, maxTotal - visibleCompleted)
+        return Array(repeating: FortiFitColors.positive, count: visibleCompleted)
+            + Array(repeating: FortiFitColors.primaryAccent, count: visiblePlanned)
+    }
+
+    /// Row 1 — naturally centered under the day number. With 1 dot the dot sits
+    /// directly under the number; with 2 it straddles center; with 3 the row fills.
+    private func dotRowCentered(dots: [Color]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(0..<min(dots.count, 3), id: \.self) { index in
+                Circle()
+                    .fill(dots[index])
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .frame(height: 6)
+    }
+
+    /// Row 2 — fixed 3-slot layout so dot 4 sits under dot 1, 5 under 2, 6 under 3.
+    /// Row 1 is always full (3 dots) whenever row 2 has any content, so slot
+    /// alignment between the rows is exact.
+    private func dotRowSlotted(dots: [Color]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { column in
+                let index = 3 + column
+                if index < dots.count {
                     Circle()
-                        .fill(FortiFitColors.positive)
+                        .fill(dots[index])
                         .frame(width: 6, height: 6)
-                }
-                ForEach(0..<visiblePlanned, id: \.self) { _ in
-                    Circle()
-                        .fill(FortiFitColors.primaryAccent)
+                } else {
+                    Color.clear
                         .frame(width: 6, height: 6)
-                }
-                if overflow > 0 {
-                    Text("+\(overflow)")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(FortiFitColors.mutedText)
                 }
             }
         }
+        .frame(height: 6)
     }
 }

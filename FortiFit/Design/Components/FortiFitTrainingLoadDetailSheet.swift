@@ -300,7 +300,7 @@ struct FortiFitTrainingLoadDetailSheet: View {
                 FortiFitCard {
                     VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                         HStack {
-                            Text("Stress Load")
+                            Text("Training Load")
                                 .font(FortiFitTypography.detailSheetItemTitle)
                                 .foregroundStyle(FortiFitColors.primaryText)
                             Spacer()

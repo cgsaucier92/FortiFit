@@ -127,6 +127,13 @@ final class HealthKitSyncService {
             try? context.save()
 
             await backfillMissingEffortScores(context: context)
+
+            // BUG-078 — Notify foreground UI (Home, etc.) that HK ingest changed
+            // SwiftData so view models can re-snapshot without waiting for the
+            // user to navigate away and back. Posted regardless of whether any
+            // workouts/deletes landed: an empty cycle is cheap on the listener
+            // side and we want delete-only syncs to refresh too.
+            notifyHealthKitDidImport()
         } catch {
             // Anchor not updated on failure; next sync retries from last good anchor
         }
@@ -264,7 +271,20 @@ final class HealthKitSyncService {
         }
         if changed {
             try? context.save()
+            notifyHealthKitDidImport()
         }
+    }
+
+    // MARK: - Foreground Refresh Broadcast (BUG-078)
+
+    /// Posts `Notification.Name.fortiFitHealthKitDidImport` so any foregrounded
+    /// view model that snapshots HK-derived state (Home, etc.) can re-fetch.
+    /// The HK observer fires while foregrounded but our VMs use snapshot state
+    /// (not `@Query`), so without this signal the UI only catches up on the
+    /// next `.onAppear`. Posting from MainActor since this service is annotated
+    /// `@MainActor` — listeners can subscribe directly without queue hops.
+    private func notifyHealthKitDidImport() {
+        NotificationCenter.default.post(name: .fortiFitHealthKitDidImport, object: nil)
     }
 
     // MARK: - Last Sync Date
@@ -313,4 +333,17 @@ final class HealthKitSyncService {
         let descriptor = FetchDescriptor<Workout>(predicate: predicate)
         return (try? context.fetch(descriptor))?.first
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Posted by `HealthKitSyncService` after `importPendingWorkouts` commits a
+    /// successful sync cycle (or `backfillMissingEffortScores` mutates rpe).
+    /// Listeners that snapshot HK-derived state into their own view-model
+    /// properties (e.g. `HomeViewModel.recentWorkouts`, training load, power
+    /// level) should re-run their load on this signal so a workout completed
+    /// on Apple Watch shows up without the user navigating away and back.
+    /// See BUG-078.
+    static let fortiFitHealthKitDidImport = Notification.Name("fortiFitHealthKitDidImport")
 }

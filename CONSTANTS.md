@@ -94,13 +94,49 @@ Icons displayed to the left of each option in the long-press context menu on Tre
 
 Icons rendered on the Workout Detail Summary stat-card grid and the Share Image Card stat-card grid (see SCREENS.md § Workout Detail → Summary and § Share Image Card). Each icon's color is defined in § Stat Card Colors below.
 
-| Field | SF Symbol | Visible On |
+| Field | Icon | Visible On |
 |-------|-----------|-----------|
-| Effort | `chart.bar.fill` | All workout types (when rated) |
-| Duration | `clock` | All workout types (when recorded) |
-| Distance | `ruler` | Cardio only (when recorded) |
+| Effort (Workout Detail Summary, Metric Detail Sheet hero, Share Image Card) | Custom `FortiFitEffortBars` 5-bar glyph — see § Effort Bars Glyph | All workout types (when rated) |
+| Effort (Log Workout dropdown) | `chart.bar.fill` SF Symbol | All workout types (when rated) |
+| Duration | `clock` SF Symbol | All workout types (when recorded) |
+| Distance | `ruler` SF Symbol | Cardio only (when recorded) |
 
-**Rendering:** Icon size matches the label text size on the stat card. The Effort icon uses SwiftUI's palette rendering mode to color its three bars independently — see § Stat Card Colors and § Effort Color Mapping. All other icons render in a single color per § Stat Card Colors.
+**Rendering:** Icon size matches the label text size on the stat card. SF Symbol icons render in a single color per § Stat Card Colors. The Effort bars glyph derives lit-bar count from the rpe tier and lit-bar color from § Effort Color Mapping — see § Effort Bars Glyph for full specification.
+
+---
+
+## Effort Bars Glyph
+
+Custom 5-bar ascending-bars indicator used in place of an SF Symbol for the Effort icon on the Workout Detail Summary stat card, the Metric Detail Sheet Effort hero, and the Share Image Card stat-card grid. Inspired by Apple Fitness's Effort row glyph. The Log Workout dropdown continues to use the `chart.bar.fill` SF Symbol (text-list context, not a stat card).
+
+**Component:** `FortiFitEffortBars(rpe: Int, size: CGFloat = 16)` in `Design/Components/`. Default `size: 16` matches the in-app stat-card label text; the Share Image Card invokes the glyph with `size: 12` to match its smaller 12pt label text.
+
+**Tier-to-lit-bar mapping** (1:1 with § Effort Label Mapping):
+
+| RPE | Label | Lit Bars |
+|-----|-------|----------|
+| 1, 2 | Easy | 1 |
+| 3, 4 | Light | 2 |
+| 5, 6 | Moderate | 3 |
+| 7, 8 | Hard | 4 |
+| 9, 10 | All Out | 5 |
+
+**Bar geometry:**
+
+- 5 vertical capsule bars, bottom-aligned, ascending height left-to-right
+- Height fractions of `size`: 0.40 / 0.55 / 0.70 / 0.85 / 1.00
+- Bar width: `max(2, size × 0.18)`
+- Horizontal spacing: `max(1.5, size × 0.10)`
+- Container height = `size` (matches surrounding label text)
+
+**Color rules:**
+
+- Lit bars: `AppConstants.effortColor(for: rpe)` — collapses to 3-band per § Effort Color Mapping (green / yellow / red).
+- Unlit bars: `FortiFitColors.mutedText × 0.25`.
+
+**Nil handling:** Not applicable. The Workout Detail Summary Effort card and the Metric Detail Sheet Effort hero are both conditionally rendered only when `workout.rpe != nil`, so the bars always have a tier to render.
+
+**Accessibility:** The glyph is `.accessibilityHidden(true)` by default; the surrounding label/value text conveys the meaning. Call sites override with `.accessibilityIdentifier(...)` for UI test reachability (`workoutDetail_summaryCard_effortBars`, `metricDetailSheet_hero_effortBars`).
 
 ---
 
@@ -129,7 +165,8 @@ Colors applied to icons and values on every stat card in the Workout Detail Summ
 
 | Metric | Icon Color | Value Color | Sparkline Color (Detail Sheet) |
 |---|---|---|---|
-| Effort | Multi-color palette: short bar `#10b981`, middle bar `#C4F648`, tall bar `#ef4444` | Dynamic — maps from `workout.rpe` per § Effort Color Mapping | Per-segment color — each segment endpoint maps via § Effort Color Mapping |
+| Effort (Workout Detail Summary, Metric Detail Sheet hero, Share Image Card) | Custom `FortiFitEffortBars` glyph — lit bars use the dynamic band color from § Effort Color Mapping; unlit bars use `FortiFitColors.mutedText × 0.25`. See § Effort Bars Glyph. | Dynamic — maps from `workout.rpe` per § Effort Color Mapping | Per-segment color — each segment endpoint maps via § Effort Color Mapping |
+| Effort (Log Workout dropdown) | Multi-color palette on `chart.bar.fill`: short bar `#10b981`, middle bar `#C4F648`, tall bar `#ef4444` | Dynamic — maps from `workout.rpe` per § Effort Color Mapping | n/a |
 | Duration | `#4B2893` (purple) | `#4B2893` | `#4B2893` |
 | Distance | `#289193` (teal) | `#289193` | `#289193` |
 | Avg HR | `#ef4444` (red) | `#ef4444` | `#ef4444` |
@@ -142,7 +179,7 @@ Colors applied to icons and values on every stat card in the Workout Detail Summ
 **Notes on the table above:**
 - All hex values reference tokens already defined in § Colors (Positive Green, Caution Yellow, Alert Red, Chart Purple, Chart Orange, Chart Teal). No new tokens introduced.
 - Elevation and Exercise Minutes are not in the user's explicit color spec but inherit sensible defaults — Elevation tracks the calorie family (orange) since it represents "work performed against gravity," and Exercise Minutes tracks the Duration family (purple) since it's a time-based metric. Adjust if a different mapping is preferred.
-- The Effort icon requires SwiftUI's palette rendering: `Image(systemName: "chart.bar.fill").symbolRenderingMode(.palette).foregroundStyle(.green, .yellow, .red)` (using the actual hex tokens). Layer order in `chart.bar.fill` is short → medium → tall, so the foreground style tuple maps to that order naturally; verify visually on first build in case Apple changes the layer order in a future SF Symbols release.
+- The Effort palette-rendered SF Symbol applies only on the Log Workout dropdown: `Image(systemName: "chart.bar.fill").symbolRenderingMode(.palette).foregroundStyle(.green, .yellow, .red)` (using the actual hex tokens). Layer order in `chart.bar.fill` is short → medium → tall, so the foreground style tuple maps to that order naturally; verify visually on first build in case Apple changes the layer order in a future SF Symbols release. On the Workout Detail Summary, the Metric Detail Sheet hero, and the Share Image Card, the SF Symbol is replaced by `FortiFitEffortBars` per § Effort Bars Glyph.
 
 **The current workout's data point on every detail sheet sparkline** is highlighted with Primary Accent Blue `#3b82f6` (filled circle, larger radius) — uniform across all metrics regardless of line color, so users can always locate the current session in the chart.
 
@@ -333,7 +370,7 @@ Headline value format on the widget left column: `{numerator}/{denominator} {uni
 |---|---|
 | `stateConnectAppleHealthMessage` | "Connect Apple Health to track your activity rings." |
 | `stateConnectAppleHealthCTA` | "Connect" |
-| `statePairAppleWatchMessage` | "Pair an Apple Watch to see your Move, Exercise, and Stand activity here." |
+| `statePairAppleWatchMessage` | "No recent Apple Watch activity detected. Wear your Apple Watch to track your Move, Exercise, and Stand activity here." |
 
 #### Workout Contribution Caption
 
@@ -759,7 +796,7 @@ Goal cards use the **same long-press tease animation as Home screen widget cards
 |------------|-------------|-------------|
 | `trainingLoad` | Training Load | Shows your accumulated training stress score and recovery readiness based on recent workout intensity, volume, and frequency. |
 | `weekStreak` | Week Streak | Tracks how many consecutive weeks you've met your weekly workout target. |
-| `powerLevel` | Power Level | Measures your average strength volume trend over the last 30 days across Strength Training and HIIT workouts. |
+| `powerLevel` | Power Level | Measures your average strength volume trend across Strength Training and HIIT workouts so you can see if you're getting stronger. |
 | `todaysPlan` | Today's Plan | Shows your scheduled workout for today so you can jump straight into logging. Long-press → "Complete Workout" opens the same compact confirmation sheet as the Plan tab. |
 | `appleActivity` | Activity Rings | Tracks your daily Move, Exercise, and Stand rings. Requires an Apple Watch and Apple Health connected in Settings. |
 | `recoveryStatus` | Recovery Status | Tracks your sleep, recovery, and time since your last workout. Requires a sleep-tracking device (Apple Watch, Oura, Whoop, etc.) and Apple Health connected in Settings. When placed adjacent to Training Load, the two widgets link into a single composite with shared border, sleep-adjusted decay, and Sleep Impact Chip. |
@@ -889,7 +926,7 @@ Hero value + caption rendered above the plot area on every chart card when its d
 |---|---|---|
 | `strengthTracker` | `{latest weight} {unit}` (e.g., `225 lbs`) | `LATEST` |
 | `trainingFrequency` | `{avg sessions/week, 1 dp}` | `AVG / LAST 8 WEEKS` |
-| `personalRecords` | `+{delta} {unit}` (current − previous) | `LATEST PR` |
+| `personalRecords` | `+{delta} {unit}` (current − previous) | `LATEST PR CHANGE` |
 | `trainingLoadTrend` | `{today's score, integer}` | `TODAY` |
 | `workoutVolume` | `{avg session volume, formatted with K/M suffix}` | `AVG / SESSION` |
 | `rpeTrend` | `{avg rpe, 1 dp}` | `AVG / LAST 8 WEEKS` |
@@ -1131,6 +1168,90 @@ Stored in `AppConstants.TrainingLoad.linkedAdvisoryText` as a dictionary keyed b
 
 Thresholds: < −10% = Deloading, −10% to +10% = Steady, > +10% = Rising.
 
+> **Phase 12 note:** the **Contextual Message** column is no longer rendered as a visible line on the Power Level widget card or the Breakdown Sheet hero (the gauge + directional indicator + delta caption carry the meaning). It is retained as the VoiceOver announcement string for the gauge (see § Power Level Gauge → Accessibility) and as the source for the See Info modal's plain-language summary. The **No data** row's message remains the card's empty-state copy when fewer than 3 qualifying workouts exist.
+
+---
+
+## Power Level Gauge (Phase 12)
+
+Shared visual tokens for the continuous Power Level gauge. The **same** gauge renders on the Power Level widget card (compact) and the Breakdown Sheet hero (larger). Surfaces the underlying continuous `pct_change` that the categorical status (Deloading/Steady/Rising) is derived from. See SCREENS.md § Home Screen → Power Level widget, § Power Level Breakdown Sheet → block 1, and SERVICES.md § Power Level Algorithm → Widget & Hero Gauge Position.
+
+### Track
+
+| Property | Value |
+|---|---|
+| Visible range | Fixed **−30% … +30%** of `pct_change`. Values beyond clamp to the track ends and trigger the **Overflow Indicator** treatment on the thumb (the delta caption still shows the true figure). See § Overflow Indicator below. |
+| Height | 8pt (widget and sheet) |
+| Corner radius | 4pt (capsule ends) |
+| Zone fills | Deloading `#ef4444` (Alert Red) from −30% to −10% · Steady `#404040` (Border gray) from −10% to +10% · Rising `#10b981` (Positive Green) from +10% to +30%. Zones meet at the threshold ticks. |
+| Threshold ticks | Two 1pt dividers at −10% and +10%, filled with the **card background** (`#1a1a1a` on the widget / sheet card surface) so the zones read as separated segments. |
+| Lateral inset | The gauge body (track + axis labels together) is inset **16pt** on each side from the parent card's content area. This leaves breathing room for the thumb at clamped positions (8pt overhang past the track end) and, when off-scale, the indicator halo (14pt outer radius). Position math is unchanged — `pct ∈ [−30, +30]` still maps across the (now narrower) track width. |
+
+### Thumb
+
+| Property | Value |
+|---|---|
+| Shape | Circle, 16pt diameter |
+| Fill | Current **status color** (red / gray-`#737373` for Steady / green) |
+| Border | 2pt, card-background color (`#1a1a1a`) for contrast against the track |
+| Position | Center mapped from clamped `pct_change`: `x = (clamp(pct, −30, 30) + 30) / 60` across the track width. At exactly the −10% / +10% boundary, the thumb sits on the tick. |
+
+### Overflow Indicator
+
+Renders an "off-scale" treatment on the thumb when `pct_change` lies outside the gauge's visible range, so the clamped thumb position cannot be misread as the exact value. The delta caption remains the source of truth for the precise figure; the indicator is a redundant visual signal that the bar has saturated. Visual reference: `Design Mockups/PowerLevelWidgetGauge_Overflow.svg` (Option A).
+
+| Property | Value |
+|---|---|
+| Trigger | `|pct_change| > 30` (strict greater-than). At exactly ±30% the thumb sits on the axis label without an overflow indicator. Hidden in the No-Data state. |
+| Halo | Two concentric `Circle`s rendered **behind** the thumb. Radii proportional to `thumbDiameter` — outer ≈ `thumbDiameter × 0.875`, inner ≈ `thumbDiameter × 0.6875` (so the halo scales 1:1 between the compact widget and the Breakdown Sheet hero). Fill = the same status color as the thumb; opacity = **28%** (inner) / **18%** (outer). |
+| Chevron | SF Symbol `chevron.right.2` (double chevron) for positive overflow (`pct_change > +30`) · `chevron.left.2` for negative overflow (`pct_change < −30`). Centered inside the thumb. ~9pt, `.bold` weight, tinted **Card Surface** (`#1a1a1a`) for contrast against the colored thumb fill. |
+| Animation | Static — no pulse, fade, or rotation. The thumb's existing position animation (`.easeOut 0.4s`) carries it to the clamped edge; the indicator simply appears/disappears with the position update. Respects `accessibilityReduceMotion` by inheriting the parent's no-animation branch. |
+| Caption / Ticks / Position math | **Unchanged.** Tick labels remain `−30% / −10% / +10% / +30%`; position formula is identical; delta caption continues to show the true `pct_change`. |
+| Symmetry | Same rules mirror on the negative side — chevron points left, halo and opacity values are identical, glow color follows the Deloading status. |
+| Accessibility identifier | `homeWidget_powerLevel_gaugeOverflowIndicator` (compact) · `powerLevelDetailSheet_heroGaugeOverflowIndicator` (hero) — attached to the halo+chevron composite. |
+
+### Thumb Pulse
+
+A subtle breathing halo behind the thumb that surfaces "live, still changing" on the active states. Renders on **both** the compact widget and the Breakdown Sheet hero. Color tracks the thumb's status color, so the visual cue inherits the state mapping automatically.
+
+| Property | Value |
+|---|---|
+| Trigger | Status is `.rising` or `.deloading`, the gauge is **not** in the No-Data state, and `accessibilityReduceMotion` is **off**. The off-scale state does **not** suppress the pulse — the animated halo stacks behind the static off-scale halo so the "live" cue rides on top of the "saturated" cue. |
+| Suppressed when | `.steady` (intentionally calm — nothing is changing) · No-Data state (no thumb to anchor the pulse) · Reduce Motion is on. |
+| Shape | `Circle`, same 16pt diameter as the thumb, fill = thumb's status color (no border). |
+| Animation | `scaleEffect` 1.0 → 2.1× combined with `opacity` 0.35 → 0 over **1.6s**, `.easeOut`, `repeatForever(autoreverses: false)`. Begins on `onAppear`. |
+| Z-order | Rendered **behind** the thumb and, when off-scale, behind the overflow halo + chevron as well. |
+| Accessibility identifier | `homeWidget_powerLevel_gaugeThumbPulse` (compact) · `powerLevelDetailSheet_heroGaugeThumbPulse` (hero) — attached to the breathing halo circle. Present in the view hierarchy only when the pulse is rendering. |
+
+### Directional Indicator
+
+Renders **only** on the Breakdown Sheet hero. The widget card omits the glyph entirely — the gauge thumb + color zones carry the state, and the delta caption carries the magnitude. `FortiFitPowerLevelGauge.glyph(for:)` remains the shared mapping used by the hero.
+
+| Property | Value |
+|---|---|
+| Glyph | `↓` Deloading · `—` Steady · `↑` Rising (status-colored). Sole status glyph on the hero — no status word. |
+| Size | Widget: **not rendered.** Sheet hero: ~40pt. |
+
+### Delta Caption
+
+| Property | Value |
+|---|---|
+| Format | `{sign}{pct}% vs prior 30d` (widget) · `{sign}{pct}% vs prior 30 days` (sheet hero) |
+| Color | Muted Text `#737373` |
+| Source | `PowerLevelService.windowComparison().deltaPct`, rounded to a whole percent. Carries the true value even when the thumb is clamped. |
+
+### Axis Labels
+
+`−30%` / `−10%` / `+10%` / `+30%` beneath the track, `FortiFitTypography.labelSmall` (13/semibold) with 1pt kerning, Muted Text, aligned to the track ends and the two ticks. Rendered on **both** the widget card and the Breakdown Sheet hero (the two outer labels sit at the track ends; the −10% / +10% labels center under their threshold ticks).
+
+### Empty / No-Data State
+
+When fewer than 3 qualifying Strength/HIIT workouts exist in the current 30d window: render the track in Steady gray only (no zones, no thumb), `—` indicator, and the **No data** copy from § Power Level Statuses in place of the delta caption. Matches the Breakdown Sheet hero per-block empty state (SCREENS.md § Power Level Breakdown Sheet → Per-block empty states).
+
+### Accessibility
+
+The gauge exposes a single combined VoiceOver label: `"Power level: {status}. {pct}% versus the prior 30 days."` — the status **word** is spoken here even though it is not drawn, so the state is never conveyed by color alone (WCAG AA, PRD § Accessibility). When `|pct_change| > 30`, the label appends `" Off-scale — past +30%."` (or `−30%`), so the off-scale state is announced rather than left only as a visual cue. Reduce Motion: the thumb snaps to position rather than animating on recompute, and the Thumb Pulse is suppressed entirely.
+
 ---
 
 ## Chart Data Thresholds (Trends Screen)
@@ -1177,7 +1298,7 @@ Visual tokens for the styled PNG image produced by `WorkoutShareService` (see `S
 | Stat card container | `#1a1a1a` background, `#404040` 1px border, 12px corner radius, 14px horizontal × 12px vertical internal padding |
 | Stat card label row | SF symbol + sentence-case label, both Muted Text `#737373`, 12px, 700 weight. No chevron in the share-image variant — there's no tap target. |
 | Stat card value | Primary Text `#e5e5e5`, 22px, 800 weight, sentence case for label-style values (Effort), numeric for everything else with inline muted unit (`#a3a3a3`, 12px, 600 weight) |
-| Stat card icons | SF Symbols per § Workout Detail Summary Icons (Effort uses `chart.bar.fill`) and § Workout Detail Health Data Icons. Rendered at same size and color as the label text. |
+| Stat card icons | SF Symbols per § Workout Detail Summary Icons and § Workout Detail Health Data Icons, rendered at same size and color as the label text. **Effort** uses the custom `FortiFitEffortBars` 5-bar glyph (size 12) per § Effort Bars Glyph — not an SF Symbol. |
 | Effort label rendering | Descriptive label only (e.g., `Hard`) per § Effort Label Mapping — no number shown on the share image |
 | Exercise name | `#e5e5e5`, 15px, 700 weight |
 | Set detail | `#a3a3a3`, 13px, 600 weight. Format: `{sets} × {reps} @ {weight} {unit}` or `{sets} × {reps} (BW)` |
@@ -1460,7 +1581,7 @@ Visual + content constants specific to the Training Load Detail Sheet (SCREENS.m
 |---|---|
 | Max rows | 5 |
 | Lookback | 7 days |
-| Row format | `{name}` (Primary Text 15/700) · `{date}` (Muted 13px) · `{pct}%` (Muted 13px, monospaced digit) · inline horizontal share bar (~56×4pt capsule, Primary Accent Blue fill on Elevated Surface track, filled to `pct/100`). Absolute stress-load value is intentionally not displayed — created additivity confusion vs the hero score and read as "0 stress load · 5%" after integer rounding. |
+| Row format | `{name}` (Primary Text 15/700) · `{date}` (Muted 13px) · `{pct}%` (Muted 13px, monospaced digit) · inline horizontal share bar (~56×4pt capsule, Primary Accent Blue fill on Elevated Surface track, filled to `pct/100`). Absolute training-load value is intentionally not displayed — created additivity confusion vs the hero score and read as "0 training load · 5%" after integer rounding. |
 | Footer link | `See all in Trends →` (Primary Accent Blue 13/600) — navigates to Trends → Training Load Trend chart detail |
 
 ### Week Comparison Band
@@ -1469,7 +1590,7 @@ Row + trailing italic caption inside a single `FortiFitCard`. Matches the linked
 
 | Property | Value |
 |---|---|
-| Row copy template | `Stress load · {arrow} {abs(deltaPct)}%` (no "vs last week" suffix — the caption beneath establishes the comparison) |
+| Row copy template | `Training load · {arrow} {abs(deltaPct)}%` (no "vs last week" suffix — the caption beneath establishes the comparison) |
 | Arrow rule | `↑` when `deltaPct >= 0`, `↓` when `deltaPct < 0` |
 | Delta color when current ≤ previous | Positive Green `#10b981` |
 | Delta color when current > previous | Alert Red `#ef4444` |
@@ -1486,13 +1607,17 @@ Row + trailing italic caption inside a single `FortiFitCard`. Matches the linked
 
 Visual + content constants specific to the Power Level Breakdown Sheet (SCREENS.md § Power Level Breakdown Sheet).
 
-### Hero
+### Hero (Phase 12 — icon-only gauge)
+
+Mirrors the widget gauge at sheet scale. Full token set in § Power Level Gauge.
 
 | Property | Value |
 |---|---|
-| Status label color | Per § Power Level Statuses |
-| Directional indicator size | 48pt, status-colored |
+| Status word | **Not rendered** (Phase 12). The directional indicator is the sole status glyph. |
+| Directional indicator size | ~40pt, status-colored |
 | Numeric line | `{currentAvgVolume} avg volume` (Primary Text 20/700 + Muted unit) |
+| Delta caption | `{sign}{pct}% vs prior 30 days` (Muted Text) |
+| Gauge | Continuous track per § Power Level Gauge (−30%…+30%, threshold ticks, status-zoned, status-colored thumb, axis labels). |
 
 ### 30-Day Volume Chart
 
@@ -1508,10 +1633,27 @@ Visual + content constants specific to the Power Level Breakdown Sheet (SCREENS.
 
 | Property | Value |
 |---|---|
+| Card header | `Driving Your Trend` (Primary Text, `FortiFitTypography.detailSheetItemTitle`) |
+| Subtitle | `% change in volume vs previous 30 days` (Muted Text, `FortiFitTypography.labelSmall`). Sits directly below the header, above the rows. Disambiguates the per-row `%` values as each exercise's own 30-day volume delta — *not* a share of the overall window-comparison delta. |
 | Max rows | 3 |
 | Filter | `sessionCountInWindow >= 3` (≥ 3-session filter per Phase 8.8) |
-| Row layout | Exercise name (Primary Text 15/700) · `{sign}{deltaPct}% volume vs previous 30d` (status-colored, right-aligned) · 30-day sparkline (~80×24pt, Primary Accent Blue, no marks) |
+| Row layout | Exercise name (`FortiFitTypography.bodySmall`, Muted Text, single-line) · `{sign}{deltaPct}%` (sign-colored against the *rounded display value*: Positive green `#10b981` when `> 0`, Alert red `#ef4444` when `< 0`, Muted gray `#737373` when the value rounds to `0%` — so near-zero values like `+0.3%` that display as `0%` share the muted treatment; `FortiFitTypography.labelSmall`, right-aligned). The qualifying "volume vs previous 30 days" copy is rendered once at the card level (see Subtitle above) rather than repeated per row. |
 | Sort | Descending current-window volume; ties broken by descending session count, then exercise name ascending |
+
+### Window Comparison Bars (Phase 12)
+
+Block 2 visual — two stacked bars (positioned directly below the hero gauge, above the Top Exercises card). Source: `PowerLevelService.windowComparison()` (no new service logic).
+
+| Property | Value |
+|---|---|
+| Header | `Window comparison` (Primary Text, `FortiFitTypography.detailSheetItemTitle` — 18pt regular, matches the Top Exercises card header) |
+| Delta chip | `{sign}{deltaPct}%`, status-colored text on a faint same-hue tint (~12% opacity of the status color), ~3×8pt padding, 6pt radius, right-aligned in the header row |
+| Bar track | Elevated Surface `#2d2d2d`, 10pt height, 5pt corner radius |
+| Previous bar | Fill Muted gray `#737373`; micro-label `PREVIOUS 30D` (uppercase `FortiFitTypography.labelSmall` — 13/semibold — with 1pt kerning); right-aligned value `{previous30dAvg}` (`FortiFitTypography.labelSmall`, Secondary Text) |
+| Current bar | Fill **status color**; micro-label `CURRENT 30D` (uppercase `FortiFitTypography.labelSmall` — 13/semibold — with 1pt kerning, status-colored); right-aligned value `{current30dAvg}` (`FortiFitTypography.labelSmall`, Primary Text) |
+| Scaling | Both bars scaled to the **larger** of the two averages — larger bar fills the track, smaller fills `min/max` proportionally |
+| Values | Displayed via `UnitConversion.displayWeight(kg:)` |
+| Empty rule | Hide the entire block when `current30dAvg == 0` OR `previous30dAvg == 0` (unchanged) |
 
 ### Nudge Archetypes
 
@@ -1578,6 +1720,7 @@ The hero region is two side-by-side columns: `SLEEP` (left) + `SINCE LAST WORKOU
 | Hero sub-labels | `SLEEP` / `SINCE LAST WORKOUT` — Primary Accent Blue 11/700, uppercase, 2px letter-spacing |
 | Hero values | `{h}h {mm}m` (sleep) / `{value}` (workout — no trailing descriptor, sub-label supplies it) — Primary Text, **32px / 900 weight** (matches Weekly Streak count treatment). Muted Text when no data. |
 | Deep caption (SLEEP column only) | `{pct}% DEEP · {h}h {mm}m` (e.g., `34% DEEP · 1h 24m`) — Muted Text 11/700, uppercase, 2px letter-spacing, dot-separated |
+| Workout-name caption (SINCE LAST WORKOUT column only) | `{Workout.name}` rendered as-stored (sentence/title case as the user entered it — *not* forced uppercase) — Muted Text 11/700, 2px letter-spacing, single-line tail truncation. Falls back to `{Workout.workoutType}` when `name` is empty/whitespace. Suppressed entirely when no workout has been logged. |
 
 ### Since Last Workout Hero Value
 
@@ -1937,70 +2080,44 @@ Two hero columns side-by-side at the top.
 | `linkedRecoveryLoadDetailSheet_recoveryHero` | Left column |
 | `linkedRecoveryLoadDetailSheet_loadHero` | Right column |
 
-### Stacked Combined Chart (14-Day Sleep + Sleep-Adjusted TL)
+### Combined Sleep & Load Chart (Dual Axis, 14-Day)
 
-Two vertically-stacked sparklines sharing an x-axis (calendar day), with **synchronized scrubbing**.
+Single Swift Charts view overlaying sleep duration and sleep-adjusted Training Load on a shared 14-day x-axis. Both lines share the chart's 0–100 y-domain; sleep hours are normalized into that space for plotting and the trailing axis labels render the un-normalized hour values so the right-axis reads naturally in hours.
 
 | Property | Value |
 |---|---|
 | Window | Last 14 days |
-| Top sparkline | Sleep duration. Line color: Chart Purple `#4B2893`. Interpolation: `.catmullRom`. |
-| Top caption | `Last 14 days · Sleep duration` |
-| Bottom sparkline | Training Load score (sleep-adjusted). Line color: TL zone color of latest score (per § Training Load Zones). Interpolation: `.catmullRom`. |
-| Bottom caption | `Last 14 days · Training Load (sleep-adjusted)` |
-| Synchronized scrub | Dragging on either chart highlights the matching day on both. Annotation: `{date} · {sleepHours}h sleep · {zone} ({score}/100)` |
-| Data source | `DailySleepSnapshot` (top) + `DailyTrainingLoadSnapshot` (bottom) — see PRD.md § Data Model |
-| Identifier (combined block) | `linkedRecoveryLoadDetailSheet_combinedChart` |
-| Identifier (top chart) | `linkedRecoveryLoadDetailSheet_sleepSparkline` |
-| Identifier (bottom chart) | `linkedRecoveryLoadDetailSheet_loadSparkline` |
+| Title | `Last 14 Days · Sleep & Load` |
+| Inline legend (beneath title) | `● SLEEP` (Chart Purple dot) + `● LOAD` (latest zone color dot) — 11/700 Muted Text uppercase, 1.5 kerning |
+| Sleep line | Chart Purple `#4B2893`, `.catmullRom`, 2pt stroke. Points: latest = Primary Accent Blue, others = Chart Purple. Data source: `DailySleepSnapshot`. |
+| Load line | Latest-score zone color (per § Training Load Zones), `.catmullRom`, 2pt stroke. Points: per-day zone color. Data source: `DailyTrainingLoadSnapshot` with live fallback for days lacking a persisted snapshot (see SERVICES.md § Training Load Algorithm → `fourteenDayDailyScores`). |
+| Left axis (Load) | Position `.leading`, domain `0...100`, ticks `[30, 55, 80]`, label color = latest zone color, dashed grid lines (`StrokeStyle(lineWidth: 0.5, dash: [3, 3])`, Border color). |
+| Right axis (Sleep) | Position `.trailing`, label color Chart Purple, **no** grid lines. Tick values from `DailySleepSnapshot.sparklineAxisValues(for:)` rendered as `{h}h` (denormalized from the shared 0–100 domain). |
+| Scrubbing | Single tap or drag selects the nearest calendar day across either dataset (set-union of load + sleep dates, snapped to start-of-day). One neutral `RuleMark` (Muted Text @ 0.6) renders at the selected day. Selected points scale to 96 symbol size; un-selected points dim to 0.35 opacity; both lines dim to 0.55 opacity when any day is selected. Light haptic on cross-day transition. |
+| Combined annotation | Single row beneath the chart: `{sleepDuration}` (Chart Purple) · `{score} / 100` (zone color) · `{zone}` (Primary Text) · trailing `{date}` (Muted Text). Renders `— h —m` or `— / 100` for whichever side is missing on the selected day so a missed sleep night doesn't hide the load read (and vice versa). |
+| Chart height | 140 pt |
+| Identifier (chart) | `linkedRecoveryLoadDetailSheet_combinedChart` |
+| Identifier (load points) | `linkedRecoveryLoadDetailSheet_loadChartDataPoint_{index}` |
+| Identifier (sleep points) | `linkedRecoveryLoadDetailSheet_sleepChartDataPoint_{index}` |
+| Identifier (annotation) | `linkedRecoveryLoadDetailSheet_combinedSelectionAnnotation` |
 
 ### Window Comparison Band
 
-Two-line band + trailing caption, all inside a single `FortiFitCard` below the combined chart. No card title — the two rows (`Stress Load` and `Sleep`) act as the card's visible identity at all collapse states; only the caption hides behind the chevron (see SCREENS.md § Linked Recovery & Load Detail Sheet → Collapsible insight cards).
+Two-line band + trailing caption, all inside a single `FortiFitCard` below the combined chart. No card title — the two rows (`Training Load` and `Sleep`) act as the card's visible identity at all collapse states; only the caption hides behind the chevron (see SCREENS.md § Linked Recovery & Load Detail Sheet → Collapsible insight cards).
 
 | Line | Format |
 |---|---|
-| Stress Load | `STRESS LOAD · {↑/↓} {pct}%` (uppercase Muted label + Primary Text value). The trailing "vs last week" is intentionally omitted — the grey caption beneath the rows already names the matched windows. When the matched window is fewer than 2 days (i.e. early Monday before any data has accrued), the value renders as `Not enough data` in Muted Text. |
-| Sleep | `SLEEP · {↑/↓} {pct}%`. Same `Not enough data` treatment as Stress Load when the matched window is fewer than 2 days. |
+| Training Load | `TRAINING LOAD · {↑/↓} {pct}%` (uppercase Muted label + Primary Text value). The trailing "vs last week" is intentionally omitted — the grey caption beneath the rows already names the matched windows. When the matched window is fewer than 2 days (i.e. early Monday before any data has accrued), the value renders as `Not enough data` in Muted Text. |
+| Sleep | `SLEEP · {↑/↓} {pct}%`. Same `Not enough data` treatment as Training Load when the matched window is fewer than 2 days. |
 | Caption (below both rows) | `This week so far ({Mon, MMM d} – today) vs same period last week ({Mon, MMM d} – {matched weekday, MMM d})` — 11pt italic Muted Text, ID `linkedRecoveryLoadDetailSheet_windowComparisonCaption`. Names the day-of-week-matched windows (BUG-065, BUG-066). |
 
-Arrow colors: Alert Red for higher stress load / lower sleep, Positive Green for the inverse. Computation: **day-of-week matched windows** — both rows compare Mon-through-current-weekday of this ISO week vs Mon-through-the-same-weekday of the prior ISO week. On Monday the window is a single day (and the row collapses to `Not enough data`); on Sunday it is the full Mon–Sun week. Stress Load is a sum of raw `sessionStress` over the matched window (no time decay; see SERVICES.md § Training Load Algorithm → `weekOverWeekComparison`). Sleep is the mean of `totalSleepMinutes` over nights *present* in each matched window (missing nights are skipped, not zero-filled; see SERVICES.md § RecoveryStatusService → `sleepWeekOverWeekComparison`). Both windows are aligned so a single caption describes both rows.
+Arrow colors: Alert Red for higher training load / lower sleep, Positive Green for the inverse. Computation: **day-of-week matched windows** — both rows compare Mon-through-current-weekday of this ISO week vs Mon-through-the-same-weekday of the prior ISO week. On Monday the window is a single day (and the row collapses to `Not enough data`); on Sunday it is the full Mon–Sun week. Training Load is a sum of raw `sessionStress` over the matched window (no time decay; see SERVICES.md § Training Load Algorithm → `weekOverWeekComparison`). Sleep is the mean of `totalSleepMinutes` over nights *present* in each matched window (missing nights are skipped, not zero-filled; see SERVICES.md § RecoveryStatusService → `sleepWeekOverWeekComparison`). Both windows are aligned so a single caption describes both rows.
 
 Identifier: `linkedRecoveryLoadDetailSheet_windowComparison`
 
-### Correlation Callout
-
-Single-sentence Muted-Text line (`FortiFitTypography.bodySmall`) rendered inside the Personal Insights card above the per-pattern rows — same visual treatment as the Pattern 1/2/3 rows so the card reads as one coherent insights block. Median-split the user's last N days (N ≥ 14) of paired (sleep, next-day-score) data at the 7h sleep mark (algorithm: SERVICES.md § RecoveryStatusService → `computeSleepLoadCorrelation()`).
-
-`correlationDelta = mean(highSleepScores) − mean(lowSleepScores)` — i.e., the mean next-day TL score after high-sleep nights minus the mean after short-sleep nights.
-
-| Variant | Trigger | Copy |
-|---|---|---|
-| High-sleep → much-lower-score (healthy correlation) | `correlationDelta <= -5` | `"Strong nights (≥ 7h) bring your score down ~{n} points the next day."` |
-| High-sleep → much-higher-score (inverted — rebound training pattern) | `correlationDelta >= +5` | `"Short nights (< 6h) leave your score ~{n} points higher the next day."` |
-| No clear correlation | `|correlationDelta| < 5` OR insufficient data | `"Your sleep and load haven't shown a clear pattern yet."` |
-
-> **Variant naming caveat (BUG-049):** the two non-zero-delta variants are documented for symmetry but capture *opposite* underlying user behaviors. The first (negative delta) is the common pattern — good sleep correlates with lower next-day TL. The second (positive delta) is rare and tends to surface when an athlete trains harder after well-rested nights, raising next-day TL via additional training load. The copy strings are kept distinct so the user reads a phrasing that matches the data direction; the algorithm picks the variant strictly off the delta sign + magnitude.
-
-Hidden if fewer than 14 paired days exist. Identifier: `linkedRecoveryLoadDetailSheet_correlationCallout`. The callout renders above the per-pattern insight rows inside the Personal Insights card (see § Personal Pattern Insights). The Personal Insights card is visible whenever the correlation callout OR ≥ 1 detected pattern is available.
-
-### Personal Pattern Insights
-
-Up to 3 auto-detected patterns from ≥ 21 days of paired data, rendered inside the Personal Insights card below the correlation callout line (see § Correlation Callout). Each pattern is a single italic Muted-Text line. Detection algorithms in SERVICES.md § RecoveryStatusService → Personal Insights.
-
-| Pattern type | Example copy |
-|---|---|
-| Score-by-sleep-bucket | `"Your training load runs ~{n} points lower after 7+ hour nights."` |
-| Sleep-by-workout-type | `"You sleep an average of {n} min less on {workoutType} training days."` |
-| Multi-week aggregate | `"Your most consistent recovery weeks (~{n} points lower load) line up with sleep targets met 5+ nights."` |
-
-| Identifier (block) | `linkedRecoveryLoadDetailSheet_personalInsights` |
-|---|---|
-| Identifier (per-row) | `linkedRecoveryLoadDetailSheet_personalInsights_row_{0..2}` |
-
 ### Last 3 Nights Row
 
-Three-cell row below personal insights. Each cell: `{Day}, {Month} {Date} · {h}h {mm}m · {pct}% deep`.
+Three-cell row below the window comparison band. Each cell: `{Day}, {Month} {Date} · {h}h {mm}m · {pct}% deep`.
 
 Identifier: `linkedRecoveryLoadDetailSheet_last3Nights`
 
@@ -2029,14 +2146,13 @@ Reuses the Phase 8.8 detail-sheet footer pattern.
 
 ### Collapsible Insight Cards
 
-Five secondary body blocks on the Linked Recovery & Load Detail Sheet expose a bottom-aligned chevron toggle that hides their content. Matches the Goals card chevron pattern: `Image(systemName: isExpanded ? "chevron.up" : "chevron.down")`, `.font(.system(size: 12, weight: .semibold))`, `FortiFitColors.mutedText`, full-width plain `Button` with `.frame(height: 24)` and `.contentShape(Rectangle())`, animated with `withAnimation(.easeInOut(duration: 0.1))`. The card title row stays visible when collapsed; everything below it hides. The Window Comparison card uses the static title `Stress Load & Sleep` (added so the collapsed state has a label).
+Four secondary body blocks on the Linked Recovery & Load Detail Sheet expose a bottom-aligned chevron toggle that hides their content. Matches the Goals card chevron pattern: `Image(systemName: isExpanded ? "chevron.up" : "chevron.down")`, `.font(.system(size: 12, weight: .semibold))`, `FortiFitColors.mutedText`, full-width plain `Button` with `.frame(height: 24)` and `.contentShape(Rectangle())`, animated with `withAnimation(.easeInOut(duration: 0.1))`. The card title row stays visible when collapsed; everything below it hides. The Window Comparison card uses the static title `Training Load & Sleep` (added so the collapsed state has a label).
 
 State persists per-card via `UserSettings` UserDefaults flags (registered defaults all `false` → collapsed on first launch and after install).
 
 | Card | UserDefaults key | Default | Chevron accessibility identifier |
 |---|---|---|---|
-| Window comparison (Stress Load & Sleep) | `recoverySheetStressLoadExpanded` | `false` | `linkedRecoveryLoadDetailSheet_windowComparison_chevron` |
-| Personal Pattern Insights | `recoverySheetPersonalInsightsExpanded` | `false` | `linkedRecoveryLoadDetailSheet_personalInsights_chevron` |
+| Window comparison (Training Load & Sleep) | `recoverySheetStressLoadExpanded` | `false` | `linkedRecoveryLoadDetailSheet_windowComparison_chevron` |
 | Last 3 Nights | `recoverySheetLast3NightsExpanded` | `false` | `linkedRecoveryLoadDetailSheet_last3Nights_chevron` |
 | Contributing This Week | `recoverySheetContributingExpanded` | `false` | `linkedRecoveryLoadDetailSheet_contributingWorkouts_chevron` |
 | Time Since Last Workout | `recoverySheetTimeSinceWorkoutExpanded` | `false` | `linkedRecoveryLoadDetailSheet_timeSinceWorkout_chevron` |

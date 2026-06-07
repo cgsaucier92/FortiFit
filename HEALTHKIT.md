@@ -308,17 +308,7 @@ Add `SCREENS.md § Match Prompt Sheet` section with layout spec.
 Unlink is **always** gated behind a SwiftUI `.confirmationDialog` regardless of entry point. Title "Unlink workout from Apple Health?" Message "This will delete all Apple Health–sourced summary data for this workout, and you won't be able to link it back. This can't be undone." Actions: destructive "Unlink" + cancel "Cancel". Copy is owned by `AppConstants.HealthKit.unlinkConfirm*` (see CONSTANTS.md § HealthKit Strings).
 
 ### On Unlink (one-way, destructive on summary data)
-1. Capture `healthKitUUID` into a local before clearing — needed for step 7.
-2. Clear `healthKitUUID`, `healthKitSourceBundleID`, `healthKitActivityType` (set to nil).
-3. **Clear the six HK-only summary fields** (set each to nil): `avgHeartRate`, `maxHeartRate`, `activeEnergyKcal`, `totalEnergyBurnedKcal`, `elevationAscendedMeters`, `exerciseMinutes`. These have no manual-entry path in FitNavi, so retaining them on a now-manual workout would surface data the user can't trace, edit, or reproduce.
-4. **Conditionally clear `rpe`:** if `workout.rpeFromHK == true`, set `rpe = nil`. Set `rpeFromHK = false` regardless. This isolates the destructive clear to RPE values that originated from `workoutEffortScore` (see § 8) without erasing user-entered effort ratings.
-5. **Retain** `durationMinutes`, `distanceKm`, `date`, `time`, `name`, `note`, `ExerciseSets`, and `indoor` — these either have a manual-entry path or are user-owned per § 7. They become regular editable fields on a now-manual workout.
-6. Bump `lastModifiedDate` to `.now`.
-7. **Fire the full Workout Cascade** (SERVICES.md § Workout Cascade). Training Load, Effort Trend chart points, Power Level inputs, header summary recompute, and GoalSnapshot recompute against the cleared values. This is a behavior change from the prior spec — see § Why cascade now.
-8. **Write a `WorkoutMatchRejection`** with `(healthKitUUID: capturedUUID, workoutId: workout.id, reason: .unlinked)`. This guarantees:
-   - The matcher (`WorkoutMatcher.findCandidates(for:)`) skips the (UUID, workoutId) pair forever.
-   - If the same HK UUID re-imports (e.g., the user removes and re-installs the Health source), auto-create proceeds normally as a new workout, but auto-link to this specific FitNavi workout is short-circuited. Other FitNavi workouts can still match it via the normal flow.
-   - Re-linking via the Match Prompt Sheet for this same pairing is impossible — the matcher never queues it.
+The ordered step sequence — capture `healthKitUUID` → clear the three HK pointer fields → clear the six HK-only summary fields (`avgHeartRate`, `maxHeartRate`, `activeEnergyKcal`, `totalEnergyBurnedKcal`, `elevationAscendedMeters`, `exerciseMinutes`) → conditionally clear `rpe` when `rpeFromHK == true` (clearing the flag either way) → retain `durationMinutes`/`distanceKm`/`date`/`time`/`indoor`/user-owned fields → bump `lastModifiedDate` → fire the full Workout Cascade → write a `WorkoutMatchRejection` with `reason: .unlinked` — is specified once in **SERVICES.md § Deletion Cascading Behavior → HealthKit Unlink**. The rejection makes unlink one-way: the matcher skips that `(uuid, workoutId)` pair forever; a re-import of the same HK UUID auto-creates a fresh workout but never auto-links back to this one. Rationale below is the HK-side spec.
 
 ### Why one-way
 Reversible unlink caused confused re-prompts and weaker warning copy. One-way unlink → "Unlinking is permanent" reads crisply and the matcher never re-proposes a rejected pair. Same-outcome workaround: delete the FitNavi workout and let auto-create rebuild from HK.
@@ -348,7 +338,7 @@ Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator.
 - **Two-row callout** explaining (a) which fields are read-only here and (b) that unlinking is permanent and deletes Apple Health–sourced summary data — see SCREENS.md § Workout Detail → Source Indicator Info Sheet for exact copy and SF symbols.
 - **Primary safe action:** full-width "Done" button (Primary Accent blue outline). This is the visually largest action, matching the iOS convention of giving the safe path the prominence.
 - **Demoted destructive link:** "Unlink from Apple Health" rendered as a small Alert Red text-style link below Done. Tap → confirmation dialog (see § 14 Confirmation) → on confirm runs `HealthKitSyncService.unlink(workout:)` per § 14.
-- **Footer metadata** (muted, below destructive link): Activity Type, Source (uses `sourceName` resolver), Imported date, Last synced (relative time from `HealthKitSyncService.lastSyncDate(for:)`). Source name resolution: Apple Watch → `Apple Workout`, recognized sources → `HKSource.name`, unresolvable → `another app`. Never renders a raw bundle ID.
+- **Footer metadata** (muted, below destructive link): Activity Type, Source (via the `sourceName` resolver — see the Source Indicator bullet above and SERVICES.md § HealthKitClient), Imported date, Last synced (relative time from `HealthKitSyncService.lastSyncDate(for:)`).
 
 Full layout spec lives in SCREENS.md § Workout Detail → Source Indicator Info Sheet.
 
@@ -441,7 +431,7 @@ HealthKit capability added to the target.
 | `HKCategoryTypeIdentifierSleepAnalysis` | 17+ | **Phase 11.** Sleep stage samples (`.asleepDeep`, `.asleepREM`, `.asleepCore`, `.asleepUnspecified`, `.awake`, `.inBed`). Read for any HK source (Apple Watch, Oura, Whoop, AutoSleep, etc.). Aggregated by `RecoveryStatusService` into `DailySleepSnapshot` records on the 6pm-to-6pm wake-up-date window (see § 21). |
 | `HKQuantityTypeIdentifierWorkoutEffortScore` | 18+ (gated) | Per-workout. |
 
-> **Removed (BUG-048):** earlier revisions of this section listed `HKCharacteristicTypeIdentifierSleepDurationGoal` as a Phase 11 read type. That characteristic does not exist in HealthKit's public API — the only characteristic identifiers Apple exposes are `activityMoveMode`, `biologicalSex`, `bloodType`, `dateOfBirth`, `fitzpatrickSkinType`, and `wheelchairUse`. Apple's "Sleep Schedule" feature stores sleep goals internally but is not reachable through HealthKit reads. The Import from Apple Health button in the Recovery Status Settings Modal therefore always emits the "No sleep goal set in Apple Health." toast in this build; see § 21 → Apple Health sleep goal import.
+> **Note (BUG-048):** HealthKit exposes no `sleepDurationGoal` characteristic in its public API, so no sleep-goal read type is requested. The Import from Apple Health button in the Recovery Status Settings Modal therefore always emits the "No sleep goal set in Apple Health." toast. Full explanation in § 21 → `DefaultHealthKitClient` Sleep Methods.
 
 `typesToShare` is an empty set. Only `typesToRead` is populated.
 
@@ -495,18 +485,7 @@ See TESTING.md for target structure and conventions.
 - `workoutEffortScore` API on real iOS 18 device
 
 ### Accessibility Identifiers
-Add to `AccessibilityIdentifiers.swift`:
-- `settings_appleHealthToggle`
-- `settings_appleHealthSyncNowButton`
-- `settings_appleHealthOpenSettingsButton`
-- `workoutDetail_healthSourceIndicator`
-- `workoutDetail_healthUnlinkButton`
-- `logWorkout_durationReadOnlyHelper`
-- `logWorkout_distanceReadOnlyHelper`
-- `logWorkout_dateReadOnlyHelper`
-- `matchPromptSheet_linkButton`
-- `matchPromptSheet_keepSeparateButton`
-- `matchPromptSheet_decideLaterButton`
+Canonical inventory: **TESTING.md § Accessibility Identifiers** → the "HealthKit" and "HealthKit (Phase 8.5+ Source Info Sheet)" rows (`settings_appleHealth*`, `workoutDetail_health*`, the Log Workout HealthKit-linked field popovers `logWorkout_hkFieldInfoIcon_{date|startTime|duration|distance}` — matching SCREENS § Log Workout and CONSTANTS § HealthKit Strings — and `matchPromptSheet_*`). Add new identifiers there, not here.
 
 ---
 
@@ -627,7 +606,7 @@ A separate cascade from the Workout Cascade because the inputs and consumers dif
 
 1. Refresh the Recovery Status widget's view-model (hero value, deep caption, no-sleep-last-night sub-state detection).
 2. If the widget is linked to Training Load (`HomeWidgetService.isLinkedActive(widgets:settings:) == true`), recompute today's TL score on the sleep-adjusted path (SERVICES.md § Training Load Algorithm → Sleep-Adjusted Decay) and overwrite today's `DailyTrainingLoadSnapshot`.
-3. If a detail sheet (unlinked OR linked) is currently presented, the sheet's service publisher emits — sleep sparkline, stages bar, comparison band, correlation callout, and personal insights all update live.
+3. If a detail sheet (unlinked OR linked) is currently presented, the sheet's service publisher emits — sleep sparkline, stages bar, and comparison band all update live.
 4. Debounce across all triggers: 500ms.
 
 ### Known Failure Modes (documented, no UI)

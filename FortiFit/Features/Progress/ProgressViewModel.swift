@@ -505,7 +505,11 @@ final class ProgressViewModel {
         var weeks: [RPEWeekEntry] = []
         forEachRecentWeek { weekStart, endOfWeek in
             let weekWorkouts = allWorkouts.filter { $0.date >= weekStart && $0.date <= endOfWeek && $0.rpe != nil }
-            let avgRPE = weekWorkouts.isEmpty ? 0 : Double(weekWorkouts.compactMap(\.rpe).reduce(0, +)) / Double(weekWorkouts.count)
+            // BUG-079 — drop empty weeks so `hasRPEData` (and therefore the chart card)
+            // matches `TrendsChartService.hasEnoughData(for: "rpeTrend", ...)` used by
+            // the detail view. Mirrors `computeDurationTrend`'s identical guard.
+            guard !weekWorkouts.isEmpty else { return }
+            let avgRPE = Double(weekWorkouts.compactMap(\.rpe).reduce(0, +)) / Double(weekWorkouts.count)
             weeks.append(RPEWeekEntry(weekStart: weekStart, averageRPE: avgRPE))
         }
         rpeWeeklyData = weeks

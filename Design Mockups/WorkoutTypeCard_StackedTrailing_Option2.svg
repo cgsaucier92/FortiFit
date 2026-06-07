@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 540" font-family="-apple-system, SF Pro Text, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="360" height="540" fill="#0a0a0a"/>
+
+  <text x="16" y="20" fill="#737373" font-size="11" letter-spacing="0.5">Workout type cards — Option 2: stacked right column</text>
+  <text x="16" y="36" fill="#525252" font-size="9.5">Trailing chrome stacks vertically (count on top, indicators beneath) when sort or filter is active.</text>
+
+  <!-- =========================================== -->
+  <!-- STATE A: sort + filter ACTIVE — stacked     -->
+  <!-- =========================================== -->
+  <text x="16" y="62" fill="#a3a3a3" font-size="10" font-weight="600" letter-spacing="0.5">STATE A — SORT + FILTER ACTIVE (stacked right column)</text>
+
+  <!-- Card 1: Strength Training -->
+  <g transform="translate(0,72)">
+    <rect x="16" y="0" width="328" height="56" rx="12" fill="#1a1a1a" stroke="#262626" stroke-width="1"/>
+    <!-- leading icon placeholder (figure.strengthtraining.traditional) -->
+    <g transform="translate(28,18)" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="6" cy="3" r="2.2" fill="#3b82f6" stroke="none"/>
+      <line x1="2" y1="14" x2="10" y2="14"/>
+      <line x1="0" y1="11" x2="0" y2="17"/>
+      <line x1="12" y1="11" x2="12" y2="17"/>
+    </g>
+    <!-- title (now has room to render full "Strength Training") -->
+    <text x="56" y="34" fill="#3b82f6" font-size="16" font-weight="600">Strength Training</text>
+
+    <!-- right column row 1: count (top) -->
+    <text x="296" y="24" text-anchor="end" fill="#737373" font-size="10" letter-spacing="0.6" font-weight="600">86 WORKOUTS</text>
+
+    <!-- right column row 2: sort + filter indicators (bottom) -->
+    <g transform="translate(252,34)" fill="#737373">
+      <!-- sort: list.number -->
+      <rect x="0" y="1" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="5" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="9" width="9" height="1.5" rx="0.5"/>
+      <text x="11.5" y="11" font-size="8" font-weight="700" fill="#737373">123</text>
+      <!-- filter: line.3.horizontal.decrease + count -->
+      <g transform="translate(32,0)">
+        <rect x="0" y="1" width="12" height="1.5" rx="0.5"/>
+        <rect x="1.5" y="5" width="9" height="1.5" rx="0.5"/>
+        <rect x="3" y="9" width="6" height="1.5" rx="0.5"/>
+        <text x="14" y="11" font-size="9" font-weight="700" fill="#737373">1</text>
+      </g>
+    </g>
+
+    <!-- chevron -->
+    <path d="M 306 22 L 314 28 L 306 34" stroke="#737373" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Card 2: Cardio -->
+  <g transform="translate(0,140)">
+    <rect x="16" y="0" width="328" height="56" rx="12" fill="#1a1a1a" stroke="#262626" stroke-width="1"/>
+    <g transform="translate(28,16)" fill="#3b82f6">
+      <circle cx="6" cy="3" r="2.2"/>
+      <rect x="5" y="6" width="2" height="9" rx="1"/>
+      <rect x="0.5" y="9" width="11" height="1.6" rx="0.6"/>
+      <rect x="3" y="14" width="2" height="6" rx="1"/>
+      <rect x="7" y="14" width="2" height="6" rx="1"/>
+    </g>
+    <text x="56" y="34" fill="#3b82f6" font-size="16" font-weight="600">Cardio</text>
+    <g transform="translate(252,34)" fill="#737373">
+      <rect x="0" y="1" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="5" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="9" width="9" height="1.5" rx="0.5"/>
+      <text x="11.5" y="11" font-size="8" font-weight="700" fill="#737373">123</text>
+      <g transform="translate(32,0)">
+        <rect x="0" y="1" width="12" height="1.5" rx="0.5"/>
+        <rect x="1.5" y="5" width="9" height="1.5" rx="0.5"/>
+        <rect x="3" y="9" width="6" height="1.5" rx="0.5"/>
+        <text x="14" y="11" font-size="9" font-weight="700" fill="#737373">1</text>
+      </g>
+    </g>
+    <text x="296" y="24" text-anchor="end" fill="#737373" font-size="10" letter-spacing="0.6" font-weight="600">53 WORKOUTS</text>
+    <path d="M 306 22 L 314 28 L 306 34" stroke="#737373" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Card 3: HIIT -->
+  <g transform="translate(0,208)">
+    <rect x="16" y="0" width="328" height="56" rx="12" fill="#1a1a1a" stroke="#262626" stroke-width="1"/>
+    <g transform="translate(28,16)" fill="#3b82f6">
+      <circle cx="6" cy="3" r="2.2"/>
+      <rect x="5" y="6" width="2" height="7" rx="1"/>
+      <rect x="2" y="13" width="2" height="6" rx="1" transform="rotate(-15 3 16)"/>
+      <rect x="8" y="13" width="2" height="6" rx="1" transform="rotate(15 9 16)"/>
+    </g>
+    <text x="56" y="34" fill="#3b82f6" font-size="16" font-weight="600">HIIT</text>
+    <g transform="translate(252,34)" fill="#737373">
+      <rect x="0" y="1" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="5" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="9" width="9" height="1.5" rx="0.5"/>
+      <text x="11.5" y="11" font-size="8" font-weight="700" fill="#737373">123</text>
+      <g transform="translate(32,0)">
+        <rect x="0" y="1" width="12" height="1.5" rx="0.5"/>
+        <rect x="1.5" y="5" width="9" height="1.5" rx="0.5"/>
+        <rect x="3" y="9" width="6" height="1.5" rx="0.5"/>
+        <text x="14" y="11" font-size="9" font-weight="700" fill="#737373">1</text>
+      </g>
+    </g>
+    <text x="296" y="24" text-anchor="end" fill="#737373" font-size="10" letter-spacing="0.6" font-weight="600">70 WORKOUTS</text>
+    <path d="M 306 22 L 314 28 L 306 34" stroke="#737373" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Card 4: Other -->
+  <g transform="translate(0,276)">
+    <rect x="16" y="0" width="328" height="56" rx="12" fill="#1a1a1a" stroke="#262626" stroke-width="1"/>
+    <g transform="translate(28,16)" fill="#3b82f6">
+      <circle cx="6" cy="3" r="2.2"/>
+      <rect x="5" y="6" width="2" height="9" rx="1"/>
+      <rect x="3" y="15" width="2" height="5" rx="1"/>
+      <rect x="7" y="15" width="2" height="5" rx="1"/>
+    </g>
+    <text x="56" y="34" fill="#3b82f6" font-size="16" font-weight="600">Other</text>
+    <g transform="translate(252,34)" fill="#737373">
+      <rect x="0" y="1" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="5" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="9" width="9" height="1.5" rx="0.5"/>
+      <text x="11.5" y="11" font-size="8" font-weight="700" fill="#737373">123</text>
+      <g transform="translate(32,0)">
+        <rect x="0" y="1" width="12" height="1.5" rx="0.5"/>
+        <rect x="1.5" y="5" width="9" height="1.5" rx="0.5"/>
+        <rect x="3" y="9" width="6" height="1.5" rx="0.5"/>
+        <text x="14" y="11" font-size="9" font-weight="700" fill="#737373">1</text>
+      </g>
+    </g>
+    <text x="296" y="24" text-anchor="end" fill="#737373" font-size="10" letter-spacing="0.6" font-weight="600">3 WORKOUTS</text>
+    <path d="M 306 22 L 314 28 L 306 34" stroke="#737373" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Card 5: Yoga -->
+  <g transform="translate(0,344)">
+    <rect x="16" y="0" width="328" height="56" rx="12" fill="#1a1a1a" stroke="#262626" stroke-width="1"/>
+    <g transform="translate(28,16)" fill="#3b82f6">
+      <circle cx="6" cy="3" r="2.2"/>
+      <rect x="5" y="6" width="2" height="6" rx="1"/>
+      <rect x="0" y="11" width="12" height="1.6" rx="0.6"/>
+      <rect x="2" y="14" width="2" height="6" rx="1" transform="rotate(20 3 17)"/>
+      <rect x="8" y="14" width="2" height="6" rx="1" transform="rotate(-20 9 17)"/>
+    </g>
+    <text x="56" y="34" fill="#3b82f6" font-size="16" font-weight="600">Yoga</text>
+    <g transform="translate(252,34)" fill="#737373">
+      <rect x="0" y="1" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="5" width="9" height="1.5" rx="0.5"/>
+      <rect x="0" y="9" width="9" height="1.5" rx="0.5"/>
+      <text x="11.5" y="11" font-size="8" font-weight="700" fill="#737373">123</text>
+      <g transform="translate(32,0)">
+        <rect x="0" y="1" width="12" height="1.5" rx="0.5"/>
+        <rect x="1.5" y="5" width="9" height="1.5" rx="0.5"/>
+        <rect x="3" y="9" width="6" height="1.5" rx="0.5"/>
+        <text x="14" y="11" font-size="9" font-weight="700" fill="#737373">1</text>
+      </g>
+    </g>
+    <text x="296" y="24" text-anchor="end" fill="#737373" font-size="10" letter-spacing="0.6" font-weight="600">7 WORKOUTS</text>
+    <path d="M 306 22 L 314 28 L 306 34" stroke="#737373" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- =========================================== -->
+  <!-- STATE B: sort + filter INACTIVE — single row -->
+  <!-- =========================================== -->
+  <text x="16" y="424" fill="#a3a3a3" font-size="10" font-weight="600" letter-spacing="0.5">STATE B — INACTIVE (single-row right column, unchanged)</text>
+
+  <g transform="translate(0,434)">
+    <rect x="16" y="0" width="328" height="48" rx="12" fill="#1a1a1a" stroke="#262626" stroke-width="1"/>
+    <g transform="translate(28,14)" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="6" cy="3" r="2.2" fill="#3b82f6" stroke="none"/>
+      <line x1="2" y1="14" x2="10" y2="14"/>
+      <line x1="0" y1="11" x2="0" y2="17"/>
+      <line x1="12" y1="11" x2="12" y2="17"/>
+    </g>
+    <text x="56" y="30" fill="#3b82f6" font-size="16" font-weight="600">Strength Training</text>
+    <text x="296" y="30" text-anchor="end" fill="#737373" font-size="10" letter-spacing="0.6" font-weight="600">86 WORKOUTS</text>
+    <path d="M 306 18 L 314 24 L 306 30" stroke="#737373" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- =========================================== -->
+  <!-- Notes                                       -->
+  <!-- =========================================== -->
+  <g transform="translate(16,500)">
+    <text x="0" y="0" fill="#737373" font-size="9" font-weight="600" letter-spacing="0.4">NOTES</text>
+    <text x="0" y="13" fill="#525252" font-size="9">• Card height grows from 48pt → 56pt when active; all 5 cards grow together (consistent rhythm).</text>
+    <text x="0" y="25" fill="#525252" font-size="9">• Title gets full width on every card — "Strength Training" no longer competes with sort+filter chrome.</text>
+  </g>
+</svg>

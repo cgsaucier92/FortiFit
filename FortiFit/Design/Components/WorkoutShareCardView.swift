@@ -104,6 +104,7 @@ struct WorkoutShareCardView: View {
         let unit: String?
         let iconColor: Color
         let valueColor: Color
+        var effortRPE: Int? = nil
     }
 
     private var shareCardStats: [ShareStatData] {
@@ -117,7 +118,8 @@ struct WorkoutShareCardView: View {
                 value: AppConstants.effortLabel(for: rpe),
                 unit: nil,
                 iconColor: bandColor,
-                valueColor: bandColor
+                valueColor: bandColor,
+                effortRPE: rpe
             ))
         }
         if let duration = workout.durationMinutes {
@@ -247,9 +249,13 @@ struct WorkoutShareCardView: View {
     private func shareStatCard(_ data: ShareStatData) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Image(systemName: data.symbol)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(data.iconColor)
+                if let rpe = data.effortRPE {
+                    FortiFitEffortBars(rpe: rpe, size: 12)
+                } else {
+                    Image(systemName: data.symbol)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(data.iconColor)
+                }
                 Text(data.label)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(FortiFitColors.primaryText)

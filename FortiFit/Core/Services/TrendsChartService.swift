@@ -407,6 +407,62 @@ struct TrendsChartService {
         }
     }
 
+    // MARK: - Enough-Data Predicate (Shared by Card + Detail)
+
+    // BUG-073 — single source of truth for the "do I have enough data to render this
+    // chart?" question. Both `FortiFitChartCard` (via `ProgressViewModel.has*Data`) and
+    // `FortiFitChartDetailView` (via its per-renderer empty-state gate) must call this
+    // so the compact card and the expanded detail never disagree about emptiness.
+    // Thresholds mirror CONSTANTS § Chart Data Thresholds.
+    static func hasEnoughData(
+        for chartType: String,
+        exerciseName: String? = nil,
+        range: DetailTimeRange,
+        context: ModelContext
+    ) -> Bool {
+        switch chartType {
+        case "strengthTracker":
+            return dataPoints(for: chartType, exerciseName: exerciseName, range: range, context: context).count >= 2
+        case "workoutVolume":
+            return dataPoints(for: chartType, exerciseName: nil, range: range, context: context).count >= 2
+        case "personalRecords":
+            return !exercisesWithPRs(context: context).isEmpty
+        case "trainingLoadTrend":
+            // Range-independent: matches `ProgressViewModel.hasLoadTrendData` —
+            // need at least 3 distinct days with workouts in the last 14 days.
+            let cutoff = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+            let recent = WorkoutService.fetchAll(context: context).filter { $0.date >= cutoff }
+            let days = Set(recent.map { Calendar.current.startOfDay(for: $0.date) })
+            return days.count >= 3
+        case "workoutTypeBreakdown":
+            return breakdownPercentages(range: range, context: context).reduce(0) { $0 + $1.count } >= 2
+        case "trainingFrequency":
+            // Need ≥ 1 *completed* prior week (ends before current week start) with count > 0.
+            let points = dataPoints(for: chartType, exerciseName: nil, range: range, context: context)
+            return hasAtLeastOneCompletedWeek(points: points, requiringValue: true)
+        case "rpeTrend", "sessionDuration":
+            // Need ≥ 1 *completed* prior week with data. `*Points` helpers already drop
+            // empty weeks for these two, so any point with a completed weekStart qualifies.
+            let points = dataPoints(for: chartType, exerciseName: nil, range: range, context: context)
+            return hasAtLeastOneCompletedWeek(points: points, requiringValue: false)
+        default:
+            return false
+        }
+    }
+
+    private static func hasAtLeastOneCompletedWeek(points: [ChartDataPoint], requiringValue: Bool) -> Bool {
+        let now = Date()
+        var isoCalendar = Calendar(identifier: .iso8601)
+        isoCalendar.firstWeekday = 2
+        let currentWeekStart = now.startOfWeek
+
+        return points.contains { point in
+            guard let weekEnd = isoCalendar.date(byAdding: .day, value: 6, to: point.x) else { return false }
+            let isCompleted = weekEnd < currentWeekStart
+            return isCompleted && (!requiringValue || point.y > 0)
+        }
+    }
+
     // MARK: - Data Point Fetch (Detail View)
 
     static func dataPoints(
@@ -620,38 +676,10 @@ struct TrendsChartService {
     }
 
     private static func personalRecordsDelta(exerciseName: String?, workouts: [Workout], useLbs: Bool, summary: ChartSummary) -> ChartDelta {
-        guard let name = exerciseName, !name.isEmpty else {
-            return ChartDelta(hero: summary.hero, caption: summary.caption, delta: nil, direction: .flat)
-        }
-
-        let nameLower = name.lowercased()
-        var history: [(weightKg: Double, date: Date)] = []
-        for workout in workouts.sorted(by: { $0.date < $1.date }) {
-            for set in workout.exerciseSets {
-                guard let weight = set.weightKg,
-                      set.exerciseName.lowercased() == nameLower else { continue }
-                history.append((weight, workout.date))
-            }
-        }
-
-        var runningMax = history.first?.weightKg ?? 0
-        var prEvents: [(record: Double, previous: Double)] = []
-        for i in 1..<history.count {
-            if history[i].weightKg > runningMax {
-                prEvents.append((record: history[i].weightKg, previous: runningMax))
-                runningMax = history[i].weightKg
-            }
-        }
-
-        guard let latest = prEvents.last else {
-            return ChartDelta(hero: summary.hero, caption: summary.caption, delta: nil, direction: .flat)
-        }
-
-        let diffKg = latest.record - latest.previous
-        let displayDiff = useLbs ? diffKg * UnitConversion.kgToLbsFactor : diffKg
-        let unit = useLbs ? "lbs" : "kg"
-        let delta = AppConstants.Trends.deltaString(magnitude: "+\(Int(displayDiff.rounded())) \(unit)", rangeLabel: "PR")
-        return ChartDelta(hero: summary.hero, caption: summary.caption, delta: delta, direction: .up)
+        // Personal Records detail header intentionally omits the delta chip — the
+        // hero value already expresses the latest PR change (e.g. "+5 lbs"), so a
+        // second "+5 lbs vs. prior PR" chip is redundant.
+        return ChartDelta(hero: summary.hero, caption: summary.caption, delta: nil, direction: .flat)
     }
 
     private static func trainingLoadDelta(workouts: [Workout], calendar: Calendar, now: Date, summary: ChartSummary, context: ModelContext) -> ChartDelta {
@@ -988,5 +1016,42 @@ struct TrendsChartService {
             chart.sortOrder = index
         }
         try? context.save()
+    }
+
+    // MARK: - Y-Axis Domain
+
+    // BUG-076 — Swift Charts' auto Y-axis snaps the top gridline to the max
+    // data value, landing the latest point flush on the plot-frame stroke.
+    // Combined with .catmullRom overshoot at sharp peaks, the line can clip
+    // above the border. Centralised here so compact card and detail view
+    // stay in lockstep (Phase 6.2 swipe paging must not retick).
+    static func paddedYDomain(
+        for values: [Double],
+        headroomFraction: Double = 0.10,
+        floorAtZero: Bool = true
+    ) -> ClosedRange<Double> {
+        let fallback: ClosedRange<Double> = 0...1
+        guard let rawMax = values.max(), rawMax.isFinite else { return fallback }
+        guard rawMax > 0 else { return fallback }
+
+        let lower = floorAtZero ? 0.0 : min(0.0, values.min() ?? 0.0)
+        let padded = rawMax * (1.0 + max(0, headroomFraction))
+        let upper = niceCeiling(padded)
+        return lower...upper
+    }
+
+    /// Rounds an upper bound up to a chart-friendly step (1/2/5 × 10^n) so
+    /// the top gridline lands on a readable number.
+    private static func niceCeiling(_ value: Double) -> Double {
+        guard value > 0 else { return 1 }
+        let exponent = floor(log10(value))
+        let magnitude = pow(10.0, exponent)
+        let normalized = value / magnitude
+        let niceNormalized: Double
+        if normalized <= 1 { niceNormalized = 1 }
+        else if normalized <= 2 { niceNormalized = 2 }
+        else if normalized <= 5 { niceNormalized = 5 }
+        else { niceNormalized = 10 }
+        return niceNormalized * magnitude
     }
 }

@@ -282,6 +282,17 @@ struct HomeView: View {
                     recoveryService.refreshTimerLine(context: modelContext)
                 }
             }
+            // BUG-078 — Refresh when HealthKitSyncService imports a workout while
+            // Home is foregrounded. Without this, the snapshot-based VM state
+            // (recentWorkouts, training load, power level, today's plan) only
+            // catches up on the next .onAppear, so Apple Watch workouts
+            // completed mid-session don't surface until the user navigates away
+            // and back.
+            .onReceive(NotificationCenter.default.publisher(for: .fortiFitHealthKitDidImport)) { _ in
+                viewModel.loadData(context: modelContext)
+                activityService.refreshWorkoutContributions(context: modelContext)
+                recoveryService.refreshTimerLine(context: modelContext)
+            }
             .onChange(of: viewModel.activeWidgets.map(\.widgetType)) { _, _ in
                 recoveryService.isLinkedActive = isLinkedActive
             }
@@ -694,6 +705,7 @@ struct HomeView: View {
         case "powerLevel":
             FortiFitPowerLevelWidget(
                 result: viewModel.powerLevelResult,
+                pctChange: powerLevelPctChangeOrNil,
                 isReorderMode: viewModel.isEditMode
             )
 
@@ -716,6 +728,9 @@ struct HomeView: View {
                 lastWorkoutValue: recoveryService.lastWorkoutHeroFormatted.isEmpty
                     ? recoveryService.lastWorkoutHero(context: modelContext)
                     : recoveryService.lastWorkoutHeroFormatted,
+                lastWorkoutName: recoveryService.lastWorkoutNameHeroFormatted.isEmpty
+                    ? recoveryService.lastWorkoutNameHero(context: modelContext)
+                    : recoveryService.lastWorkoutNameHeroFormatted,
                 isReorderMode: viewModel.isEditMode,
                 onConnect: { showSettings = true },
                 onOpenIOSSettings: {
@@ -730,13 +745,55 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Power Level Widget Inputs (Phase 12)
+
+    /// `pct_change` for the gauge thumb; nil when undefined (no baseline or no
+    /// qualifying workouts at all). See SERVICES.md § Power Level Algorithm
+    /// → Widget & Hero Gauge Position.
+    private var powerLevelPctChangeOrNil: Double? {
+        let comparison = viewModel.powerLevelWindowComparison
+        if viewModel.powerLevelResult.status == .noData { return nil }
+        if comparison.previous30dAvg == 0 { return nil }
+        return comparison.deltaPct
+    }
+
     // MARK: - Today's Plan Widget
 
     private var todaysPlanWidget: some View {
         FortiFitCard {
             HStack(alignment: .top, spacing: FortiFitSpacing.gapMedium) {
                 // Left column — title + workout info with silhouette watermark
-                ZStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
+                    FortiFitWidgetHeader(title: "Today's Plan")
+
+                    if let workout = viewModel.currentPlannedWorkout {
+                        Text(workout.workoutName)
+                            .font(FortiFitTypography.dataValue)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                            .lineLimit(2)
+
+                        if viewModel.additionalPlannedCount > 0 {
+                            Text("\(viewModel.additionalPlannedCount) more planned")
+                                .font(.system(size: 11, weight: .bold))
+                                .kerning(FortiFitTypography.labelKerning)
+                                .foregroundStyle(FortiFitColors.mutedText)
+                        }
+                    } else if viewModel.todaysPlanAllCompleted {
+                        HStack(spacing: FortiFitSpacing.elementSpacing) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(FortiFitColors.positive)
+                            Text("All planned workouts completed.")
+                                .font(FortiFitTypography.note)
+                                .foregroundStyle(FortiFitColors.mutedText)
+                        }
+                    } else {
+                        Text("No workout planned for today.")
+                            .font(FortiFitTypography.note)
+                            .foregroundStyle(FortiFitColors.primaryText)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(alignment: .center) {
                     if let workout = viewModel.currentPlannedWorkout,
                        let symbol = AppConstants.workoutTypeSymbols[workout.workoutType] {
                         Image(systemName: symbol)
@@ -747,39 +804,7 @@ struct HomeView: View {
                             .accessibilityIdentifier(AccessibilityID.homeWidget_todaysPlan_silhouette)
                             .accessibilityHidden(true)
                     }
-
-                    VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                        FortiFitWidgetHeader(title: "Today's Plan")
-
-                        if let workout = viewModel.currentPlannedWorkout {
-                            Text(workout.workoutName)
-                                .font(FortiFitTypography.dataValue)
-                                .foregroundStyle(FortiFitColors.primaryText)
-                                .lineLimit(2)
-
-                            if viewModel.additionalPlannedCount > 0 {
-                                Text("\(viewModel.additionalPlannedCount) more planned")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .kerning(FortiFitTypography.labelKerning)
-                                    .foregroundStyle(FortiFitColors.mutedText)
-                            }
-                        } else if viewModel.todaysPlanAllCompleted {
-                            HStack(spacing: FortiFitSpacing.elementSpacing) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(FortiFitColors.positive)
-                                Text("All planned workouts completed.")
-                                    .font(FortiFitTypography.note)
-                                    .foregroundStyle(FortiFitColors.mutedText)
-                            }
-                        } else {
-                            Text("No workout planned for today.")
-                                .font(FortiFitTypography.note)
-                                .foregroundStyle(FortiFitColors.primaryText)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity)
 
                 // Right column — calendar square (25% width)
                 GeometryReader { geo in
@@ -790,6 +815,7 @@ struct HomeView: View {
                     .frame(width: geo.size.width, height: geo.size.height)
                 }
                 .frame(minHeight: 80, maxHeight: .infinity)
+                .padding(.vertical, FortiFitSpacing.elementSpacing)
                 .containerRelativeFrame(.horizontal) { length, _ in
                     length * 0.25
                 }
@@ -813,10 +839,6 @@ struct HomeView: View {
         ) {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 FortiFitWidgetHeader(title: "Training Load")
-
-                Text(linkedAwareLoadResult.zone)
-                    .font(FortiFitTypography.dataValue)
-                    .foregroundStyle(loadColor)
 
                 Text(linkedAwareAdvisory)
                     .font(FortiFitTypography.note)
@@ -872,6 +894,9 @@ struct HomeView: View {
                     lastWorkoutValue: recoveryService.lastWorkoutHeroFormatted.isEmpty
                         ? recoveryService.lastWorkoutHero(context: modelContext)
                         : recoveryService.lastWorkoutHeroFormatted,
+                    lastWorkoutName: recoveryService.lastWorkoutNameHeroFormatted.isEmpty
+                        ? recoveryService.lastWorkoutNameHero(context: modelContext)
+                        : recoveryService.lastWorkoutNameHeroFormatted,
                     isReorderMode: viewModel.isEditMode,
                     isEmbedded: true,
                     onConnect: { showSettings = true },
@@ -1098,12 +1123,21 @@ struct HomeView: View {
                         step: 1
                     )
                     .tint(FortiFitColors.primaryAccent)
+                    // BUG-081: .lineLimit(1) + .fixedSize keep INTERMEDIATE on a single line
+                    // on 393pt-class devices (HStack would otherwise propose ~⅓ width per Text
+                    // and force the middle label to wrap mid-word).
                     HStack {
                         Text("BEGINNER")
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                         Spacer()
                         Text("INTERMEDIATE")
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                         Spacer()
                         Text("ADVANCED")
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .font(FortiFitTypography.labelSmall)
                     .kerning(FortiFitTypography.labelKerning)

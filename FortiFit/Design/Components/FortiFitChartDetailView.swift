@@ -248,9 +248,12 @@ struct FortiFitChartDetailView: View {
     private func lineChartDetail(chartId: String, range: DetailTimeRange, exerciseName: String?, color: Color, gradientAnchor: ChartGradientAnchor, yLabel: String) -> some View {
         let points = TrendsChartService.dataPoints(for: chartId, exerciseName: exerciseName, range: range, context: modelContext)
 
-        if points.isEmpty {
+        // BUG-073 — gate on the same threshold the card uses so a single data point
+        // doesn't render here while the card shows "log more…"
+        if !TrendsChartService.hasEnoughData(for: chartId, exerciseName: exerciseName, range: range, context: modelContext) {
             emptyChartState(chartId: chartId)
         } else {
+            let yDomain = TrendsChartService.paddedYDomain(for: points.map(\.y))
             detailPlotArea(gradientAnchor: gradientAnchor) {
                 Chart {
                     ForEach(Array(points.enumerated()), id: \.element.id) { index, point in
@@ -259,7 +262,7 @@ struct FortiFitChartDetailView: View {
                             y: .value("Value", point.y)
                         )
                         .foregroundStyle(selectedIndex == nil || selectedIndex == index ? color : color.opacity(0.35))
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(.monotone)
 
                         PointMark(
                             x: .value("Date", point.x),
@@ -288,6 +291,7 @@ struct FortiFitChartDetailView: View {
                             .lineStyle(StrokeStyle(lineWidth: 1))
                     }
                 }
+                .chartYScale(domain: yDomain)
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
@@ -336,7 +340,10 @@ struct FortiFitChartDetailView: View {
     private func barChartDetail(chartId: String, range: DetailTimeRange, color: Color, gradientAnchor: ChartGradientAnchor, yLabel: String, yDomain: ClosedRange<Double>? = nil) -> some View {
         let points = TrendsChartService.dataPoints(for: chartId, exerciseName: nil, range: range, context: modelContext)
 
-        if points.isEmpty {
+        // BUG-073 — match the card's threshold (e.g. trainingFrequency requires
+        // ≥ 1 completed week with count > 0; the raw `points` array includes
+        // empty weeks and would otherwise let the chart render with all-zero bars).
+        if !TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext) {
             emptyChartState(chartId: chartId)
         } else {
             let formatter = DateFormatter()
@@ -376,13 +383,7 @@ struct FortiFitChartDetailView: View {
                         }
                     }
                 }
-                .modify { chart in
-                    if let domain = yDomain {
-                        chart.chartYScale(domain: domain)
-                    } else {
-                        chart
-                    }
-                }
+                .chartYScale(domain: yDomain ?? TrendsChartService.paddedYDomain(for: points.map(\.y)))
                 .chartOverlay { proxy in
                     GeometryReader { _ in
                         Rectangle().fill(.clear).contentShape(Rectangle())
@@ -407,7 +408,10 @@ struct FortiFitChartDetailView: View {
     private func trainingLoadDetail(chartId: String, range: DetailTimeRange, gradientAnchor: ChartGradientAnchor) -> some View {
         let points = TrendsChartService.dataPoints(for: chartId, exerciseName: nil, range: range, context: modelContext)
 
-        if points.isEmpty {
+        // BUG-073 — `trainingLoadPoints` returns 30 daily points unconditionally
+        // (with zero-score days), so `!points.isEmpty` is always true. Match the
+        // card's "3+ days with workouts in last 14 days" gate instead.
+        if !TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext) {
             emptyChartState(chartId: chartId)
         } else {
             let formatter = DateFormatter()
@@ -532,7 +536,11 @@ struct FortiFitChartDetailView: View {
         let name = exerciseName ?? ""
         let events = TrendsChartService.fullPRTimeline(for: name, context: modelContext)
 
-        if prExercises.isEmpty {
+        // BUG-073 — funnel through `hasEnoughData` for consistency with other charts
+        // (semantically equivalent to `prExercises.isEmpty` since both wrap
+        // `exercisesWithPRs(...)`). The inner `events.isEmpty` defensive check below
+        // handles the picker-selected-an-edge-case-exercise sub-state.
+        if !TrendsChartService.hasEnoughData(for: chartId, range: .allTime, context: modelContext) {
             emptyChartState(chartId: chartId)
         } else {
             FortiFitSelect(
@@ -552,6 +560,8 @@ struct FortiFitChartDetailView: View {
                 emptyChartState(chartId: chartId)
             } else {
                 let useLbs = settings.useLbs
+                let displayWeights = events.map { useLbs ? $0.weightKg * UnitConversion.kgToLbsFactor : $0.weightKg }
+                let yDomain = TrendsChartService.paddedYDomain(for: displayWeights)
 
                 detailPlotArea(gradientAnchor: gradientAnchor) {
                     Chart {
@@ -563,7 +573,7 @@ struct FortiFitChartDetailView: View {
                                 y: .value("Weight", displayWeight)
                             )
                             .foregroundStyle(selectedIndex == nil || selectedIndex == index ? FortiFitColors.chartDeepBlue : FortiFitColors.chartDeepBlue.opacity(0.35))
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(.monotone)
 
                             PointMark(
                                 x: .value("Date", event.date),
@@ -580,6 +590,7 @@ struct FortiFitChartDetailView: View {
                             .accessibilityIdentifier(AccessibilityID.trendsChartDetailPRTimelinePoint(index: index))
                         }
                     }
+                    .chartYScale(domain: yDomain)
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
@@ -658,7 +669,9 @@ struct FortiFitChartDetailView: View {
     private func breakdownDetail(chartId: String, range: DetailTimeRange, gradientAnchor: ChartGradientAnchor) -> some View {
         let rows = TrendsChartService.breakdownPercentages(range: range, context: modelContext)
 
-        if rows.isEmpty {
+        // BUG-073 — card requires total ≥ 2 workouts in range; the donut would
+        // otherwise render with a single 100% slice from one workout.
+        if !TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext) {
             emptyChartState(chartId: chartId)
         } else {
             let total = rows.reduce(0) { $0 + $1.count }

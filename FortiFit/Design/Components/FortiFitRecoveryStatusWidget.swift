@@ -11,6 +11,10 @@ struct FortiFitRecoveryStatusWidget: View {
     /// Sourced from `RecoveryStatusService.lastWorkoutHeroFormatted` /
     /// `lastWorkoutHero(context:)`.
     let lastWorkoutValue: String
+    /// Display name of the workout the SINCE LAST WORKOUT timer is anchored to. Rendered
+    /// as-stored (sentence/title case as the user entered it) in the caption beneath the
+    /// hero value. Empty string suppresses the caption — used in the no-workouts-yet state.
+    let lastWorkoutName: String
     var isReorderMode: Bool = false
     /// When true, the card suppresses its own border so the linked Recovery & Load
     /// composite renders as a single seamless card (the composite supplies its own
@@ -102,8 +106,11 @@ struct FortiFitRecoveryStatusWidget: View {
         }
     }
 
-    /// SINCE LAST WORKOUT hero column — label + bare value, stacked. Renders in all 4
-    /// gating states (workout history is independent of HK sleep gating).
+    /// SINCE LAST WORKOUT hero column — label + bare value, plus an optional caption
+    /// naming the source workout (mirrors the SLEEP column's deep caption typography,
+    /// but rendered in the workout's as-stored case rather than forced uppercase). The
+    /// caption is suppressed when `lastWorkoutName` is empty (no-workouts-yet state).
+    /// Renders in all 4 gating states (workout history is independent of HK sleep gating).
     private var lastWorkoutColumn: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
             Text("SINCE LAST WORKOUT")
@@ -116,6 +123,16 @@ struct FortiFitRecoveryStatusWidget: View {
                 .font(.system(size: 32, weight: .black))
                 .foregroundStyle(lastWorkoutValueColor)
                 .accessibilityIdentifier(AccessibilityID.homeWidget_recoveryStatus_lastWorkoutValue)
+
+            if !lastWorkoutName.isEmpty {
+                Text(lastWorkoutName)
+                    .font(.system(size: 11, weight: .bold))
+                    .kerning(2)
+                    .foregroundStyle(FortiFitColors.mutedText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .accessibilityIdentifier(AccessibilityID.homeWidget_recoveryStatus_lastWorkoutCaption)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

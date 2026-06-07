@@ -21,6 +21,12 @@ enum AccessibilityID {
     static let addWidgetsMenuDismiss = "addWidgetsMenuDismiss"
     static let homeWidget_trainingLoad_seeInfo = "homeWidget_trainingLoad_seeInfo"
     static let homeWidget_powerLevel_seeInfo = "homeWidget_powerLevel_seeInfo"
+    static let homeWidget_powerLevel_card = "homeWidget_powerLevel_card"
+    static let homeWidget_powerLevel_deltaCaption = "homeWidget_powerLevel_deltaCaption"
+    static let homeWidget_powerLevel_gauge = "homeWidget_powerLevel_gauge"
+    static let homeWidget_powerLevel_gaugeThumb = "homeWidget_powerLevel_gaugeThumb"
+    static let homeWidget_powerLevel_gaugeOverflowIndicator = "homeWidget_powerLevel_gaugeOverflowIndicator"
+    static let homeWidget_powerLevel_gaugeThumbPulse = "homeWidget_powerLevel_gaugeThumbPulse"
     static let homeWidget_trainingLoad_configureSettings = "homeWidget_trainingLoad_configureSettings"
     static let homeWidget_weeklyStreak_configureSettings = "homeWidget_weeklyStreak_configureSettings"
     static let homeWidget_todaysPlan_completeWorkoutMenuItem = "homeWidget_todaysPlan_completeWorkoutMenuItem"
@@ -99,7 +105,9 @@ enum AccessibilityID {
     static let workoutDetail_summaryCard_totalKcal = "workoutDetail_summaryCard_totalKcal"
     static let workoutDetail_summaryCard_elevation = "workoutDetail_summaryCard_elevation"
     static let workoutDetail_summaryCard_exerciseMinutes = "workoutDetail_summaryCard_exerciseMinutes"
+    static let workoutDetail_summaryCard_effortBars = "workoutDetail_summaryCard_effortBars"
     static let metricDetailSheet_closeButton = "metricDetailSheet_closeButton"
+    static let metricDetailSheet_hero_effortBars = "metricDetailSheet_hero_effortBars"
 
     // MARK: - Workout List
 
@@ -266,7 +274,6 @@ enum AccessibilityID {
 
     static let powerLevelDetailSheet_closeButton = "powerLevelDetailSheet_closeButton"
     static let powerLevelDetailSheet_hero = "powerLevelDetailSheet_hero"
-    static let powerLevelDetailSheet_volumeChart = "powerLevelDetailSheet_volumeChart"
     static let powerLevelDetailSheet_topExercises = "powerLevelDetailSheet_topExercises"
     static let powerLevelDetailSheet_windowComparison = "powerLevelDetailSheet_windowComparison"
     static let powerLevelDetailSheet_nudge = "powerLevelDetailSheet_nudge"
@@ -276,11 +283,15 @@ enum AccessibilityID {
         "powerLevelDetailSheet_topExerciseRow_\(index)"
     }
 
-    static let powerLevelDetailSheet_chartSelectionAnnotation = "powerLevelDetailSheet_chartSelectionAnnotation"
+    // MARK: - Power Level Gauge (Phase 12)
 
-    static func powerLevelDetailSheet_chartDataPoint(_ index: Int) -> String {
-        "powerLevelDetailSheet_chartDataPoint_\(index)"
-    }
+    static let powerLevelDetailSheet_heroGauge = "powerLevelDetailSheet_heroGauge"
+    static let powerLevelDetailSheet_heroGaugeThumb = "powerLevelDetailSheet_heroGaugeThumb"
+    static let powerLevelDetailSheet_heroGaugeOverflowIndicator = "powerLevelDetailSheet_heroGaugeOverflowIndicator"
+    static let powerLevelDetailSheet_heroGaugeThumbPulse = "powerLevelDetailSheet_heroGaugeThumbPulse"
+    static let powerLevelDetailSheet_windowComparison_deltaChip = "powerLevelDetailSheet_windowComparison_deltaChip"
+    static let powerLevelDetailSheet_windowComparison_previousBar = "powerLevelDetailSheet_windowComparison_previousBar"
+    static let powerLevelDetailSheet_windowComparison_currentBar = "powerLevelDetailSheet_windowComparison_currentBar"
 
     // MARK: - Recovery Status Widget (Phase 11)
 
@@ -296,6 +307,7 @@ enum AccessibilityID {
     static let homeWidget_recoveryStatus_deepSleepCaption = "homeWidget_recoveryStatus_deepSleepCaption"
     static let homeWidget_recoveryStatus_lastWorkoutHero = "homeWidget_recoveryStatus_lastWorkoutHero"
     static let homeWidget_recoveryStatus_lastWorkoutValue = "homeWidget_recoveryStatus_lastWorkoutValue"
+    static let homeWidget_recoveryStatus_lastWorkoutCaption = "homeWidget_recoveryStatus_lastWorkoutCaption"
     static let homeWidget_recoveryStatus_watermark = "homeWidget_recoveryStatus_watermark"
     static let homeWidget_recoveryStatus_seeInfo = "homeWidget_recoveryStatus_seeInfo"
     static let homeWidget_recoveryStatus_configureSettings = "homeWidget_recoveryStatus_configureSettings"
@@ -360,10 +372,7 @@ enum AccessibilityID {
     static let linkedRecoveryLoadDetailSheet_stagesBar = "linkedRecoveryLoadDetailSheet_stagesBar"
     static let linkedRecoveryLoadDetailSheet_sleepEfficiencyCaption = "linkedRecoveryLoadDetailSheet_sleepEfficiencyCaption"
     static let linkedRecoveryLoadDetailSheet_combinedChart = "linkedRecoveryLoadDetailSheet_combinedChart"
-    static let linkedRecoveryLoadDetailSheet_sleepSparkline = "linkedRecoveryLoadDetailSheet_sleepSparkline"
-    static let linkedRecoveryLoadDetailSheet_loadSparkline = "linkedRecoveryLoadDetailSheet_loadSparkline"
-    static let linkedRecoveryLoadDetailSheet_loadChartSelectionAnnotation = "linkedRecoveryLoadDetailSheet_loadChartSelectionAnnotation"
-    static let linkedRecoveryLoadDetailSheet_sleepChartSelectionAnnotation = "linkedRecoveryLoadDetailSheet_sleepChartSelectionAnnotation"
+    static let linkedRecoveryLoadDetailSheet_combinedSelectionAnnotation = "linkedRecoveryLoadDetailSheet_combinedSelectionAnnotation"
 
     static func linkedRecoveryLoadDetailSheet_loadChartDataPoint(_ index: Int) -> String {
         "linkedRecoveryLoadDetailSheet_loadChartDataPoint_\(index)"
@@ -375,8 +384,6 @@ enum AccessibilityID {
 
     static let linkedRecoveryLoadDetailSheet_windowComparison = "linkedRecoveryLoadDetailSheet_windowComparison"
     static let linkedRecoveryLoadDetailSheet_windowComparisonCaption = "linkedRecoveryLoadDetailSheet_windowComparisonCaption"
-    static let linkedRecoveryLoadDetailSheet_correlationCallout = "linkedRecoveryLoadDetailSheet_correlationCallout"
-    static let linkedRecoveryLoadDetailSheet_personalInsights = "linkedRecoveryLoadDetailSheet_personalInsights"
     static let linkedRecoveryLoadDetailSheet_last3Nights = "linkedRecoveryLoadDetailSheet_last3Nights"
     static let linkedRecoveryLoadDetailSheet_contributingWorkouts = "linkedRecoveryLoadDetailSheet_contributingWorkouts"
     static let linkedRecoveryLoadDetailSheet_timeSinceWorkout = "linkedRecoveryLoadDetailSheet_timeSinceWorkout"
@@ -386,14 +393,9 @@ enum AccessibilityID {
     static let linkedRecoveryLoadDetailSheet_configureSettingsButton = "linkedRecoveryLoadDetailSheet_configureSettingsButton"
 
     static let linkedRecoveryLoadDetailSheet_windowComparison_chevron = "linkedRecoveryLoadDetailSheet_windowComparison_chevron"
-    static let linkedRecoveryLoadDetailSheet_personalInsights_chevron = "linkedRecoveryLoadDetailSheet_personalInsights_chevron"
     static let linkedRecoveryLoadDetailSheet_last3Nights_chevron = "linkedRecoveryLoadDetailSheet_last3Nights_chevron"
     static let linkedRecoveryLoadDetailSheet_contributingWorkouts_chevron = "linkedRecoveryLoadDetailSheet_contributingWorkouts_chevron"
     static let linkedRecoveryLoadDetailSheet_timeSinceWorkout_chevron = "linkedRecoveryLoadDetailSheet_timeSinceWorkout_chevron"
-
-    static func linkedRecoveryLoadDetailSheet_personalInsightsRow(_ index: Int) -> String {
-        "linkedRecoveryLoadDetailSheet_personalInsights_row_\(index)"
-    }
 
     static func linkedRecoveryLoadDetailSheet_timeSinceWorkout_typeRow(_ type: String) -> String {
         "linkedRecoveryLoadDetailSheet_timeSinceWorkout_typeRow_\(type.replacingOccurrences(of: " ", with: "_"))"

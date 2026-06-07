@@ -55,9 +55,14 @@ struct FortiFitMetricDetailSheet: View {
     private var heroBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
-                Image(systemName: metric.sfSymbol)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(heroIconColor)
+                if metric == .effort, let rpe = workout.rpe {
+                    FortiFitEffortBars(rpe: rpe)
+                        .accessibilityIdentifier(AccessibilityID.metricDetailSheet_hero_effortBars)
+                } else {
+                    Image(systemName: metric.sfSymbol)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(heroIconColor)
+                }
                 Text(metric.displayLabel)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(FortiFitColors.primaryText)
@@ -110,8 +115,8 @@ struct FortiFitMetricDetailSheet: View {
 
     @ViewBuilder
     private var sparklineBlock: some View {
-        let data = WorkoutMetricService.sparklineData(for: metric, workout: workout, context: modelContext)
-        if data.count >= 3 {
+        if let result = WorkoutMetricService.sparklineData(for: metric, workout: workout, context: modelContext) {
+            let data = result.points
             VStack(alignment: .leading, spacing: 8) {
                 Chart {
                     if metric == .effort {
@@ -146,7 +151,7 @@ struct FortiFitMetricDetailSheet: View {
                         .stroke(FortiFitColors.border, lineWidth: 1)
                 )
 
-                Text("Last 30 days · \(workout.workoutType)")
+                Text(sparklineCaption(for: result.mode))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(FortiFitColors.mutedText)
             }
@@ -154,6 +159,16 @@ struct FortiFitMetricDetailSheet: View {
             Text("Not enough data yet — log a few more sessions.")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(FortiFitColors.mutedText)
+        }
+    }
+
+    private func sparklineCaption(for mode: WorkoutMetricService.SparklineMode) -> String {
+        switch mode {
+        case .trailingWindow(let days, let anchorDate):
+            let anchorString = anchorDate.formatted(.dateTime.month().day())
+            return "Last \(days) days through \(anchorString) · \(workout.workoutType)"
+        case .recentFallback(let sessionCount):
+            return "Last \(sessionCount) \(workout.workoutType) sessions"
         }
     }
 

@@ -6,7 +6,7 @@ import SwiftData
 /// realistic multi-week histories of sleep + workouts. Composes `Workout`,
 /// `DailySleepSnapshot`, and `DailyTrainingLoadSnapshot` records into a SwiftData
 /// context in a way that lets a single test exercise the full Phase 11 surface
-/// (gating, sleep-adjusted decay, correlation, personal insights) without manually
+/// (gating, sleep-adjusted decay, correlation) without manually
 /// hand-crafting dozens of fixtures.
 ///
 /// All times anchor to 8 AM today so the wake-up-date attribution is deterministic
@@ -99,7 +99,7 @@ enum RealisticUserScenarioBuilder {
     // MARK: - Canned scenarios
 
     /// Two weeks of consistent sleep + workouts. Used to verify the linked composite
-    /// produces a meaningful sleep-load correlation reading and personal insights.
+    /// produces a meaningful sleep-load correlation reading.
     static func twoWeeksConsistentTraining() -> [Day] {
         var days: [Day] = []
         for offset in (1..<14).reversed() {

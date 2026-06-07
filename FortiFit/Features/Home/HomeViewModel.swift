@@ -56,6 +56,12 @@ final class HomeViewModel {
         indicatorColor: "737373",
         message: "Log Strength Training or HIIT workouts to track your power level."
     )
+    /// Window comparison intermediates feeding the Power Level widget gauge (Phase 12).
+    /// The widget's gauge thumb position derives from `deltaPct`; nil-equivalent
+    /// (no-data) is represented by `previous30dAvg == 0`.
+    var powerLevelWindowComparison = PowerLevelService.PowerLevelWindowComparison(
+        current30dAvg: 0, previous30dAvg: 0, deltaPct: 0
+    )
 
     // MARK: - Today's Plan Data
     var todaysScheduledWorkouts: [ScheduledWorkout] = []
@@ -121,6 +127,7 @@ final class HomeViewModel {
 
         // Power Level
         powerLevelResult = PowerLevelService.calculatePowerLevel(context: context, now: now)
+        powerLevelWindowComparison = PowerLevelService.windowComparison(context: context, now: now)
 
         // Today's Plan
         todaysScheduledWorkouts = PlanService.fetchTodaysScheduledWorkouts(context: context)

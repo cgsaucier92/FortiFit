@@ -1,9 +1,8 @@
 import SwiftUI
 import SwiftData
-import Charts
 
 /// Power Level Breakdown Sheet — opened by tapping the Power Level home widget.
-/// Hero + 30-day volume chart + top exercises + window comparison + calculated nudge.
+/// Hero + window comparison + top exercises + calculated nudge.
 ///
 /// See SCREENS.md § Power Level Breakdown Sheet and CONSTANTS.md § Power Level Detail Sheet.
 struct FortiFitPowerLevelDetailSheet: View {
@@ -17,8 +16,6 @@ struct FortiFitPowerLevelDetailSheet: View {
     @State private var topExercises: [PowerLevelService.PowerLevelTopExercise] = []
     @State private var windowComparison = PowerLevelService.PowerLevelWindowComparison(current30dAvg: 0, previous30dAvg: 0, deltaPct: 0)
     @State private var nudge = PowerLevelService.PowerLevelNudge(archetype: .coldStart, inputs: .init(), messageKey: "coldStart")
-    @State private var dailyVolume: [(date: Date, volume: Double)] = []
-    @State private var selectedChartIndex: Int? = nil
 
     var onSeeInfo: (() -> Void)?
     var onNavigateToStrengthTracker: ((String) -> Void)?
@@ -33,9 +30,8 @@ struct FortiFitPowerLevelDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.cardPadding) {
                 header
                 heroBlock
-                volumeChartBlock
-                topExercisesBlock
                 windowComparisonBlock
+                topExercisesBlock
                 nudgeBlock
                 footer
             }
@@ -69,165 +65,96 @@ struct FortiFitPowerLevelDetailSheet: View {
 
     // MARK: - Hero
 
+    // MARK: - Hero (Phase 12 — icon-only gauge)
+
+    /// `pct_change` for the hero gauge thumb. `nil` in cold-start, no-data, and
+    /// no-baseline cases — drives the gauge's no-data presentation per
+    /// CONSTANTS.md § Power Level Gauge → Empty / No-Data State.
+    private var heroPctChange: Double? {
+        if isColdStart || powerLevel.status == .noData { return nil }
+        if windowComparison.previous30dAvg == 0 { return nil }
+        return windowComparison.deltaPct
+    }
+
+    private var heroStatusForGauge: PowerLevelService.Status {
+        // In cold-start, gauge renders Steady-gray no-data per spec — but the
+        // gauge itself short-circuits to no-data when pctChange is nil, so the
+        // status only steers the (suppressed) thumb color. Keep the real status
+        // for the directional indicator above.
+        powerLevel.status
+    }
+
     private var heroBlock: some View {
         FortiFitCard {
-            VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                if isColdStart {
-                    Text("Steady")
-                        .font(.system(size: 22, weight: .black))
-                        .foregroundStyle(FortiFitColors.mutedText)
-                    Text("—")
-                        .font(.system(size: 48, weight: .black))
-                        .foregroundStyle(FortiFitColors.mutedText)
-                    Text(AppConstants.WidgetDetail.EmptyState.powerLevelHero)
-                        .font(FortiFitTypography.note)
-                        .foregroundStyle(FortiFitColors.mutedText)
-                } else {
-                    Text(powerLevel.statusLabel)
-                        .font(.system(size: 22, weight: .black))
-                        .foregroundStyle(Color(hex: powerLevel.indicatorColor))
-                    Text(powerLevel.indicator)
-                        .font(.system(size: 48, weight: .black))
-                        .foregroundStyle(Color(hex: powerLevel.indicatorColor))
-                    Text(formattedAvgVolumeLine)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(FortiFitColors.primaryText)
-                }
+            VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
+                heroSummaryRow
+                FortiFitPowerLevelGauge(
+                    status: heroStatusForGauge,
+                    pctChange: heroPctChange,
+                    scale: .hero,
+                    gaugeIdentifier: AccessibilityID.powerLevelDetailSheet_heroGauge,
+                    thumbIdentifier: AccessibilityID.powerLevelDetailSheet_heroGaugeThumb,
+                    overflowIndicatorIdentifier: AccessibilityID.powerLevelDetailSheet_heroGaugeOverflowIndicator,
+                    pulseHaloIdentifier: AccessibilityID.powerLevelDetailSheet_heroGaugeThumbPulse
+                )
             }
         }
         .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_hero)
     }
 
-    private var isColdStart: Bool {
-        nudge.archetype == .coldStart
-    }
+    @ViewBuilder
+    private var heroSummaryRow: some View {
+        HStack(alignment: .center, spacing: FortiFitSpacing.gapMedium) {
+            Text(heroIndicatorGlyph)
+                .font(.system(size: 40, weight: .semibold))
+                .foregroundStyle(heroIndicatorColor)
 
-    private var formattedAvgVolumeLine: String {
-        "\(formattedVolume(windowComparison.current30dAvg)) avg volume"
-    }
-
-    // MARK: - Volume Chart
-
-    private var volumeChartBlock: some View {
-        FortiFitCard {
-            VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                Text("Last 30 days")
-                    .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
-
-                if chartEntries.count < 2 {
-                    Text(AppConstants.WidgetDetail.EmptyState.powerLevelVolumeChart)
+            VStack(alignment: .leading, spacing: 2) {
+                if isColdStart {
+                    Text(AppConstants.WidgetDetail.EmptyState.powerLevelHero)
                         .font(FortiFitTypography.note)
                         .foregroundStyle(FortiFitColors.mutedText)
-                        .padding(.vertical, FortiFitSpacing.gapMedium)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    interactiveVolumeChart
-                    selectionAnnotation
+                    HStack(alignment: .firstTextBaseline, spacing: FortiFitSpacing.elementSpacing) {
+                        Text(formattedVolume(windowComparison.current30dAvg))
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(FortiFitColors.primaryText)
+                        Text("avg volume")
+                            .font(FortiFitTypography.labelSmall)
+                            .foregroundStyle(FortiFitColors.mutedText)
+                    }
+                    Text(heroDeltaCaption)
+                        .font(FortiFitTypography.labelSmall)
+                        .foregroundStyle(FortiFitColors.mutedText)
                 }
             }
-        }
-        .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_volumeChart)
-    }
-
-    private var chartEntries: [(date: Date, volume: Double)] {
-        dailyVolume.filter { $0.volume > 0 }
-    }
-
-    /// 30-day Swift Chart with tap-to-select + drag-to-scrub selection state, matching
-    /// the behavior of `FortiFitTrainingLoadDetailSheet.interactiveDailyChart`.
-    private var interactiveVolumeChart: some View {
-        let entries = chartEntries
-        return Chart {
-            ForEach(Array(entries.enumerated()), id: \.element.date) { index, entry in
-                let isSelected = selectedChartIndex == index
-                let isLatest = entry.date == entries.last?.date
-                let isDimmed = selectedChartIndex != nil && !isSelected
-
-                LineMark(
-                    x: .value("Day", entry.date),
-                    y: .value("Volume", entry.volume)
-                )
-                .foregroundStyle(FortiFitColors.chartPurple.opacity(selectedChartIndex == nil ? 1.0 : 0.55))
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-
-                PointMark(
-                    x: .value("Day", entry.date),
-                    y: .value("Volume", entry.volume)
-                )
-                .foregroundStyle(
-                    (isLatest ? FortiFitColors.primaryAccent : FortiFitColors.chartPurple)
-                        .opacity(isDimmed ? 0.35 : 1.0)
-                )
-                .symbolSize(isSelected ? 96 : (isLatest ? 64 : 20))
-                .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_chartDataPoint(index))
-            }
-
-            if let idx = selectedChartIndex, idx < entries.count {
-                RuleMark(x: .value("Selected", entries[idx].date))
-                    .foregroundStyle(FortiFitColors.primaryAccent.opacity(0.6))
-                    .lineStyle(StrokeStyle(lineWidth: 1))
-            }
-        }
-        .chartXAxis(.hidden)
-        .chartOverlay { proxy in
-            GeometryReader { _ in
-                Rectangle().fill(.clear).contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                scrubChart(to: value.location, proxy: proxy)
-                            }
-                    )
-                    .onTapGesture { location in
-                        scrubChart(to: location, proxy: proxy)
-                    }
-            }
-        }
-        .frame(height: 140)
-    }
-
-    /// Renders the selected data point's volume and date below the chart.
-    @ViewBuilder
-    private var selectionAnnotation: some View {
-        let entries = chartEntries
-        if let idx = selectedChartIndex, idx < entries.count {
-            let entry = entries[idx]
-            HStack(spacing: FortiFitSpacing.elementSpacing) {
-                Text(formattedVolume(entry.volume))
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(FortiFitColors.primaryAccent)
-                Spacer()
-                Text(entry.date.shortFormatted)
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(FortiFitColors.mutedText)
-            }
-            .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_chartSelectionAnnotation)
+            Spacer(minLength: 0)
         }
     }
 
-    /// Tap/drag handler: find the chart entry whose date is closest to the gesture's
-    /// x-coordinate (resolved via `ChartProxy.value(atX:)`) and select it. Fires a light
-    /// haptic on selection change, matching `FortiFitTrainingLoadDetailSheet.scrubChart`.
-    private func scrubChart(to location: CGPoint, proxy: ChartProxy) {
-        let entries = chartEntries
-        guard !entries.isEmpty else { return }
-        guard let dateValue: Date = proxy.value(atX: location.x) else { return }
-        var closestIndex = 0
-        var closestDist = abs(entries[0].date.timeIntervalSince(dateValue))
-        for i in 1..<entries.count {
-            let dist = abs(entries[i].date.timeIntervalSince(dateValue))
-            if dist < closestDist {
-                closestDist = dist
-                closestIndex = i
-            }
+    private var heroIndicatorGlyph: String {
+        FortiFitPowerLevelGauge.glyph(for: powerLevel.status)
+    }
+
+    private var heroIndicatorColor: Color {
+        // Cold-start collapses to muted regardless of underlying status — the
+        // gauge is in no-data state and the indicator must agree.
+        if isColdStart || powerLevel.status == .noData {
+            return FortiFitColors.mutedText
         }
-        if selectedChartIndex != closestIndex {
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
-            selectedChartIndex = closestIndex
-        }
+        return FortiFitPowerLevelGauge.color(for: powerLevel.status)
+    }
+
+    private var heroDeltaCaption: String {
+        guard let pct = heroPctChange else { return "No data" }
+        let rounded = Int(pct.rounded())
+        let sign = rounded >= 0 ? "+" : ""
+        return "\(sign)\(rounded)% vs prior 30 days"
+    }
+
+    private var isColdStart: Bool {
+        nudge.archetype == .coldStart
     }
 
     private func formattedVolume(_ volume: Double) -> String {
@@ -250,6 +177,10 @@ struct FortiFitPowerLevelDetailSheet: View {
                 Text("Driving Your Trend")
                     .font(FortiFitTypography.detailSheetItemTitle)
                     .foregroundStyle(FortiFitColors.primaryText)
+
+                Text("% change in volume vs previous 30 days")
+                    .font(FortiFitTypography.labelSmall)
+                    .foregroundStyle(FortiFitColors.mutedText)
 
                 if topExercises.isEmpty {
                     Text(AppConstants.WidgetDetail.EmptyState.powerLevelTopExercises)
@@ -280,85 +211,132 @@ struct FortiFitPowerLevelDetailSheet: View {
         // No prior-window data → render an em-dash instead of a misleading "+0%".
         let hasBaseline = exercise.previousWindowVolume > 0
         let sign = exercise.deltaPct >= 0 ? "+" : ""
+        // Color matches the *displayed* (rounded) value's sign so near-zero
+        // values like +0.3% — which render as "0%" — share the muted treatment.
+        let roundedDelta = Int(exercise.deltaPct.rounded())
         let deltaColor: Color
         if !hasBaseline {
             deltaColor = FortiFitColors.mutedText
-        } else if exercise.deltaPct > 10 {
+        } else if roundedDelta > 0 {
             deltaColor = FortiFitColors.positive
-        } else if exercise.deltaPct < -10 {
+        } else if roundedDelta < 0 {
             deltaColor = FortiFitColors.alert
         } else {
-            deltaColor = FortiFitColors.primaryAccent
+            deltaColor = FortiFitColors.mutedText
         }
-        let deltaLabel = hasBaseline ? "\(sign)\(Int(exercise.deltaPct.rounded()))%" : "\u{2014}"
+        let deltaLabel = hasBaseline ? "\(sign)\(roundedDelta)%" : "\u{2014}"
         return HStack(alignment: .center, spacing: FortiFitSpacing.elementSpacing) {
             Text(exercise.exerciseName)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(FortiFitColors.primaryText)
+                .font(FortiFitTypography.bodySmall)
+                .foregroundStyle(FortiFitColors.mutedText)
                 .lineLimit(1)
             Spacer()
             Text(deltaLabel)
                 .font(FortiFitTypography.labelSmall)
                 .foregroundStyle(deltaColor)
-            sparkline(values: exercise.sparkline30d)
-                .frame(width: 80, height: 24)
         }
         .padding(.vertical, FortiFitSpacing.elementSpacing / 2)
         .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_topExerciseRow(index))
     }
 
-    private func sparkline(values: [Double]) -> some View {
-        Chart {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                LineMark(
-                    x: .value("idx", index),
-                    y: .value("v", value)
-                )
-                .foregroundStyle(FortiFitColors.primaryAccent)
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: 1.5))
-            }
-        }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartPlotStyle { $0.background(Color.clear) }
-    }
-
-    // MARK: - Window Comparison
+    // MARK: - Window Comparison (Phase 12 — two-bar card)
 
     @ViewBuilder
     private var windowComparisonBlock: some View {
+        // Hide entire block when either window is zero — unchanged from the
+        // pre-Phase-12 single-line band.
         if windowComparison.current30dAvg > 0 && windowComparison.previous30dAvg > 0 {
             windowComparisonCard
         }
     }
 
     private var windowComparisonCard: some View {
-        let sign = windowComparison.deltaPct >= 0 ? "+" : ""
-        let deltaColor: Color = {
-            if windowComparison.deltaPct > 10 { return FortiFitColors.positive }
-            if windowComparison.deltaPct < -10 { return FortiFitColors.alert }
-            return FortiFitColors.primaryAccent
-        }()
-        let settings = UserSettings.shared
-        let currentDisplay = settings.useLbs
-            ? Int((UnitConversion.kgToLbs(windowComparison.current30dAvg) ?? 0).rounded())
-            : Int(windowComparison.current30dAvg.rounded())
-        let prevDisplay = settings.useLbs
-            ? Int((UnitConversion.kgToLbs(windowComparison.previous30dAvg) ?? 0).rounded())
-            : Int(windowComparison.previous30dAvg.rounded())
+        let statusColor = FortiFitPowerLevelGauge.color(for: powerLevel.status)
+        let largerAvg = max(windowComparison.current30dAvg, windowComparison.previous30dAvg)
+        let currentRatio = largerAvg > 0 ? windowComparison.current30dAvg / largerAvg : 0
+        let previousRatio = largerAvg > 0 ? windowComparison.previous30dAvg / largerAvg : 0
+
         return FortiFitCard {
-            HStack {
-                Text("Current 30d: \(currentDisplay.formatted(.number)) · Previous 30d: \(prevDisplay.formatted(.number))")
-                    .font(FortiFitTypography.body)
-                    .foregroundStyle(FortiFitColors.primaryText)
-                Spacer()
-                Text("(\(sign)\(Int(windowComparison.deltaPct.rounded()))%)")
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(deltaColor)
+            VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
+                windowComparisonHeader(statusColor: statusColor)
+                windowComparisonBar(
+                    label: "PREVIOUS 30D",
+                    labelColor: FortiFitColors.mutedText,
+                    valueText: formattedVolume(windowComparison.previous30dAvg),
+                    valueColor: FortiFitColors.mutedText,
+                    fillColor: FortiFitColors.mutedText,
+                    ratio: previousRatio,
+                    identifier: AccessibilityID.powerLevelDetailSheet_windowComparison_previousBar
+                )
+                windowComparisonBar(
+                    label: "CURRENT 30D",
+                    labelColor: statusColor,
+                    valueText: formattedVolume(windowComparison.current30dAvg),
+                    valueColor: FortiFitColors.primaryText,
+                    fillColor: statusColor,
+                    ratio: currentRatio,
+                    identifier: AccessibilityID.powerLevelDetailSheet_windowComparison_currentBar
+                )
             }
         }
         .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_windowComparison)
+    }
+
+    private func windowComparisonHeader(statusColor: Color) -> some View {
+        let rounded = Int(windowComparison.deltaPct.rounded())
+        let sign = rounded >= 0 ? "+" : ""
+        let chipText = "\(sign)\(rounded)%"
+        return HStack {
+            Text("Window Comparison")
+                .font(FortiFitTypography.detailSheetItemTitle)
+                .foregroundStyle(FortiFitColors.primaryText)
+            Spacer()
+            Text(chipText)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(statusColor)
+                .padding(.horizontal, FortiFitSpacing.elementSpacing)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadiusPill)
+                        .fill(statusColor.opacity(0.12))
+                )
+                .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_windowComparison_deltaChip)
+        }
+    }
+
+    private func windowComparisonBar(
+        label: String,
+        labelColor: Color,
+        valueText: String,
+        valueColor: Color,
+        fillColor: Color,
+        ratio: Double,
+        identifier: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing / 2) {
+            HStack {
+                Text(label)
+                    .font(FortiFitTypography.labelSmall)
+                    .kerning(1)
+                    .foregroundStyle(labelColor)
+                Spacer()
+                Text(valueText)
+                    .font(FortiFitTypography.labelSmall)
+                    .foregroundStyle(valueColor)
+            }
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(FortiFitColors.elevatedSurface)
+                        .frame(width: proxy.size.width, height: 10)
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(fillColor)
+                        .frame(width: proxy.size.width * CGFloat(max(0, min(ratio, 1))), height: 10)
+                }
+            }
+            .frame(height: 10)
+        }
+        .accessibilityIdentifier(identifier)
     }
 
     // MARK: - Nudge
@@ -366,8 +344,8 @@ struct FortiFitPowerLevelDetailSheet: View {
     private var nudgeBlock: some View {
         FortiFitCard {
             Text(renderedNudgeCopy)
-                .font(FortiFitTypography.note)
-                .foregroundStyle(FortiFitColors.mutedText)
+                .font(FortiFitTypography.detailSheetItemTitle)
+                .foregroundStyle(FortiFitColors.primaryText)
         }
         .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_nudge)
     }
@@ -428,34 +406,5 @@ struct FortiFitPowerLevelDetailSheet: View {
         topExercises = PowerLevelService.topContributingExercises(context: modelContext, now: now)
         windowComparison = PowerLevelService.windowComparison(context: modelContext, now: now)
         nudge = PowerLevelService.computeNudge(context: modelContext, now: now)
-        dailyVolume = computeDailyVolume(now: now)
-    }
-
-    private func computeDailyVolume(now: Date) -> [(date: Date, volume: Double)] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: now)
-        guard let start = calendar.date(byAdding: .day, value: -30, to: today),
-              let end = calendar.date(byAdding: .day, value: 1, to: today) else {
-            return []
-        }
-        let predicate = #Predicate<Workout> { workout in
-            workout.date >= start && workout.date < end &&
-            (workout.workoutType == "Strength Training" || workout.workoutType == "HIIT")
-        }
-        let descriptor = FetchDescriptor<Workout>(
-            predicate: predicate,
-            sortBy: [SortDescriptor(\.date, order: .forward)]
-        )
-        let workouts = (try? modelContext.fetch(descriptor)) ?? []
-
-        var byDay: [Date: Double] = [:]
-        for workout in workouts {
-            let day = calendar.startOfDay(for: workout.date)
-            byDay[day, default: 0] += PowerLevelService.workoutVolume(for: workout)
-        }
-        return (0..<30).reversed().compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
-            return (date: day, volume: byDay[day] ?? 0)
-        }
     }
 }

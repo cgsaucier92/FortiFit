@@ -266,6 +266,8 @@ struct FortiFitProgressView: View {
             },
             chart: {
                 let lastDate = viewModel.strengthDataPoints.last?.date
+                let displayWeights = viewModel.strengthDataPoints.map { settings.useLbs ? $0.weight * UnitConversion.kgToLbsFactor : $0.weight }
+                let yDomain = TrendsChartService.paddedYDomain(for: displayWeights)
                 Chart {
                     ForEach(Array(viewModel.strengthDataPoints.enumerated()), id: \.element.id) { index, point in
                         let displayWeight = settings.useLbs
@@ -277,7 +279,7 @@ struct FortiFitProgressView: View {
                             y: .value("Weight", displayWeight)
                         )
                         .foregroundStyle(FortiFitColors.chartPink)
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(.monotone)
 
                         if point.date == lastDate {
                             PointMark(
@@ -304,6 +306,7 @@ struct FortiFitProgressView: View {
                         }
                     }
                 }
+                .chartYScale(domain: yDomain)
                 .chartYAxisLabel(settings.useLbs ? "lbs" : "kg")
                 .chartYAxis {
                     AxisMarks(position: .leading) { _ in
@@ -343,6 +346,7 @@ struct FortiFitProgressView: View {
             onExpand: expandAction(for: chartId),
             controls: { EmptyView() },
             chart: {
+                let yDomain = TrendsChartService.paddedYDomain(for: viewModel.weeklyFrequency.map { Double($0.count) })
                 Chart {
                     ForEach(Array(viewModel.weeklyFrequency.enumerated()), id: \.element.id) { index, entry in
                         let label = weekLabel(entry.weekStart)
@@ -356,6 +360,7 @@ struct FortiFitProgressView: View {
                         .accessibilityIdentifier(AccessibilityID.trendsChartDataPoint(chartId, index: index))
                     }
                 }
+                .chartYScale(domain: yDomain)
                 .chartYAxis {
                     AxisMarks(position: .leading) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
@@ -632,6 +637,7 @@ struct FortiFitProgressView: View {
             },
             chart: {
                 let lastDate = viewModel.volumeDataPoints.last?.date
+                let yDomain = TrendsChartService.paddedYDomain(for: viewModel.volumeDataPoints.map(\.volume))
                 Chart {
                     ForEach(Array(viewModel.volumeDataPoints.enumerated()), id: \.element.id) { index, point in
                         LineMark(
@@ -639,7 +645,7 @@ struct FortiFitProgressView: View {
                             y: .value("Volume", point.volume)
                         )
                         .foregroundStyle(FortiFitColors.chartPurple)
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(.monotone)
 
                         if point.date == lastDate {
                             PointMark(
@@ -665,6 +671,7 @@ struct FortiFitProgressView: View {
                         }
                     }
                 }
+                .chartYScale(domain: yDomain)
                 .chartYAxis {
                     AxisMarks(position: .leading) { _ in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
@@ -827,6 +834,7 @@ struct FortiFitProgressView: View {
             onExpand: expandAction(for: chartId),
             controls: { EmptyView() },
             chart: {
+                let yDomain = TrendsChartService.paddedYDomain(for: viewModel.durationWeeklyData.map(\.averageDuration))
                 Chart {
                     ForEach(Array(viewModel.durationWeeklyData.enumerated()), id: \.element.id) { index, entry in
                         let label = weekLabel(entry.weekStart)
@@ -840,6 +848,7 @@ struct FortiFitProgressView: View {
                         .accessibilityIdentifier(AccessibilityID.trendsChartDataPoint(chartId, index: index))
                     }
                 }
+                .chartYScale(domain: yDomain)
                 .chartYAxisLabel("min")
                 .chartXAxisLabel("week of")
                 .chartYAxis {

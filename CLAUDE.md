@@ -43,15 +43,9 @@ Before closing a session: all three test targets passing (intentionally failing 
 
 ## Out of Scope (Do Not Build)
 
-- Social features, multi-user (single-workout image export and template QR sharing are in scope — see SCREENS.md § Workout Detail, SCREENS.md § Workout Templates List)
-- Subscriptions or IAP
-- Native watchOS companion app. WorkoutKit-based outbound scheduling is in scope as of Phase 8.7 — see WORKOUTKIT.md.
-- Third-party device integration (Garmin, Whoop, Fitbit)
-- Cloud sync or user accounts
-- HealthKit write-back (FitNavi → HealthKit). HealthKit **read** integration is in scope as of Phase 8 (workouts/activity) and Phase 11 (sleep) — see HEALTHKIT.md. Write-back remains deferred indefinitely; see HEALTHKIT.md § 2 Scope and § 20 Future Phases.
-- Nutrition tracking
-- Mental health or mindfulness features
-- Onboarding flow
+Do not build, scaffold UI for, or write service logic for: social/multi-user, subscriptions/IAP, native watchOS companion app, third-party device SDKs (Garmin/Whoop/Fitbit), cloud sync/accounts, HealthKit write-back, nutrition, mental-health/mindfulness, onboarding.
+
+In-scope exceptions and phase nuance (single-workout image export + template QR sharing; HealthKit **read** in Phase 8/11; WorkoutKit **outbound** in Phase 8.7; biometrics deferred to Phase 10): see **PRD.md § 7 Out of Scope (v1)** — the canonical list.
 
 ---
 
@@ -273,7 +267,7 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Tests + new accessibility identifiers | TESTING § WorkoutKit Test Strategy; WORKOUTKIT § 16, § 17 |
 
 ### Phase 8.7.1: Apple Watch Push — Entry-Point Refinement
-*Refinement on top of Phase 8.7. Moves the primary configuration moment from the Plan card glyph to the Schedule Workout sheet, auto-defaults Push when master is on. Time is decoupled from Push — setting a scheduled time is optional regardless of push state; when no time is set, `WatchScheduleService` falls back to noon for the WorkoutKit API call. Full rename "Sync" → "Push" everywhere user-facing; "Set Specific Time" → "Scheduled Time", "Date" → "Scheduled Date" on Plan/Edit screens. Internal Swift identifiers unchanged.*
+*Refinement on Phase 8.7. Primary Push configuration moves from the Plan card glyph to the Schedule Workout sheet (auto-defaults Push on when master is on). Time is decoupled from Push (optional; noon fallback when unset). User-facing "Sync"→"Push" rename (internal identifiers unchanged) — see CONSTANTS.md § Apple Watch Strings and WORKOUTKIT.md § 7.*
 
 | Feature | Spec |
 |---|---|
@@ -294,7 +288,7 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Today's Plan Detail Sheet (`FortiFitTodaysPlanDetailSheet`) + per-row Complete button + Schedule More chip + completed-row visibility windowing | SCREENS § Today's Plan Detail Sheet; SERVICES § PlanService → Retrieval (`fetchTodaysScheduledWorkouts`); CONSTANTS § Today's Plan Detail Sheet; INFO_COPY § Widget Detail Sheet Empty States |
 | Training Load Detail Sheet (`FortiFitTrainingLoadDetailSheet`) + 14-day chart + contributing workouts + week comparison + recovery callout | SCREENS § Training Load Detail Sheet; SERVICES § Training Load Algorithm → Detail Sheet Helpers; CONSTANTS § Training Load Detail Sheet; INFO_COPY § Widget Detail Sheet Empty States |
 | Weekly Streak Insights Sheet (`FortiFitWeeklyStreakDetailSheet`) — typographic hero, stat row, this-week ring, 26-week heatmap, milestone shelf — no flame | SCREENS § Weekly Streak Insights Sheet; SERVICES § Streak Algorithm → Weekly Streak Insights Helpers; CONSTANTS § Weekly Streak Insights; INFO_COPY § Widget Detail Sheet Empty States |
-| Power Level Breakdown Sheet (`FortiFitPowerLevelDetailSheet`) + 30-day volume chart + top 3 exercises (≥ 3-session filter) + window comparison + **calculated** nudge | SCREENS § Power Level Breakdown Sheet; SERVICES § Power Level Algorithm → Top Contributing Exercises / Window Comparison / Nudge Computation; CONSTANTS § Power Level Detail Sheet; INFO_COPY § Power Level Nudge Copy |
+| Power Level Breakdown Sheet (`FortiFitPowerLevelDetailSheet`) + top 3 exercises (≥ 3-session filter) + window comparison + **calculated** nudge | SCREENS § Power Level Breakdown Sheet; SERVICES § Power Level Algorithm → Top Contributing Exercises / Window Comparison / Nudge Computation; CONSTANTS § Power Level Detail Sheet; INFO_COPY § Power Level Nudge Copy |
 | Activity Detail Sheet footer retrofit (See Info / Configure Settings) | SCREENS § Activity Detail Sheet (Phase 8.8 retrofit) |
 | Settings Modal `Done` button (outlined) on Weekly Streak / Training Load / Activity Rings modals | SCREENS § Widget Definitions (Weekly Streak / Training Load Settings Modals), § Activity Rings Settings Modal; CONSTANTS § Settings Modal Done Button |
 | Activity Rings Settings Modal — Reset removed; Import moved to first position | SCREENS § Activity Rings Settings Modal; CONSTANTS § Activity Rings → Settings Modal Strings |
@@ -310,7 +304,7 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | `recoveryStatus` widget type + default-seed update + Add Widgets order (adjacent to Training Load) | CONSTANTS § Widget Types, § Add Widgets Menu Order; SERVICES § HomeWidgetService; SCREENS § Home Screen |
 | Four gating states (Connect Apple Health / Sleep Access Denied / No Sleep Tracker / Live) + no-sleep-last-night sub-state | SCREENS § Home Screen (Recovery Status → States); SERVICES § RecoveryStatusService |
 | Sleep hero (32/900 value, deep-sleep caption) + timer line + `moon.zzz` watermark | SCREENS § Home Screen (Recovery Status widget); CONSTANTS § Recovery Status Widget |
-| `RecoveryStatusService` (sleep fetch + observer, 30-day cache, efficiency, correlation, gating, readiness copy, smart suggestion, personal insights) | SERVICES § RecoveryStatusService |
+| `RecoveryStatusService` (sleep fetch + observer, 30-day cache, efficiency, correlation, gating, readiness copy, smart suggestion) | SERVICES § RecoveryStatusService |
 | `DefaultHealthKitClient` sleep methods (sample query, observer subscription, sleep duration goal characteristic read) | SERVICES § HealthKitClient; HEALTHKIT § 21 |
 | `HealthKitSyncService` sleep observer + BG refresh registration | SERVICES § HealthKitSyncService; HEALTHKIT § 21 |
 | HK auth scope expansion (sleep) + Info.plist `NSHealthShareUsageDescription` update | HEALTHKIT § 17, § 21 |
@@ -332,6 +326,19 @@ Each phase is a one-line goal plus a feature → spec-ref index. Drill into the 
 | Tests + new accessibility identifiers | TESTING § Accessibility Identifiers → Recovery Status |
 | Collapsible insight cards on Linked Recovery & Load Detail Sheet (5 cards, persisted via UserSettings, default collapsed) | SCREENS § Linked Recovery & Load Detail Sheet → Collapsible insight cards; CONSTANTS § Linked Recovery & Load Detail Sheet → Collapsible Insight Cards |
 | Implementation plan | IMPLEMENTATION_PLAN_PHASE_11.md |
+
+### Phase 12: Power Level Gauge Visual Redesign
+*The Power Level widget gains a continuous gauge (bar + threshold ticks + status-colored thumb) surfacing the underlying `pct_change`, with an icon-only status indicator (no status word) and a sentence-case "Power Level" header. The Breakdown Sheet hero mirrors the gauge; block 4 becomes two scaled comparison bars (current vs previous 30d). Add-only — no change to the Power Level algorithm, thresholds, or scope.*
+
+| Feature | Spec |
+|---|---|
+| Power Level widget continuous gauge + icon-only header + delta caption | SCREENS § Home Screen (Power Level widget); CONSTANTS § Power Level Gauge |
+| Breakdown Sheet hero — icon-only gauge | SCREENS § Power Level Breakdown Sheet (block 1); CONSTANTS § Power Level Detail Sheet → Hero |
+| Window comparison bars (replaces block-4 text band) | SCREENS § Power Level Breakdown Sheet (block 4); CONSTANTS § Power Level Detail Sheet → Window Comparison Bars |
+| Gauge position from existing `pct_change` (no new service logic) | SERVICES § Power Level Algorithm → Widget & Hero Gauge Position, → Window Comparison Computation |
+| Mockups (visual guides) | Design/Mockups/PowerLevelWidgetGauge.svg, Design/Mockups/PowerLevelBreakdownSheet.svg |
+| Tests + new accessibility identifiers | TESTING § Power Level Gauge Test Strategy; TESTING § Accessibility Identifiers (Power Level Gauge) |
+| Implementation plan | IMPLEMENTATION_PLAN_PHASE_12.md |
 
 ### Phase 9: Launch Prep
 *Ready for TestFlight or App Store.*

@@ -136,6 +136,127 @@ struct WorkoutMetricServiceTests {
         #expect(WorkoutMetricService.isPersonalBest(for: .distance, workout: best, context: context) == true)
         #expect(WorkoutMetricService.isPersonalBest(for: .distance, workout: w1, context: context) == false)
     }
+
+    // MARK: - Sparkline Windowing (BUG-072)
+
+    /// Regression test for BUG-072: opening the metric detail sheet for an older workout
+    /// in a type with dense history must return points from the *workout's neighborhood*,
+    /// not the last 30 days relative to today. Pre-fix, the cutoff was anchored to `Date()`
+    /// and the window slid entirely past the workout being viewed.
+    @Test func sparklineData_olderWorkoutInDenseHistory_returnsTrailingWindowAroundWorkoutDate() throws {
+        let context = try makeTestContext()
+        let now = Date()
+        let calendar = Calendar.current
+
+        // 70 HIIT workouts at weekly cadence — mirrors the screenshot user's data shape.
+        var inserted: [Workout] = []
+        for weekIndex in 0..<70 {
+            let date = calendar.date(byAdding: .day, value: -7 * weekIndex, to: now)!
+            let kcal = 200.0 + Double(weekIndex)
+            let w = Workout(name: "HIIT \(weekIndex)", date: date, workoutType: "HIIT", activeEnergyKcal: kcal)
+            context.insert(w)
+            inserted.append(w)
+        }
+        try context.save()
+
+        // Pick the workout from 8 weeks ago (~56 days back from "today" in the test).
+        let target = inserted[8]
+        let result = WorkoutMetricService.sparklineData(for: .activeKcal, workout: target, context: context)
+
+        #expect(result != nil, "Sparkline must return data for a workout with 70 dense same-type peers (pre-fix returned nil)")
+        guard let result else { return }
+        #expect(result.points.count >= 3, "Trailing 30-day window around the workout must yield ≥ 3 points")
+        if case .trailingWindow(_, let anchorDate) = result.mode {
+            #expect(calendar.isDate(anchorDate, inSameDayAs: target.date), "Window anchor must be the workout's date")
+        } else {
+            Issue.record("Dense-history case must use trailingWindow mode, got \(result.mode)")
+        }
+        let cutoff = calendar.date(byAdding: .day, value: -30, to: target.date)!
+        for point in result.points {
+            #expect(point.date >= cutoff && point.date <= target.date,
+                    "All sparkline points must fall within [workout.date - 30d, workout.date]")
+        }
+    }
+
+    /// Regression test for BUG-072: when same-type cadence is sparser than the 30-day window
+    /// (e.g., a once-a-month long run), the service falls back to the last 5 sessions of
+    /// that type at-or-before the workout's date so the sparkline can still render.
+    @Test func sparklineData_sparseCadenceType_returnsRecentFallback() throws {
+        let context = try makeTestContext()
+        let now = Date()
+        let calendar = Calendar.current
+
+        // 12 monthly long runs — only one of them ever sits inside a 30-day window.
+        var inserted: [Workout] = []
+        for monthIndex in 0..<12 {
+            let date = calendar.date(byAdding: .day, value: -30 * monthIndex, to: now)!
+            let w = Workout(name: "Long Run \(monthIndex)", date: date, workoutType: "Cardio", distanceKm: 15.0 + Double(monthIndex))
+            context.insert(w)
+            inserted.append(w)
+        }
+        try context.save()
+
+        let target = inserted[0]
+        let result = WorkoutMetricService.sparklineData(for: .distance, workout: target, context: context)
+
+        #expect(result != nil, "Sparse-cadence types must still render via fallback when ≥ 3 sessions exist in history")
+        guard let result else { return }
+        if case .recentFallback(let sessionCount) = result.mode {
+            #expect(sessionCount == 5, "Default fallback session count is 5")
+            #expect(result.points.count == 5, "Fallback must return exactly 5 points when ≥ 5 sessions exist at-or-before anchor")
+        } else {
+            Issue.record("Sparse-cadence case must use recentFallback mode, got \(result.mode)")
+        }
+        // Every fallback point must be at-or-before the target workout's date.
+        for point in result.points {
+            #expect(point.date <= target.date, "Fallback must not include workouts dated after the target")
+        }
+    }
+
+    /// Regression test for BUG-072: a user with only 2 sessions of a type at-or-before the
+    /// target workout still legitimately has "not enough data" — the sparkline returns nil,
+    /// matching the comparative-average nil path so the empty state is consistent.
+    @Test func sparklineData_fewerThanThreeSessionsOfType_returnsNil() throws {
+        let context = try makeTestContext()
+        let now = Date()
+
+        let w1 = Workout(name: "Solo 1", date: now.addingTimeInterval(-86400), workoutType: "Yoga", activeEnergyKcal: 150)
+        let target = Workout(name: "Solo 2", date: now, workoutType: "Yoga", activeEnergyKcal: 175)
+        context.insert(w1)
+        context.insert(target)
+        try context.save()
+
+        let result = WorkoutMetricService.sparklineData(for: .activeKcal, workout: target, context: context)
+        #expect(result == nil, "Genuine no-data case must return nil so the empty state renders")
+    }
+
+    /// Regression test for BUG-072: the contradictory state observed in the bug — comparative
+    /// average renders ("199 kcal typical") AND sparkline empty state renders ("log a few more
+    /// sessions") on the same sheet — must no longer be reachable. Whenever the comparative
+    /// average is non-nil, the sparkline must also be non-nil.
+    @Test func sparklineData_neverEmptyWhenComparativeAverageExists() throws {
+        let context = try makeTestContext()
+        let now = Date()
+        let calendar = Calendar.current
+
+        // 5 monthly HIIT sessions — comparative.peers = 4 (≥ 3) → non-nil.
+        // Pre-fix the 30-day window held only 1 session and tripped the empty state.
+        var inserted: [Workout] = []
+        for monthIndex in 0..<5 {
+            let date = calendar.date(byAdding: .day, value: -30 * monthIndex, to: now)!
+            let w = Workout(name: "HIIT \(monthIndex)", date: date, workoutType: "HIIT", activeEnergyKcal: 200.0 + Double(monthIndex) * 20)
+            context.insert(w)
+            inserted.append(w)
+        }
+        try context.save()
+
+        let target = inserted[0]
+        let avg = WorkoutMetricService.comparativeAverage(for: .activeKcal, workout: target, context: context)
+        let sparkline = WorkoutMetricService.sparklineData(for: .activeKcal, workout: target, context: context)
+
+        #expect(avg != nil, "Test precondition: ≥ 3 peer sessions of the same type")
+        #expect(sparkline != nil, "Sparkline must not be empty when comparative average is non-nil (the BUG-072 contradiction)")
+    }
 }
 
 // MARK: - Source Name Tests

@@ -700,6 +700,93 @@ final class SmokeTests: XCTestCase {
         )
     }
 
+    // MARK: - Phase 12: Power Level Gauge
+
+    /// Widget card renders gauge + thumb + delta caption only — the
+    /// directional indicator glyph and the status word ("Steady" / "Rising" /
+    /// "Deloading") are both absent. State is conveyed by the gauge thumb /
+    /// color zones, and the status word is preserved in the gauge's
+    /// VoiceOver label for color-independent reading.
+    func test_powerLevelWidget_rendersGaugeAndCaption_noGlyphNoStatusWord() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let powerLevelHeader = app.staticTexts["Power Level"]
+        XCTAssertTrue(powerLevelHeader.waitForExistence(timeout: 3))
+
+        XCTAssertTrue(
+            app.otherElements["homeWidget_powerLevel_gauge"].waitForExistence(timeout: 3),
+            "Phase 12 gauge container must be present on the Power Level card"
+        )
+        XCTAssertTrue(
+            app.staticTexts["homeWidget_powerLevel_deltaCaption"].exists,
+            "Delta caption must be present"
+        )
+
+        // The status word must NOT appear on the card — color-independent state
+        // is preserved via the gauge's VoiceOver label, not visible text.
+        for word in ["Rising", "Steady", "Deloading"] {
+            let directHits = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", word))
+            XCTAssertEqual(directHits.count, 0, "Status word '\(word)' must not appear on the widget card")
+        }
+    }
+
+    /// Tapping the Power Level widget opens the breakdown sheet with the
+    /// hero gauge visible — and the hero still has no status word.
+    func test_powerLevelWidget_tap_opensBreakdownSheetWithHeroGauge() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let powerLevelHeader = app.staticTexts["Power Level"]
+        XCTAssertTrue(powerLevelHeader.waitForExistence(timeout: 3))
+        powerLevelHeader.tap()
+
+        XCTAssertTrue(
+            app.otherElements["powerLevelDetailSheet_hero"].waitForExistence(timeout: 3),
+            "Breakdown sheet hero block must appear"
+        )
+        XCTAssertTrue(
+            app.otherElements["powerLevelDetailSheet_heroGauge"].waitForExistence(timeout: 2),
+            "Hero gauge container must be rendered in the sheet"
+        )
+
+        for word in ["Rising", "Steady", "Deloading"] {
+            let hits = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", word))
+            XCTAssertEqual(hits.count, 0, "Status word '\(word)' must not be drawn on the hero")
+        }
+    }
+
+    /// Cold-start state (no qualifying workouts after --reset-state) hides
+    /// the window comparison bars entirely and renders the hero no-data copy.
+    func test_breakdownSheet_coldStart_heroNoDataCopyRendersAndBarsHidden() {
+        app.tabBars.buttons[Tab.home.rawValue].tap()
+
+        let powerLevelHeader = app.staticTexts["Power Level"]
+        XCTAssertTrue(powerLevelHeader.waitForExistence(timeout: 3))
+        powerLevelHeader.tap()
+
+        XCTAssertTrue(
+            app.otherElements["powerLevelDetailSheet_hero"].waitForExistence(timeout: 3)
+        )
+
+        // Cold-start copy from AppConstants.WidgetDetail.EmptyState.powerLevelHero.
+        let coldStartCopy = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "Log a few more Strength")
+        ).firstMatch
+        XCTAssertTrue(coldStartCopy.exists, "Cold-start hero copy must render")
+
+        XCTAssertFalse(
+            app.otherElements["powerLevelDetailSheet_windowComparison"].exists,
+            "Window comparison block must be hidden in cold-start"
+        )
+        XCTAssertFalse(
+            app.otherElements["powerLevelDetailSheet_windowComparison_previousBar"].exists,
+            "Previous bar must be hidden in cold-start"
+        )
+        XCTAssertFalse(
+            app.otherElements["powerLevelDetailSheet_windowComparison_currentBar"].exists,
+            "Current bar must be hidden in cold-start"
+        )
+    }
+
     /// Long-pressing a non-info widget (Today's Plan) does not show See Info.
     func test_longPressNonInfoWidget_doesNotShowSeeInfo() {
         app.tabBars.buttons[Tab.home.rawValue].tap()

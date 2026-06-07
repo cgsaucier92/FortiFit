@@ -40,16 +40,15 @@ struct TemplateQRModalView: View {
                     Button {
                         onDismiss()
                     } label: {
-                        Text("×")
-                            .font(.system(size: 16, weight: .semibold))
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(FortiFitColors.mutedText)
-                            .frame(width: 24, height: 24)
-                            .background(
-                                Circle()
-                                    .fill(FortiFitColors.elevatedSurface)
-                                    .stroke(FortiFitColors.border, lineWidth: 1)
+                            .frame(
+                                width: FortiFitSpacing.minTouchTarget,
+                                height: FortiFitSpacing.minTouchTarget
                             )
                     }
+                    .accessibilityLabel("Close")
                 }
 
                 // QR code container

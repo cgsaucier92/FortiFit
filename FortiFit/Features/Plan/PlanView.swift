@@ -277,20 +277,20 @@ struct PlanView: View {
             .background(FortiFitColors.background)
 
             // Toast
-            if viewModel.showCompletedToast {
-                VStack {
-                    Text("Workout completed.")
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, FortiFitSpacing.cardPadding)
-                        .padding(.vertical, FortiFitSpacing.elementSpacing)
-                        .background(Capsule().fill(FortiFitColors.primaryAccent))
-                        .padding(.top, FortiFitSpacing.screenTop)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .allowsHitTesting(false)
+            VStack {
+                Text("Workout completed.")
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, FortiFitSpacing.cardPadding)
+                    .padding(.vertical, FortiFitSpacing.elementSpacing)
+                    .background(Capsule().fill(FortiFitColors.primaryAccent))
+                    .padding(.top, FortiFitSpacing.screenTop)
+                Spacer()
             }
+            .opacity(viewModel.showCompletedToast ? 1 : 0)
+            .offset(y: viewModel.showCompletedToast ? 0 : -60)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.2), value: viewModel.showCompletedToast)
 
             // Workout Planned toast
             VStack {

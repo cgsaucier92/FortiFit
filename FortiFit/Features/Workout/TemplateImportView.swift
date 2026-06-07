@@ -6,9 +6,9 @@ struct TemplateImportView: View {
 
     let payload: TemplatePayload?
     let onDismiss: () -> Void
+    let onSaved: () -> Void
 
     @State private var resolvedName: String = ""
-    @State private var showSavedToast = false
 
     var body: some View {
         ZStack {
@@ -21,22 +21,6 @@ struct TemplateImportView: View {
                 successContent(payload)
             } else {
                 errorContent
-            }
-
-            // "Template saved!" toast
-            if showSavedToast {
-                VStack {
-                    Text("Template saved!")
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, FortiFitSpacing.cardPadding)
-                        .padding(.vertical, FortiFitSpacing.elementSpacing)
-                        .background(Capsule().fill(FortiFitColors.primaryAccent))
-                        .padding(.top, FortiFitSpacing.screenTop)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .allowsHitTesting(false)
             }
         }
         .onAppear {
@@ -55,8 +39,9 @@ struct TemplateImportView: View {
         VStack(spacing: 20) {
             // Heading
             Text("Import Template?")
-                .font(.system(size: 20, weight: .black))
-                .foregroundStyle(FortiFitColors.primaryText)
+                .font(FortiFitTypography.screenHeading)
+                .kerning(FortiFitTypography.screenHeadingKerning)
+                .foregroundStyle(FortiFitColors.primaryAccent)
 
             // Template preview card
             FortiFitCard(borderColor: FortiFitColors.border) {
@@ -160,10 +145,6 @@ struct TemplateImportView: View {
 
     private func saveTemplate(_ payload: TemplatePayload) {
         TemplateShareService.importTemplate(payload: payload, context: modelContext)
-        withAnimation { showSavedToast = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation { showSavedToast = false }
-            onDismiss()
-        }
+        onSaved()
     }
 }

@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 880" font-family="-apple-system, SF Pro Text, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="360" height="880" fill="#0a0a0a"/>
+  <text x="16" y="20" fill="#737373" font-size="11" letter-spacing="0.5">Power Level widget — overflow treatments (+141% case)</text>
+
+  <!-- ============================================================ -->
+  <!-- 1. CURRENT BEHAVIOR (problem state) -->
+  <!-- ============================================================ -->
+  <text x="16" y="48" fill="#737373" font-size="10" letter-spacing="0.5">CURRENT — thumb pinned at edge, no overflow signal</text>
+  <rect x="16" y="56" width="328" height="156" rx="12" fill="#1a1a1a" stroke="#404040" stroke-width="1"/>
+  <text x="32" y="86" fill="#3b82f6" font-size="15" font-weight="600">Power Level</text>
+  <text x="32" y="128" fill="#10b981" font-size="26" font-weight="600">&#8593;</text>
+  <text x="328" y="124" text-anchor="end" fill="#737373" font-size="13">+141% vs prior 30d</text>
+  <!-- bar segments -->
+  <rect x="32" y="150" width="96" height="8" rx="4" fill="#ef4444"/>
+  <rect x="132" y="150" width="94" height="8" rx="4" fill="#404040"/>
+  <rect x="230" y="150" width="98" height="8" rx="4" fill="#10b981"/>
+  <!-- thumb clamped at +30% edge -->
+  <circle cx="328" cy="154" r="9" fill="#10b981" stroke="#1a1a1a" stroke-width="2"/>
+  <!-- tick labels -->
+  <text x="32" y="180" fill="#737373" font-size="11">&#8722;30%</text>
+  <text x="130" y="180" text-anchor="middle" fill="#737373" font-size="11">&#8722;10%</text>
+  <text x="228" y="180" text-anchor="middle" fill="#737373" font-size="11">+10%</text>
+  <text x="328" y="180" text-anchor="end" fill="#737373" font-size="11">+30%</text>
+
+  <!-- ============================================================ -->
+  <!-- 2. OPTION A — Off-scale chevron + thumb glow -->
+  <!-- ============================================================ -->
+  <text x="16" y="248" fill="#10b981" font-size="10" letter-spacing="0.5">OPTION A — off-scale chevron + soft glow on thumb</text>
+  <rect x="16" y="256" width="328" height="156" rx="12" fill="#1a1a1a" stroke="#10b981" stroke-width="1"/>
+  <text x="32" y="286" fill="#3b82f6" font-size="15" font-weight="600">Power Level</text>
+  <text x="32" y="328" fill="#10b981" font-size="26" font-weight="600">&#8593;</text>
+  <text x="328" y="324" text-anchor="end" fill="#737373" font-size="13">+141% vs prior 30d</text>
+  <!-- bar segments -->
+  <rect x="32" y="350" width="96" height="8" rx="4" fill="#ef4444"/>
+  <rect x="132" y="350" width="94" height="8" rx="4" fill="#404040"/>
+  <rect x="230" y="350" width="98" height="8" rx="4" fill="#10b981"/>
+  <!-- soft glow ring around thumb -->
+  <circle cx="328" cy="354" r="14" fill="#10b981" fill-opacity="0.18"/>
+  <circle cx="328" cy="354" r="11" fill="#10b981" fill-opacity="0.28"/>
+  <!-- thumb at edge -->
+  <circle cx="328" cy="354" r="9" fill="#10b981" stroke="#1a1a1a" stroke-width="2"/>
+  <!-- double chevron overlaid on thumb pointing right -->
+  <path d="M 325 350 L 329 354 L 325 358" stroke="#0a0a0a" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 329 350 L 333 354 L 329 358" stroke="#0a0a0a" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- tick labels unchanged -->
+  <text x="32" y="380" fill="#737373" font-size="11">&#8722;30%</text>
+  <text x="130" y="380" text-anchor="middle" fill="#737373" font-size="11">&#8722;10%</text>
+  <text x="228" y="380" text-anchor="middle" fill="#737373" font-size="11">+10%</text>
+  <text x="328" y="380" text-anchor="end" fill="#737373" font-size="11">+30%</text>
+
+  <!-- ============================================================ -->
+  <!-- 3. OPTION B — Dynamic outermost tick label -->
+  <!-- ============================================================ -->
+  <text x="16" y="448" fill="#10b981" font-size="10" letter-spacing="0.5">OPTION B — outermost tick label swaps to actual value</text>
+  <rect x="16" y="456" width="328" height="156" rx="12" fill="#1a1a1a" stroke="#10b981" stroke-width="1"/>
+  <text x="32" y="486" fill="#3b82f6" font-size="15" font-weight="600">Power Level</text>
+  <text x="32" y="528" fill="#10b981" font-size="26" font-weight="600">&#8593;</text>
+  <text x="328" y="524" text-anchor="end" fill="#737373" font-size="13">+141% vs prior 30d</text>
+  <!-- bar segments -->
+  <rect x="32" y="550" width="96" height="8" rx="4" fill="#ef4444"/>
+  <rect x="132" y="550" width="94" height="8" rx="4" fill="#404040"/>
+  <rect x="230" y="550" width="98" height="8" rx="4" fill="#10b981"/>
+  <!-- thumb at edge -->
+  <circle cx="328" cy="554" r="9" fill="#10b981" stroke="#1a1a1a" stroke-width="2"/>
+  <!-- tick labels — outer right swapped to actual value, italic to flag dynamic -->
+  <text x="32" y="580" fill="#737373" font-size="11">&#8722;30%</text>
+  <text x="130" y="580" text-anchor="middle" fill="#737373" font-size="11">&#8722;10%</text>
+  <text x="228" y="580" text-anchor="middle" fill="#737373" font-size="11">+10%</text>
+  <text x="328" y="580" text-anchor="end" fill="#10b981" font-size="11" font-style="italic" font-weight="600">+141%</text>
+
+  <!-- ============================================================ -->
+  <!-- 4. OPTION C — Sentinel "+30%+" label -->
+  <!-- ============================================================ -->
+  <text x="16" y="648" fill="#10b981" font-size="10" letter-spacing="0.5">OPTION C — sentinel label "+30%+" indicates saturation</text>
+  <rect x="16" y="656" width="328" height="156" rx="12" fill="#1a1a1a" stroke="#10b981" stroke-width="1"/>
+  <text x="32" y="686" fill="#3b82f6" font-size="15" font-weight="600">Power Level</text>
+  <text x="32" y="728" fill="#10b981" font-size="26" font-weight="600">&#8593;</text>
+  <text x="328" y="724" text-anchor="end" fill="#737373" font-size="13">+141% vs prior 30d</text>
+  <!-- bar segments -->
+  <rect x="32" y="750" width="96" height="8" rx="4" fill="#ef4444"/>
+  <rect x="132" y="750" width="94" height="8" rx="4" fill="#404040"/>
+  <rect x="230" y="750" width="98" height="8" rx="4" fill="#10b981"/>
+  <!-- thumb at edge -->
+  <circle cx="328" cy="754" r="9" fill="#10b981" stroke="#1a1a1a" stroke-width="2"/>
+  <!-- tick labels — outer right swapped to sentinel -->
+  <text x="32" y="780" fill="#737373" font-size="11">&#8722;30%</text>
+  <text x="130" y="780" text-anchor="middle" fill="#737373" font-size="11">&#8722;10%</text>
+  <text x="228" y="780" text-anchor="middle" fill="#737373" font-size="11">+10%</text>
+  <text x="328" y="780" text-anchor="end" fill="#737373" font-size="11" font-weight="600">+30%+</text>
+
+  <!-- footnote -->
+  <text x="16" y="850" fill="#525252" font-size="10">Caption "+141% vs prior 30d" remains the source of truth for exact value across all options.</text>
+  <text x="16" y="866" fill="#525252" font-size="10">Same overflow rules mirror on the negative side: "&#8722;30%&#8722;" / italic actual value / chevron-left + glow.</text>
+</svg>

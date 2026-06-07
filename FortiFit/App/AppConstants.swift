@@ -292,23 +292,11 @@ enum AppConstants {
     static let widgetDescriptions: [String: String] = [
         "trainingLoad": "Shows your accumulated training stress score and recovery readiness based on recent workout intensity, volume, and frequency.",
         "weekStreak": "Tracks how many consecutive weeks you've met your weekly workout target.",
-        "powerLevel": "Measures your average strength volume trend over the last 30 days across Strength Training and HIIT workouts.",
+        "powerLevel": "Measures your average strength volume trend across Strength Training and HIIT workouts so you can see if you're getting stronger.",
         "todaysPlan": "Shows your scheduled workout for today so you can jump straight into logging.",
         "appleActivity": "Tracks your daily Move, Exercise, and Stand rings. Requires an Apple Watch and Apple Health connected in Settings.",
         "recoveryStatus": "Tracks your sleep, recovery, and time since your last workout. Requires a sleep-tracking device (Apple Watch, Oura, Whoop, etc.) and Apple Health connected in Settings."
     ]
-
-    // MARK: - Recovery Status (Phase 11)
-
-    enum RecoveryStatus {
-        /// Three variants from CONSTANTS.md § Linked Recovery & Load Detail Sheet → Correlation Callout.
-        /// `{n}` placeholder is replaced with `abs(correlationDelta)` rounded to nearest integer at the view layer.
-        static let correlationCopy: [String: String] = [
-            "highSleepBetter":  "Strong nights (≥ 7h) bring your score down ~{n} points the next day.",
-            "lowSleepWorse":    "Short nights (< 6h) leave your score ~{n} points higher the next day.",
-            "noPattern":        "Your sleep and load haven't shown a clear pattern yet."
-        ]
-    }
 
     enum TrainingLoad {
         /// Joint advisory copy used ONLY by the linked Recovery & Load composite — the TL
@@ -330,35 +318,35 @@ enum AppConstants {
         /// `ExerciseLoadService.calculateLoad` prevents that combination in practice.
         static let linkedAdvisoryText: [String: String] = [
             // Resting (untrained only)
-            "Resting|untrained|strong":              "No recent training stress and sleep was strong — a great day to push hard.",
+            "Resting|untrained|strong":              "No recent training stress and sleep was solid — a great day to push hard.",
             "Resting|untrained|moderatelyBelow":     "No recent training stress, but sleep was short. Favor a moderate session over a hard one.",
             "Resting|untrained|significantlyBelow":  "No recent training stress, but sleep was significantly short. Keep today light or rest.",
             // Low
-            "Low|untrained|strong":                  "Well recovered and sleep was strong — a great day to train hard.",
+            "Low|untrained|strong":                  "Well recovered and sleep was solid — a great day to train hard.",
             "Low|untrained|moderatelyBelow":         "Your body is recovered, but sleep was short. Favor a moderate session over a hard one.",
             "Low|untrained|significantlyBelow":      "Your body is recovered, but sleep was significantly short. Keep today light or rest.",
-            "Low|trained|strong":                    "Session logged. Sleep was strong — you have capacity for more if you choose.",
+            "Low|trained|strong":                    "Session logged. Sleep was solid — you have capacity for more if you choose.",
             "Low|trained|moderatelyBelow":           "Session logged, but sleep was short. Wrap up your day and let your body recover.",
             "Low|trained|significantlyBelow":        "Session logged, but sleep was significantly short. Stop here and prioritize recovery.",
             // Moderate
-            "Moderate|untrained|strong":             "Some muscle fatigue, but sleep was strong — a moderate session is well within reach.",
+            "Moderate|untrained|strong":             "Some muscle fatigue, but sleep was solid — a moderate session is well within reach.",
             "Moderate|untrained|moderatelyBelow":    "Some muscle fatigue and sleep was short. Favor a light session today.",
             "Moderate|untrained|significantlyBelow": "Some muscle fatigue and sleep was significantly short. Keep today light or rest.",
             "Moderate|trained|strong":               "Good work today. Sleep was strong — recovery should come quickly.",
-            "Moderate|trained|moderatelyBelow":      "Good work today. Sleep was short — rest is especially important tonight.",
-            "Moderate|trained|significantlyBelow":   "Good work today. Sleep was significantly short — make rest the priority tonight.",
+            "Moderate|trained|moderatelyBelow":      "Good work today. Sleep was short — rest is especially important.",
+            "Moderate|trained|significantlyBelow":   "Good work today. Sleep was significantly short — make rest the priority.",
             // High
-            "High|untrained|strong":                 "Significant muscle fatigue. Sleep was strong — a lighter session or active recovery still fits.",
+            "High|untrained|strong":                 "Significant muscle fatigue. Sleep was solid — a lighter session or active recovery still fits.",
             "High|untrained|moderatelyBelow":        "Significant muscle fatigue and sleep was short. Active recovery or rest today.",
             "High|untrained|significantlyBelow":    "Significant muscle fatigue and sleep was significantly short. Rest today.",
-            "High|trained|strong":                   "Recovery is the priority. Sleep was strong — that helps.",
-            "High|trained|moderatelyBelow":          "Recovery is the priority. Sleep was short — more reason to rest tonight.",
-            "High|trained|significantlyBelow":       "Recovery is the priority. Sleep was significantly short — full rest tonight.",
+            "High|trained|strong":                   "Rest is the priority. Sleep was solid — that'll help with muscle recovery.",
+            "High|trained|moderatelyBelow":          "Recovery is the priority. Sleep was short — prioritize resting if you're able.",
+            "High|trained|significantlyBelow":       "Recovery is the priority. Sleep was significantly short — prioritize rest.",
             // Peak
-            "Peak|untrained|strong":                 "High physical stress. Sleep was strong, but keep today to rest or very light activity.",
+            "Peak|untrained|strong":                 "High physical stress. Sleep was solid, but keep today to rest or very light activity.",
             "Peak|untrained|moderatelyBelow":        "High physical stress and sleep was short. Rest today.",
             "Peak|untrained|significantlyBelow":     "High physical stress and sleep was significantly short. Full rest today.",
-            "Peak|trained|strong":                   "You've been pushing hard. Time to rest — sleep was strong, recovery should come quickly.",
+            "Peak|trained|strong":                   "You've been pushing hard. Time to rest — sleep was solid, recovery should come quickly.",
             "Peak|trained|moderatelyBelow":          "You've been pushing hard. Time to rest — sleep was short, recovery needs the time.",
             "Peak|trained|significantlyBelow":       "You've been pushing hard. Time to rest — sleep was significantly short, your body needs it."
         ]
@@ -407,7 +395,6 @@ enum AppConstants {
             static let weeklyStreakHeroSubline = "Hit your weekly target to start a streak."
             // Power Level
             static let powerLevelHero = "Log more Strength or HIIT workouts to see your power level."
-            static let powerLevelVolumeChart = "Log more Strength or HIIT workouts to display volume trends."
             static let powerLevelTopExercises = "Log more sessions on the same exercises to surface your top drivers."
         }
     }
@@ -459,7 +446,7 @@ enum AppConstants {
     enum Trends {
         static let captionLatest = "LATEST"
         static let captionAvgLast8Weeks = "AVG / LAST 8 WEEKS"
-        static let captionLatestPR = "LATEST PR"
+        static let captionLatestPR = "LATEST PR CHANGE"
         static let captionToday = "TODAY'S LOAD"
         static let captionAvgPerSession = "AVG / SESSION"
         static let captionWorkouts = "WORKOUTS"
@@ -523,25 +510,25 @@ enum AppConstants {
         ),
         "powerLevel": ChartInfoCopy(
             title: "About Power Level",
-            intro: "Power Level shows whether your strength training volume is rising, holding steady, or trending down compared to where you were a month ago. It answers \"am I progressing?\" at a glance.",
+            intro: "Power Level shows whether your strength training volume is rising, holding steady, or trending down compared to where you were a month ago. It answers \"am I getting stronger?\" at a glance.",
             sections: [
                 ("How it's calculated", "FitNavi averages your workout volume across the last 30 days and compares it to your average across the prior 30 days. Volume per workout is sets × reps × weight, summed across every exercise in the session."),
                 ("What workouts count", "Only Strength Training and HIIT workouts. Cardio, yoga, pilates, and other types don't track exercise sets, so they don't contribute to a volume comparison."),
                 ("Bodyweight exercises", "Sets logged without a weight value count as if the weight were 1, since they still represent work performed. This keeps bodyweight volume from disappearing entirely from the comparison."),
-                ("Status thresholds", "- Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days\n- Steady (—, blue): within 10% in either direction — your volume is holding consistent\n- Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days"),
-                ("Minimum Data Threshold", "If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.")
+                ("Status thresholds", "- Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days\n- Steady (—, grey): within 10% in either direction — your volume is holding consistent\n- Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days"),
+                ("Empty state", "If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.")
             ]
         ),
         "linkedRecoveryLoad": ChartInfoCopy(
             title: "About Recovery & Load",
-            intro: "You've linked your Recovery Status and Training Load widgets. When linked, last night's sleep is factored into your Training Load score — poor sleep slows your stress decay, so your score reflects how recovered you actually are, not just how much time has passed since your last workout.",
+            intro: "When linked, last night's sleep feeds into your Training Load. Poor sleep slows your recovery, so the score reflects how rested you actually are — not just time since your last workout.",
             sections: [
-                ("How linking changes Training Load", "Without linking, Training Load decays at a fixed rate over about 10 days. Each workout's stress contribution fades smoothly regardless of how rested you are.\n\nWith linking, last night's sleep slows that decay. After a poor night, your score sits higher than it otherwise would — yesterday's training is still \"with you.\" After a strong night, decay returns to normal.\n\nThe effect is meaningful. Linking won't push your score from Moderate into Peak overnight, but several nights of poor sleep can nudge your score 10–25% higher than the unlinked calculation."),
-                ("How sleep slows stress decay", "FitNavi compares your previous night's sleep to your target. *(To change your sleep target, long-press either linked card and tap \"Configure Settings.\")*\n\n- Sleep met or exceeded your target → decay proceeds normally.\n- Sleep fell below target → decay slows proportionally. The further below, the more it slows, up to a maximum slowdown of about 40%.\n- Sleep data missing for the night → decay falls back to the unlinked rate for that day. The link itself stays active; only that single day's calculation is unaffected."),
-                ("About sleep data", "FitNavi reads sleep data from Apple Health. Any device that writes sleep to Apple Health contributes — Apple Watch, Oura Ring, Whoop, AutoSleep, and others.\n\nSleep is attributed to your wake-up day. A session ending Tuesday morning belongs to Tuesday's data. FitNavi uses a 6pm-to-6pm window so late-evening naps and overnight sessions land on the day you'd expect.\n\nModern sleep trackers classify sleep into four stages:\n- **Deep** — slow-wave sleep that drives physical recovery\n- **REM** — dream sleep that drives cognitive recovery\n- **Core** — lighter sleep, the bulk of a typical night\n- **Awake** — brief periods of wakefulness during the sleep window\n\nApple Watch's sleep stage classification is meaningfully less accurate than clinical polysomnography. Other sources may classify stages with different accuracy. Treat stage data as directional."),
-                ("How time-since-workout is calculated", "The timer counts from the start time of your most recently logged workout, regardless of type. Manual logs and workouts imported from Apple Health both count.\n\nFormat shifts as time passes: under an hour as `12 min`, hours to a day as `4h 12m`, one to three days as `1d 4h`, beyond three days as `4 days`.\n\nTap into the linked detail sheet to see how long it's been since your last workout of each type."),
-                ("Unlinking these widgets", "Long-press either card and tap \"Unlink Widgets\" to break the link. The cards stay where they are but render as independent widgets again. Training Load returns to its standard calculation.\n\nYou can also unlink by reordering the widgets so they're no longer adjacent, or by deleting either one.\n\nRe-link by long-pressing either card and choosing \"Reorder Widgets,\" then dragging them back into an adjacent position. The link reforms automatically."),
-                ("What to expect when you're starting out", "The linked score updates as soon as last night's sleep data syncs from Apple Health — usually within a few hours of waking. If you forgot your sleep tracking device, your score for that day falls back to the unlinked calculation; the link stays active and resumes its effect the next night you have data.\n\nThe Training Load detail chart inside the linked detail sheet shows your 14-day score history. Linking changes only how the *current* score is calculated — past days' scores in the chart use the calculation that was active at the time.")
+                ("How linking changes Training Load", "Without linking, Training Load decays at a fixed rate over ~10 days regardless of how rested you are.\n\nWith linking, a poor night slows that decay, so your score sits higher until you recover. A few rough nights can push the score 10–25% higher than the unlinked version."),
+                ("How sleep slows stress decay", "FitNavi compares last night's sleep to your target. *(Long-press either card → \"Configure Settings\" to change it.)*\n\n- **At or above target** — normal decay.\n- **Below target** — decay slows proportionally, up to ~40%.\n- **No data** — that day falls back to the unlinked rate. The link stays active."),
+                ("About sleep data", "FitNavi reads sleep from Apple Health. Apple Watch, Oura, Whoop, AutoSleep, and others all contribute.\n\nSleep is attributed to your wake-up day, using a 6pm-to-6pm window so late nights and naps land where you'd expect.\n\nTrackers classify sleep into four stages:\n- **Deep** — physical recovery\n- **REM** — cognitive recovery\n- **Core** — lighter sleep, the bulk of the night\n- **Awake** — brief wake-ups\n\nStage accuracy varies by device — treat it as directional, not clinical."),
+                ("How time-since-workout is calculated", "The timer starts from your most recent workout, whether logged manually or imported from Apple Health.\n\nFormat scales with time: `12 min` → `4h 12m` → `1d 4h` → `4 days`. Open the detail sheet for per-type timers."),
+                ("Unlinking these widgets", "Long-press either card → \"Unlink Widgets.\" You can also unlink by reordering them apart or deleting one. To re-link, drag them back into adjacent positions."),
+                ("What to expect when you're starting out", "Your linked score updates once last night's sleep syncs from Apple Health, usually within a few hours of waking. Missed a night? That day falls back to the unlinked rate; the link resumes the next night with data.\n\nThe 14-day chart shows current-calculation history — older days use whatever method was active then, so you may see a small step where you linked.")
             ]
         ),
         "recoveryStatus": ChartInfoCopy(
@@ -775,7 +762,7 @@ enum AppConstants {
 
         // Edit Scheduled Workout
         static let watchSyncToggleLabel = "Push to Apple Watch"
-        static let watchSyncInfoPopover = "Pushes this workout to your Apple Watch's Workout app. Appears in the Scheduled section on the workout's day."
+        static let watchSyncInfoPopover = "Pushes this workout to your Apple Watch's Fitness app. Appears in the Scheduled section on the workout's day. Rest timers defined in your workout template will appear as a countdown timer on Apple Watch between sets."
 
         // Schedule Workout
         static let scheduleWorkoutToggleLabel = "Push to Apple Watch"
@@ -784,7 +771,7 @@ enum AppConstants {
         static let scheduleWorkoutValidationFailedToast = "Couldn't push to Apple Watch — check Settings."
 
         // Inline Popover Copy
-        static let restPerSetPopover = "Rest period between each set of this exercise. On Apple Watch, the rest period appears as a countdown timer."
+        static let restPerSetPopover = "Rest period between each set of this exercise."
 
         // Duration Picker Range (REST PER SET + TIME column)
         static let durationPickerMinSeconds = 5
@@ -816,7 +803,7 @@ enum AppConstants {
         // Three Dynamic Card States
         static let stateConnectAppleHealthMessage = "Connect Apple Health to track your activity rings."
         static let stateConnectAppleHealthCTA = "Connect"
-        static let statePairAppleWatchMessage = "Pair an Apple Watch to see your Move, Exercise, and Stand activity here."
+        static let statePairAppleWatchMessage = "No recent Apple Watch activity detected. Wear your Apple Watch to track your Move, Exercise, and Stand activity here."
 
         // Workout Contribution Caption
         static func captionFromSingleWorkout(value: Int, unit: String, workoutName: String) -> String {

@@ -170,23 +170,23 @@ struct LogWorkoutView: View {
             }
 
             // "Template saved!" toast
-            if viewModel.showTemplateSavedToast {
-                VStack {
-                    Text("Template saved!")
-                        .font(FortiFitTypography.bodySmall)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, FortiFitSpacing.cardPadding)
-                        .padding(.vertical, FortiFitSpacing.elementSpacing)
-                        .background(
-                            Capsule()
-                                .fill(FortiFitColors.primaryAccent)
-                        )
-                        .padding(.top, FortiFitSpacing.screenTop)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .allowsHitTesting(false)
+            VStack {
+                Text("Template saved!")
+                    .font(FortiFitTypography.bodySmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, FortiFitSpacing.cardPadding)
+                    .padding(.vertical, FortiFitSpacing.elementSpacing)
+                    .background(
+                        Capsule()
+                            .fill(FortiFitColors.primaryAccent)
+                    )
+                    .padding(.top, FortiFitSpacing.screenTop)
+                Spacer()
             }
+            .opacity(viewModel.showTemplateSavedToast ? 1 : 0)
+            .offset(y: viewModel.showTemplateSavedToast ? 0 : -60)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.2), value: viewModel.showTemplateSavedToast)
         }
         .background(FortiFitColors.background)
         #if os(iOS)

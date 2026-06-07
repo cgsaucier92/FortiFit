@@ -4,8 +4,8 @@ import Charts
 
 /// Combined detail sheet for the linked Recovery & Load composite (Phase 11).
 /// Dual hero, stages bar, stacked 14-day combined chart, window comparison,
-/// correlation callout, personal insights, last-3-nights, contributing workouts,
-/// time-since-workout, recovery readiness callout, footer.
+/// last-3-nights, contributing workouts, time-since-workout, recovery readiness
+/// callout, footer.
 ///
 /// See SCREENS.md § Linked Recovery & Load Detail Sheet and CONSTANTS.md § Linked
 /// Recovery & Load Detail Sheet.
@@ -21,33 +21,33 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
     var onNavigateToWorkout: ((UUID) -> Void)?
 
     @State private var settings = UserSettings.shared
-    @State private var selectedLoadChartIndex: Int? = nil
-    @State private var selectedSleepChartIndex: Int? = nil
+    @State private var selectedChartDate: Date? = nil
+
+    // Cached service results — populated by `reload()` in `.task`. Drag-to-scrub mutates
+    // only the selection indices above, so the body re-evaluation that follows reads from
+    // these caches instead of re-fetching workouts/snapshots and re-running the
+    // load/sleep algorithms on every gesture tick. Mirrors `FortiFitTrainingLoadDetailSheet`.
+    @State private var loadResult: ExerciseLoadService.LoadResult = .init(
+        score: 0, zone: "Resting", zoneColor: "737373", advisory: ""
+    )
+    @State private var dailyLoadScores: [ExerciseLoadService.TrainingLoadDailyScore] = []
+    @State private var stressComparison = ExerciseLoadService.TrainingLoadWeekComparison(
+        currentWeekTss: 0, previousWeekTss: 0, deltaPct: 0, matchedDayCount: 0
+    )
+    @State private var sleepComparison = RecoveryStatusService.SleepWeekComparison(
+        currentWeekMeanMinutes: 0,
+        previousWeekMeanMinutes: 0,
+        deltaPct: 0,
+        currentWeekSnapshotCount: 0,
+        previousWeekSnapshotCount: 0,
+        matchedDayCount: 0
+    )
+    @State private var contributors: [ExerciseLoadService.TrainingLoadContributor] = []
+    @State private var linkedAdvisory: String = ""
 
     private var todaysSnapshot: DailySleepSnapshot? { recoveryService.todaysSnapshot }
     private var recent30: [DailySleepSnapshot] { recoveryService.recent30DaySleep }
     private var last14Sleep: [DailySleepSnapshot] { Array(recent30.suffix(14)) }
-    private var dailyLoadScores: [ExerciseLoadService.TrainingLoadDailyScore] {
-        // BUG-067 — pass the live sleep map and target so today's data point uses the
-        // sleep-adjusted score (matches the hero), not the baseline `calculateLoad`.
-        ExerciseLoadService.fourteenDayDailyScores(
-            context: modelContext,
-            sleepSnapshotsByDay: recoveryService.cachedSnapshotsByDay(),
-            targetSleepHours: settings.targetSleepHours
-        )
-    }
-
-    private var loadResult: ExerciseLoadService.LoadResult {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -10, to: Date()) ?? Date()
-        let workouts = WorkoutService.fetchWorkouts(from: cutoff, to: Date(), context: modelContext)
-        return ExerciseLoadService.computeCurrentScore(
-            workouts: workouts,
-            sleepSnapshotsByDay: recoveryService.cachedSnapshotsByDay(),
-            targetSleepHours: settings.targetSleepHours,
-            experienceLevel: settings.experienceLevel,
-            targetMinutesPerWorkout: settings.targetMinutesPerWorkout
-        )
-    }
 
     var body: some View {
         ScrollView {
@@ -57,7 +57,6 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
                 stagesBarBlock
                 combinedChartBlock
                 windowComparisonBlock
-                personalInsightsBlock
                 last3NightsBlock
                 contributingWorkoutsBlock
                 timeSinceWorkoutBlock
@@ -69,6 +68,40 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
         }
         .background(FortiFitColors.cardSurface)
         .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_sheet)
+        .task { reload() }
+    }
+
+    private func reload() {
+        let snapshotsByDay = recoveryService.cachedSnapshotsByDay()
+        let cutoff = Calendar.current.date(byAdding: .day, value: -10, to: Date()) ?? Date()
+        let recentWorkouts = WorkoutService.fetchWorkouts(from: cutoff, to: Date(), context: modelContext)
+        let result = ExerciseLoadService.computeCurrentScore(
+            workouts: recentWorkouts,
+            sleepSnapshotsByDay: snapshotsByDay,
+            targetSleepHours: settings.targetSleepHours,
+            experienceLevel: settings.experienceLevel,
+            targetMinutesPerWorkout: settings.targetMinutesPerWorkout
+        )
+        loadResult = result
+        dailyLoadScores = ExerciseLoadService.fourteenDayDailyScores(
+            context: modelContext,
+            sleepSnapshotsByDay: snapshotsByDay,
+            targetSleepHours: settings.targetSleepHours
+        )
+        stressComparison = ExerciseLoadService.weekOverWeekComparison(context: modelContext)
+        sleepComparison = recoveryService.sleepWeekOverWeekComparison()
+        contributors = ExerciseLoadService.sleepAdjustedContributingWorkouts(
+            context: modelContext,
+            sleepSnapshotsByDay: snapshotsByDay,
+            targetSleepHours: settings.targetSleepHours
+        )
+        linkedAdvisory = recoveryService.computeLinkedAdvisory(
+            baseAdvisory: result.advisory,
+            zone: result.zone,
+            trainedToday: result.trainedToday,
+            sleepHours: recoveryService.todaysSnapshot.map { Double($0.totalSleepMinutes) / 60.0 },
+            targetSleepHours: settings.targetSleepHours
+        )
     }
 
     // MARK: - Header
@@ -214,7 +247,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
             let asleepHM = "\(asleep / 60)h \(String(format: "%02d", asleep % 60))m"
             let inBedHM = "\(inBed / 60)h \(String(format: "%02d", inBed % 60))m"
             Text("Sleep efficiency: \(efficiency)% (\(asleepHM) asleep of \(inBedHM) in bed)")
-                .font(FortiFitTypography.bodySmall)
+                .font(FortiFitTypography.labelSmall)
                 .foregroundStyle(FortiFitColors.mutedText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_sleepEfficiencyCaption)
@@ -223,130 +256,145 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
 
     // MARK: - 14-day combined chart
 
+    /// Combined dual-axis chart overlaying sleep duration (purple, right axis in hours)
+    /// and sleep-adjusted Training Load (zone color, left axis 0–100) on a shared 14-day
+    /// x-axis. A single scrubber highlights the matching day on both lines and surfaces
+    /// both values in one annotation row beneath the chart.
+    ///
+    /// Both lines share Swift Charts' single 0–100 y-domain; sleep hours are normalized
+    /// into that space for plotting and the trailing axis labels render the un-normalized
+    /// hour values so the right-axis reads naturally in hours.
     private var combinedChartBlock: some View {
         FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
-                Text("Last 14 Days · Training Load (Sleep-Adjusted)")
+                Text("Last 14 Days · Sleep & Load")
                     .font(FortiFitTypography.detailSheetItemTitle)
                     .foregroundStyle(FortiFitColors.primaryText)
 
-                loadSparkline
-                    .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_loadSparkline)
-                loadSelectionAnnotation
+                combinedLegend
 
-                Text("Last 14 Days · Sleep duration")
-                    .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
-                    .padding(.top, FortiFitSpacing.gapSmall)
+                combinedChart
+                    .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_combinedChart)
 
-                sleepSparkline
-                    .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_sleepSparkline)
-                sleepSelectionAnnotation
+                combinedSelectionAnnotation
             }
         }
-        .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_combinedChart)
     }
 
-    /// 14-day sleep duration chart with tap-to-select + drag-to-scrub, mirroring
-    /// `FortiFitTrainingLoadDetailSheet.interactiveDailyChart`.
-    private var sleepSparkline: some View {
-        Chart {
-            ForEach(Array(last14Sleep.enumerated()), id: \.element.id) { index, snap in
-                let isSelected = selectedSleepChartIndex == index
-                let isLatest = snap.id == last14Sleep.last?.id
-                let isDimmed = selectedSleepChartIndex != nil && !isSelected
-
-                LineMark(
-                    x: .value("Date", snap.wakeUpDate),
-                    y: .value("Hours", Double(snap.totalSleepMinutes) / 60.0)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(FortiFitColors.chartPurple.opacity(selectedSleepChartIndex == nil ? 1.0 : 0.55))
-                .lineStyle(StrokeStyle(lineWidth: 2))
-
-                PointMark(
-                    x: .value("Date", snap.wakeUpDate),
-                    y: .value("Hours", Double(snap.totalSleepMinutes) / 60.0)
-                )
-                .foregroundStyle((isLatest ? FortiFitColors.primaryAccent : FortiFitColors.chartPurple).opacity(isDimmed ? 0.35 : 1.0))
-                .symbolSize(isSelected ? 96 : (isLatest ? 60 : 16))
-                .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_sleepChartDataPoint(index))
+    private var combinedLegend: some View {
+        HStack(spacing: FortiFitSpacing.gapMedium) {
+            HStack(spacing: 4) {
+                Circle().fill(FortiFitColors.chartPurple).frame(width: 6, height: 6)
+                Text("SLEEP")
             }
-
-            if let idx = selectedSleepChartIndex, idx < last14Sleep.count {
-                RuleMark(x: .value("Selected", last14Sleep[idx].wakeUpDate))
-                    .foregroundStyle(FortiFitColors.chartPurple.opacity(0.6))
-                    .lineStyle(StrokeStyle(lineWidth: 1))
+            HStack(spacing: 4) {
+                Circle().fill(Color(hex: loadResult.zoneColor)).frame(width: 6, height: 6)
+                Text("LOAD")
             }
         }
-        .chartYScale(domain: DailySleepSnapshot.sparklineDomain(for: last14Sleep))
-        .chartYAxis {
-            AxisMarks(position: .leading, values: DailySleepSnapshot.sparklineAxisValues(for: DailySleepSnapshot.sparklineDomain(for: last14Sleep))) { _ in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                    .foregroundStyle(FortiFitColors.border)
-                AxisValueLabel()
-                    .foregroundStyle(FortiFitColors.mutedText)
-            }
-        }
-        .chartXAxis(.hidden)
-        .chartOverlay { proxy in
-            GeometryReader { _ in
-                Rectangle().fill(.clear).contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                scrubSleepChart(to: value.location, proxy: proxy)
-                            }
-                    )
-                    .onTapGesture { location in
-                        scrubSleepChart(to: location, proxy: proxy)
-                    }
-            }
-        }
-        .frame(height: 100)
+        .font(.system(size: 11, weight: .bold))
+        .kerning(FortiFitTypography.labelKerning)
+        .foregroundStyle(FortiFitColors.mutedText)
     }
 
-    /// 14-day sleep-adjusted Training Load chart with tap-to-select + drag-to-scrub.
-    /// Uses the same `fourteenDayDailyScores` helper as `FortiFitTrainingLoadDetailSheet`
-    /// so days without a persisted `DailyTrainingLoadSnapshot` fall back to a live
-    /// recompute (BUG-054).
-    private var loadSparkline: some View {
-        Chart {
+    /// Sleep domain used for both the right-axis labels and the normalization that
+    /// projects sleep hours into the shared 0–100 y-space.
+    private var sleepDomainRange: ClosedRange<Double> {
+        DailySleepSnapshot.sparklineDomain(for: last14Sleep)
+    }
+
+    private func normalizeSleepHours(_ hours: Double) -> Double {
+        let lo = sleepDomainRange.lowerBound
+        let hi = sleepDomainRange.upperBound
+        let span = max(hi - lo, 0.01)
+        return ((hours - lo) / span) * 100.0
+    }
+
+    private var combinedChart: some View {
+        let domain = sleepDomainRange
+        let sleepTickValues = DailySleepSnapshot.sparklineAxisValues(for: domain)
+        let calendar = Calendar.current
+
+        return Chart {
+            // --- Load line + points (raw 0–100) ---
             ForEach(Array(dailyLoadScores.enumerated()), id: \.element.date) { index, entry in
-                let isSelected = selectedLoadChartIndex == index
+                let isSelected = selectedChartDate.map { calendar.isDate($0, inSameDayAs: entry.date) } ?? false
                 let isLatest = entry.date == dailyLoadScores.last?.date
-                let isDimmed = selectedLoadChartIndex != nil && !isSelected
+                let isDimmed = selectedChartDate != nil && !isSelected
 
                 LineMark(
                     x: .value("Day", entry.date),
-                    y: .value("Score", entry.score)
+                    y: .value("Load", entry.score),
+                    series: .value("Series", "Load")
                 )
                 .interpolationMethod(.catmullRom)
-                .foregroundStyle(Color(hex: loadResult.zoneColor).opacity(selectedLoadChartIndex == nil ? 1.0 : 0.55))
+                .foregroundStyle(Color(hex: loadResult.zoneColor).opacity(selectedChartDate == nil ? 1.0 : 0.55))
                 .lineStyle(StrokeStyle(lineWidth: 2))
 
                 PointMark(
                     x: .value("Day", entry.date),
-                    y: .value("Score", entry.score)
+                    y: .value("Load", entry.score)
                 )
                 .foregroundStyle(Color(hex: entry.zoneColor).opacity(isDimmed ? 0.35 : 1.0))
                 .symbolSize(isSelected ? 96 : (isLatest ? 60 : 16))
                 .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_loadChartDataPoint(index))
             }
 
-            if let idx = selectedLoadChartIndex, idx < dailyLoadScores.count {
-                RuleMark(x: .value("Selected", dailyLoadScores[idx].date))
-                    .foregroundStyle(Color(hex: loadResult.zoneColor).opacity(0.6))
+            // --- Sleep line + points (normalized into 0–100) ---
+            ForEach(Array(last14Sleep.enumerated()), id: \.element.id) { index, snap in
+                let isSelected = selectedChartDate.map { calendar.isDate($0, inSameDayAs: snap.wakeUpDate) } ?? false
+                let isLatest = snap.id == last14Sleep.last?.id
+                let isDimmed = selectedChartDate != nil && !isSelected
+                let hours = Double(snap.totalSleepMinutes) / 60.0
+                let normalizedY = normalizeSleepHours(hours)
+
+                LineMark(
+                    x: .value("Day", snap.wakeUpDate),
+                    y: .value("Sleep", normalizedY),
+                    series: .value("Series", "Sleep")
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(FortiFitColors.chartPurple.opacity(selectedChartDate == nil ? 1.0 : 0.55))
+                .lineStyle(StrokeStyle(lineWidth: 2))
+
+                PointMark(
+                    x: .value("Day", snap.wakeUpDate),
+                    y: .value("Sleep", normalizedY)
+                )
+                .foregroundStyle((isLatest ? FortiFitColors.primaryAccent : FortiFitColors.chartPurple).opacity(isDimmed ? 0.35 : 1.0))
+                .symbolSize(isSelected ? 96 : (isLatest ? 60 : 16))
+                .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_sleepChartDataPoint(index))
+            }
+
+            // --- Scrubber ---
+            if let selected = selectedChartDate {
+                RuleMark(x: .value("Selected", selected))
+                    .foregroundStyle(FortiFitColors.mutedText.opacity(0.6))
                     .lineStyle(StrokeStyle(lineWidth: 1))
             }
         }
         .chartYScale(domain: 0...100)
         .chartYAxis {
+            // Left axis — Load (zone-color-tinted, 0–100 with mid-zone ticks)
             AxisMarks(position: .leading, values: [30, 55, 80]) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
                     .foregroundStyle(FortiFitColors.border)
                 AxisValueLabel()
-                    .foregroundStyle(FortiFitColors.mutedText)
+                    .foregroundStyle(Color(hex: loadResult.zoneColor))
+            }
+            // Right axis — Sleep hours (purple-tinted, hour labels denormalized from
+            // the shared 0–100 space). No grid lines on this side to avoid clutter.
+            AxisMarks(position: .trailing, values: sleepTickValues.map { normalizeSleepHours($0) }) { value in
+                AxisValueLabel {
+                    if let normalized = value.as(Double.self) {
+                        let lo = domain.lowerBound
+                        let hi = domain.upperBound
+                        let span = max(hi - lo, 0.01)
+                        let hours = lo + (normalized / 100.0) * span
+                        Text("\(Int(hours.rounded()))h")
+                    }
+                }
+                .foregroundStyle(FortiFitColors.chartPurple)
             }
         }
         .chartXAxis(.hidden)
@@ -356,110 +404,96 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                scrubLoadChart(to: value.location, proxy: proxy)
+                                scrubCombinedChart(to: value.location, proxy: proxy)
                             }
                     )
                     .onTapGesture { location in
-                        scrubLoadChart(to: location, proxy: proxy)
+                        scrubCombinedChart(to: location, proxy: proxy)
                     }
             }
         }
-        .frame(height: 100)
+        .frame(height: 140)
     }
 
-    /// Selected sleep night → duration (purple), deep caption, date.
+    /// Combined annotation row — single line: sleep duration (purple) · load score
+    /// (zone color) · zone label · trailing date. Renders `—` for whichever side is
+    /// missing on the selected day so an absent sleep night doesn't hide the load read.
     @ViewBuilder
-    private var sleepSelectionAnnotation: some View {
-        if let idx = selectedSleepChartIndex, idx < last14Sleep.count {
-            let snap = last14Sleep[idx]
+    private var combinedSelectionAnnotation: some View {
+        if let selected = selectedChartDate {
+            let calendar = Calendar.current
+            let sleep = last14Sleep.first { calendar.isDate($0.wakeUpDate, inSameDayAs: selected) }
+            let load = dailyLoadScores.first { calendar.isDate($0.date, inSameDayAs: selected) }
+
             HStack(spacing: FortiFitSpacing.elementSpacing) {
-                Text(formatHero(totalMinutes: snap.totalSleepMinutes))
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(FortiFitColors.chartPurple)
-                Text(formatDeepCaption(snapshot: snap))
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                if let snap = sleep {
+                    Text(formatHero(totalMinutes: snap.totalSleepMinutes))
+                        .font(FortiFitTypography.labelSmall)
+                        .foregroundStyle(FortiFitColors.chartPurple)
+                } else {
+                    Text("— h —m")
+                        .font(FortiFitTypography.labelSmall)
+                        .foregroundStyle(FortiFitColors.mutedText)
+                }
+
+                if let entry = load {
+                    Text("\(entry.score) / 100")
+                        .font(FortiFitTypography.labelSmall)
+                        .foregroundStyle(Color(hex: entry.zoneColor))
+                    Text(entry.zone)
+                        .font(FortiFitTypography.labelSmall)
+                        .foregroundStyle(FortiFitColors.primaryText)
+                } else {
+                    Text("— / 100")
+                        .font(FortiFitTypography.labelSmall)
+                        .foregroundStyle(FortiFitColors.mutedText)
+                }
+
                 Spacer()
-                Text(snap.wakeUpDate.shortFormatted)
+                Text(selected.shortFormatted)
                     .font(FortiFitTypography.labelSmall)
                     .foregroundStyle(FortiFitColors.mutedText)
             }
-            .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_sleepChartSelectionAnnotation)
+            .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_combinedSelectionAnnotation)
         }
     }
 
-    /// Selected load day → score (zone color), zone label, date.
-    @ViewBuilder
-    private var loadSelectionAnnotation: some View {
-        if let idx = selectedLoadChartIndex, idx < dailyLoadScores.count {
-            let entry = dailyLoadScores[idx]
-            HStack(spacing: FortiFitSpacing.elementSpacing) {
-                Text("\(entry.score) / 100")
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(Color(hex: entry.zoneColor))
-                Text(entry.zone)
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(FortiFitColors.primaryText)
-                Spacer()
-                Text(entry.date.shortFormatted)
-                    .font(FortiFitTypography.labelSmall)
-                    .foregroundStyle(FortiFitColors.mutedText)
-            }
-            .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_loadChartSelectionAnnotation)
-        }
-    }
-
-    private func scrubSleepChart(to location: CGPoint, proxy: ChartProxy) {
-        guard !last14Sleep.isEmpty else { return }
+    private func scrubCombinedChart(to location: CGPoint, proxy: ChartProxy) {
         guard let dateValue: Date = proxy.value(atX: location.x) else { return }
-        var closestIndex = 0
-        var closestDist = abs(last14Sleep[0].wakeUpDate.timeIntervalSince(dateValue))
-        for i in 1..<last14Sleep.count {
-            let dist = abs(last14Sleep[i].wakeUpDate.timeIntervalSince(dateValue))
+        let calendar = Calendar.current
+        var candidateDays: [Date] = []
+        candidateDays.append(contentsOf: dailyLoadScores.map { calendar.startOfDay(for: $0.date) })
+        candidateDays.append(contentsOf: last14Sleep.map { calendar.startOfDay(for: $0.wakeUpDate) })
+        let uniqueDays = Array(Set(candidateDays))
+        guard let first = uniqueDays.first else { return }
+
+        var closest = first
+        var closestDist = abs(first.timeIntervalSince(dateValue))
+        for day in uniqueDays.dropFirst() {
+            let dist = abs(day.timeIntervalSince(dateValue))
             if dist < closestDist {
                 closestDist = dist
-                closestIndex = i
+                closest = day
             }
         }
-        if selectedSleepChartIndex != closestIndex {
+
+        let alreadySelected = selectedChartDate.map { calendar.isDate($0, inSameDayAs: closest) } ?? false
+        if !alreadySelected {
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
-            selectedSleepChartIndex = closestIndex
-        }
-    }
-
-    private func scrubLoadChart(to location: CGPoint, proxy: ChartProxy) {
-        let scores = dailyLoadScores
-        guard !scores.isEmpty else { return }
-        guard let dateValue: Date = proxy.value(atX: location.x) else { return }
-        var closestIndex = 0
-        var closestDist = abs(scores[0].date.timeIntervalSince(dateValue))
-        for i in 1..<scores.count {
-            let dist = abs(scores[i].date.timeIntervalSince(dateValue))
-            if dist < closestDist {
-                closestDist = dist
-                closestIndex = i
-            }
-        }
-        if selectedLoadChartIndex != closestIndex {
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
-            selectedLoadChartIndex = closestIndex
+            selectedChartDate = closest
         }
     }
 
     // MARK: - Window comparison
 
     private var windowComparisonBlock: some View {
-        let stressComparison = ExerciseLoadService.weekOverWeekComparison(context: modelContext)
-        let sleepComparison = sleepWeekComparison
         let matchedDayCount = stressComparison.matchedDayCount
         return FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                 comparisonRow(
-                    label: "Stress Load",
+                    label: "Training Load",
                     value: stressComparisonValueText(comparison: stressComparison),
                     isHigherBetter: false,
                     sign: stressComparison.matchedDayCount < 2 ? 0 : stressComparison.deltaPct
@@ -473,7 +507,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
 
                 if settings.recoverySheetStressLoadExpanded {
                     Text(Self.windowComparisonCaption(now: Date()))
-                        .font(FortiFitTypography.bodySmall)
+                        .font(FortiFitTypography.labelSmall)
                         .foregroundStyle(FortiFitColors.mutedText)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_windowComparisonCaption)
@@ -504,7 +538,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
 
     /// Spells out the matched Mon-through-current-weekday window on both sides so users
     /// can see the comparison is apples-to-apples (Mon–Thu vs Mon–Thu on a Thursday, full
-    /// week vs full week on a Sunday). Stress Load sums and Sleep means use the same two
+    /// week vs full week on a Sunday). Training Load sums and Sleep means use the same two
     /// windows, so one caption covers both rows (BUG-065, BUG-066).
     static func windowComparisonCaption(now: Date) -> String {
         let isoCalendar = Calendar(identifier: .iso8601)
@@ -524,10 +558,6 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
         return "This week so far (\(currentStart.formatted(style)) – today) vs same period last week (\(prevStart.formatted(style)) – \(prevMatchedEnd.formatted(style)))"
     }
 
-    private var sleepWeekComparison: RecoveryStatusService.SleepWeekComparison {
-        recoveryService.sleepWeekOverWeekComparison()
-    }
-
     private func comparisonRow(label: String, value: String, isHigherBetter: Bool, sign: Int) -> some View {
         let color: Color = {
             if sign == 0 { return FortiFitColors.mutedText }
@@ -542,51 +572,6 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
             Text(value)
                 .font(FortiFitTypography.bodySmall)
                 .foregroundStyle(color)
-        }
-    }
-
-    private func formatCorrelation(delta: Double, variant: String) -> String {
-        let n = Int(abs(delta).rounded())
-        guard let template = AppConstants.RecoveryStatus.correlationCopy[variant] else { return "" }
-        return template.replacingOccurrences(of: "{n}", with: "\(n)")
-    }
-
-    // MARK: - Personal insights (now includes the sleep-load correlation callout)
-
-    @ViewBuilder
-    private var personalInsightsBlock: some View {
-        let insights = recoveryService.computePersonalInsights(context: modelContext)
-        let correlation = recoveryService.computeSleepLoadCorrelation(context: modelContext)
-        if !insights.isEmpty || correlation != nil {
-            FortiFitCard {
-                VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
-                    Text("Personal Insights")
-                        .font(FortiFitTypography.detailSheetItemTitle)
-                        .foregroundStyle(FortiFitColors.primaryText)
-                    if settings.recoverySheetPersonalInsightsExpanded {
-                        if let corr = correlation {
-                            Text(formatCorrelation(delta: corr.delta, variant: corr.copyVariant))
-                                .font(FortiFitTypography.bodySmall)
-                                .foregroundStyle(FortiFitColors.mutedText)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_correlationCallout)
-                        }
-                        ForEach(Array(insights.enumerated()), id: \.offset) { idx, insight in
-                            Text(insight)
-                                .font(FortiFitTypography.bodySmall)
-                                .foregroundStyle(FortiFitColors.mutedText)
-                                .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_personalInsightsRow(idx))
-                        }
-                    }
-                    collapseChevron(
-                        isExpanded: settings.recoverySheetPersonalInsightsExpanded,
-                        accessibilityID: AccessibilityID.linkedRecoveryLoadDetailSheet_personalInsights_chevron
-                    ) {
-                        settings.recoverySheetPersonalInsightsExpanded.toggle()
-                    }
-                }
-            }
-            .accessibilityIdentifier(AccessibilityID.linkedRecoveryLoadDetailSheet_personalInsights)
         }
     }
 
@@ -636,15 +621,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
     // MARK: - Contributing this week
 
     private var contributingWorkoutsBlock: some View {
-        // Sleep-adjusted contributions so each row's share matches the linked sheet's
-        // hero, daily chart, and chip. Pass-through the same sleep map + target as the
-        // hero (lines 27–46), keeping every surface on the same view of the week.
-        let contributors = ExerciseLoadService.sleepAdjustedContributingWorkouts(
-            context: modelContext,
-            sleepSnapshotsByDay: recoveryService.cachedSnapshotsByDay(),
-            targetSleepHours: settings.targetSleepHours
-        )
-        return FortiFitCard {
+        FortiFitCard {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Contributing This Week")
                     .font(FortiFitTypography.detailSheetItemTitle)
@@ -785,15 +762,8 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
     // MARK: - Recovery readiness callout
 
     private var recoveryReadinessCalloutBlock: some View {
-        let combined = recoveryService.computeLinkedAdvisory(
-            baseAdvisory: loadResult.advisory,
-            zone: loadResult.zone,
-            trainedToday: loadResult.trainedToday,
-            sleepHours: todaysSnapshot.map { Double($0.totalSleepMinutes) / 60.0 },
-            targetSleepHours: settings.targetSleepHours
-        )
-        return FortiFitCard(borderColor: Color(hex: loadResult.zoneColor)) {
-            Text(combined)
+        FortiFitCard(borderColor: Color(hex: loadResult.zoneColor)) {
+            Text(linkedAdvisory)
                 .font(FortiFitTypography.body)
                 .foregroundStyle(FortiFitColors.primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
