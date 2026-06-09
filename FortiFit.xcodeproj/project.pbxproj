@@ -528,7 +528,7 @@
 				CODE_SIGN_ENTITLEMENTS = FortiFit/FortiFit.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 2.1;
 				DEVELOPMENT_TEAM = HCH8243GG3;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -578,7 +578,7 @@
 				CODE_SIGN_ENTITLEMENTS = FortiFit/FortiFit.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 2.1;
 				DEVELOPMENT_TEAM = HCH8243GG3;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;

@@ -65,6 +65,8 @@ struct SettingsView: View {
 
                 appleHealthSection
 
+                FortiFitDivider()
+
                 appleWatchSection
             }
             .padding(.horizontal, FortiFitSpacing.screenHorizontal)
@@ -107,6 +109,8 @@ struct SettingsView: View {
     @ViewBuilder
     private var appleWatchSection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
+            FortiFitScreenHeading(AppConstants.AppleWatch.settingsSectionHeader, color: FortiFitColors.primaryAccent)
+
             FortiFitCard(borderColor: FortiFitColors.border) {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                     Toggle(isOn: Binding(
@@ -178,7 +182,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var appleHealthSection: some View {
         VStack(alignment: .leading, spacing: FortiFitSpacing.gapMedium) {
-            FortiFitScreenHeading("Apple Health & Devices", color: FortiFitColors.primaryAccent)
+            FortiFitScreenHeading("Apple Health", color: FortiFitColors.primaryAccent)
 
             FortiFitCard(borderColor: FortiFitColors.border) {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {

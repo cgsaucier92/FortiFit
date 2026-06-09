@@ -77,19 +77,19 @@ struct StreakService {
 
     static func message(for streak: Int) -> String {
         switch streak {
-        case 0: return "Hit your weekly target to start a streak."
-        case 1: return "One week down. Keep the flame alive."
-        case 2: return "Two weeks strong. Building momentum."
-        case 3: return "Three weeks in. Consistency is power."
-        case 4: return "A full month of hitting your target. Keep it up."
-        case 5: return "Five weeks. You're relentless."
-        case 6: return "Six weeks. This is who you are now."
-        case 7: return "Seven weeks. The flame burns brightly."
-        case 8: return "Eight weeks. Entering beast mode."
-        case 9: return "Nine weeks. Unstoppable."
-        case 10: return "Ten weeks. Double digits. Legendary."
-        case 11: return "Eleven weeks. Almost three months strong."
-        default: return "Unstoppable."
+        case 0: return "Hit your weekly target to start a streak!"
+        case 1: return "One week down. It's all you, brah."
+        case 2: return "Two weeks. Respect."
+        case 3: return "Three weeks. Officially not a resolutioner."
+        case 4: return "Four weeks. Do you even lift? Yes. Yes you do."
+        case 5: return "Five weeks. Solid. Tight. Locked in."
+        case 6: return "Six weeks. Consistency yields results."
+        case 7: return "Seven weeks. Yeah buddy."
+        case 8: return "Eight weeks. Absolute unit behavior."
+        case 9: return "Nine weeks. Flexing on 'em respectfully."
+        case 10: return "Ten weeks. Double digits. Built different."
+        case 11: return "Eleven weeks. Mirin."
+        default: return "Unstoppable. We're all gonna make it, brah."
         }
     }
 

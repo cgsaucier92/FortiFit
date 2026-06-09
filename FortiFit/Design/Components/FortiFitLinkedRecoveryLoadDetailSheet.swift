@@ -269,7 +269,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Last 14 Days · Sleep & Load")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 combinedLegend
 
@@ -567,7 +567,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
         return HStack {
             Text(label)
                 .font(FortiFitTypography.detailSheetItemTitle)
-                .foregroundStyle(FortiFitColors.primaryText)
+                .foregroundStyle(FortiFitColors.primaryAccent)
             Spacer()
             Text(value)
                 .font(FortiFitTypography.bodySmall)
@@ -585,7 +585,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
                 VStack(alignment: .leading, spacing: FortiFitSpacing.elementSpacing) {
                     Text("Last 3 Nights")
                         .font(FortiFitTypography.detailSheetItemTitle)
-                        .foregroundStyle(FortiFitColors.primaryText)
+                        .foregroundStyle(FortiFitColors.primaryAccent)
 
                     if settings.recoverySheetLast3NightsExpanded {
                         HStack(spacing: FortiFitSpacing.gapMedium) {
@@ -625,7 +625,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Contributing This Week")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 if settings.recoverySheetContributingExpanded {
                     if contributors.isEmpty {
@@ -704,7 +704,7 @@ struct FortiFitLinkedRecoveryLoadDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Time Since Last Workout")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 if settings.recoverySheetTimeSinceWorkoutExpanded {
                     Text(recoveryService.lastWorkoutHero(context: modelContext))

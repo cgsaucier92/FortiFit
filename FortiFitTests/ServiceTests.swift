@@ -915,7 +915,32 @@ struct StreakTierMessageTests {
     }
 
     @Test func messageForZeroStreak() {
-        #expect(StreakService.message(for: 0) == "Hit your weekly target to start a streak.")
+        #expect(StreakService.message(for: 0) == "Hit your weekly target to start a streak!")
+    }
+
+    // Verifies the streak-count → message mapping matches CONSTANTS.md
+    // § Streak Motivational Messages (weeks 0–12+).
+    @Test func messageMappingMatchesSpec() {
+        #expect(StreakService.message(for: 0) == "Hit your weekly target to start a streak!")
+        #expect(StreakService.message(for: 1) == "One week down. It's all you, brah.")
+        #expect(StreakService.message(for: 2) == "Two weeks. Respect.")
+        #expect(StreakService.message(for: 3) == "Three weeks. Officially not a resolutioner.")
+        #expect(StreakService.message(for: 4) == "Four weeks. Do you even lift? Yes. Yes you do.")
+        #expect(StreakService.message(for: 5) == "Five weeks. Solid. Tight. Locked in.")
+        #expect(StreakService.message(for: 6) == "Six weeks. Consistency yields results.")
+        #expect(StreakService.message(for: 7) == "Seven weeks. Yeah buddy.")
+        #expect(StreakService.message(for: 8) == "Eight weeks. Absolute unit behavior.")
+        #expect(StreakService.message(for: 9) == "Nine weeks. Flexing on 'em respectfully.")
+        #expect(StreakService.message(for: 10) == "Ten weeks. Double digits. Built different.")
+        #expect(StreakService.message(for: 11) == "Eleven weeks. Mirin.")
+        #expect(StreakService.message(for: 12) == "Unstoppable. We're all gonna make it, brah.")
+        #expect(StreakService.message(for: 25) == "Unstoppable. We're all gonna make it, brah.")
+    }
+
+    // Tier-0 string is reused by the Insights Sheet hero empty state
+    // (INFO_COPY.md weeklyStreak.hero.subline.zero).
+    @Test func heroSublineEmptyStateMatchesTierZero() {
+        #expect(AppConstants.WidgetDetail.EmptyState.weeklyStreakHeroSubline == StreakService.message(for: 0))
     }
 }
 

@@ -176,7 +176,7 @@ struct FortiFitPowerLevelDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Driving Your Trend")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 Text("% change in volume vs previous 30 days")
                     .font(FortiFitTypography.labelSmall)
@@ -289,7 +289,7 @@ struct FortiFitPowerLevelDetailSheet: View {
         return HStack {
             Text("Window Comparison")
                 .font(FortiFitTypography.detailSheetItemTitle)
-                .foregroundStyle(FortiFitColors.primaryText)
+                .foregroundStyle(FortiFitColors.primaryAccent)
             Spacer()
             Text(chipText)
                 .font(.system(size: 12, weight: .semibold))
@@ -344,7 +344,7 @@ struct FortiFitPowerLevelDetailSheet: View {
     private var nudgeBlock: some View {
         FortiFitCard {
             Text(renderedNudgeCopy)
-                .font(FortiFitTypography.detailSheetItemTitle)
+                .font(FortiFitTypography.body)
                 .foregroundStyle(FortiFitColors.primaryText)
         }
         .accessibilityIdentifier(AccessibilityID.powerLevelDetailSheet_nudge)

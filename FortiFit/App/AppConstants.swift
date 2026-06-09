@@ -392,7 +392,7 @@ enum AppConstants {
             // Weekly Streak
             static let weeklyStreakThisWeekTargetZero = "Set a weekly workout target in Configure Settings to see this week's progress."
             static let weeklyStreakHeatmap = "Log a workout to start your streak history."
-            static let weeklyStreakHeroSubline = "Hit your weekly target to start a streak."
+            static let weeklyStreakHeroSubline = "Hit your weekly target to start a streak!"
             // Power Level
             static let powerLevelHero = "Log more Strength or HIIT workouts to see your power level."
             static let powerLevelTopExercises = "Log more sessions on the same exercises to surface your top drivers."
@@ -735,6 +735,7 @@ enum AppConstants {
 
     enum AppleWatch {
         // Settings Section
+        static let settingsSectionHeader = "Devices"
         static let settingsToggleLabel = "Sync to Apple Watch"
         static let settingsDescription = "Permit FitNavi to push your planned workouts to the Workout app on Apple Watch. Requires watchOS 11 or later."
         static let settingsStatusConnected = "Connected"

@@ -247,7 +247,7 @@ struct FortiFitTodaysPlanDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text(name)
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
                 ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                     Text(setLine(group: group))
                         .font(FortiFitTypography.bodySmall)

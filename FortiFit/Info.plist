@@ -13,6 +13,8 @@
 	</dict>
 	<key>NSHealthShareUsageDescription</key>
 	<string>FitNavi reads your workouts, sleep, and activity data from Apple Health to give you context-aware recovery insights, training load scores, and activity rings visualization.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>FitNavi does not write data to Apple Health. This permission is included only because Apple requires both read and write descriptions when HealthKit access is enabled.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

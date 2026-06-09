@@ -466,7 +466,7 @@ Opened by tapping the Weekly Streak widget. Component: `FortiFitWeeklyStreakDeta
 
 | Block | Empty trigger | Empty copy |
 |---|---|---|
-| Hero | `currentStreak == 0` | Render `0` count + flatter messaging beneath: `Hit your weekly target to start a streak.` (sourced from CONSTANTS § Streak Motivational Messages → tier 0; existing copy reused). |
+| Hero | `currentStreak == 0` | Render `0` count + flatter messaging beneath: `Hit your weekly target to start a streak!` (sourced from CONSTANTS § Streak Motivational Messages → tier 0; existing copy reused). |
 | Stat row | All values 0 | Render zeros — block is informational, never hidden. |
 | This Week's Progress | `targetWorkoutsPerWeek == 0` | Hide block entirely. Show inline note in its place: *"Set a weekly workout target in Configure Settings to see this week's progress."* |
 | History heatmap | Fewer than 1 week of any workouts | Render the grid with all 26 cells in `Untracked` style + caption *"Log a workout to start your streak history."* |

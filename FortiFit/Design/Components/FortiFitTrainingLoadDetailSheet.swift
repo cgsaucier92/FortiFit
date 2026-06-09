@@ -92,7 +92,7 @@ struct FortiFitTrainingLoadDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Last 14 Days · Training Load")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 if chartHasEnoughData {
                     interactiveDailyChart
@@ -220,7 +220,7 @@ struct FortiFitTrainingLoadDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Contributing This Week")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 if contributors.isEmpty {
                     Text(AppConstants.WidgetDetail.EmptyState.trainingLoadContributingWorkouts)
@@ -302,7 +302,7 @@ struct FortiFitTrainingLoadDetailSheet: View {
                         HStack {
                             Text("Training Load")
                                 .font(FortiFitTypography.detailSheetItemTitle)
-                                .foregroundStyle(FortiFitColors.primaryText)
+                                .foregroundStyle(FortiFitColors.primaryAccent)
                             Spacer()
                             if insufficient {
                                 Text("Not enough data")

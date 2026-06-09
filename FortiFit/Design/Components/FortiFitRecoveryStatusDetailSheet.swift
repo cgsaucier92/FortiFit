@@ -189,7 +189,7 @@ struct FortiFitRecoveryStatusDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Last 14 Days · Sleep Duration")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 if hasEnoughForSparkline {
                     interactiveSparklineChart
@@ -356,7 +356,7 @@ struct FortiFitRecoveryStatusDetailSheet: View {
             VStack(alignment: .leading, spacing: FortiFitSpacing.gapSmall) {
                 Text("Time Since Last Workout")
                     .font(FortiFitTypography.detailSheetItemTitle)
-                    .foregroundStyle(FortiFitColors.primaryText)
+                    .foregroundStyle(FortiFitColors.primaryAccent)
 
                 if noWorkoutsEver {
                     coldStartEmpty

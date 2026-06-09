@@ -417,7 +417,7 @@ Per-block empty-state copy for the four new detail sheets. Stored in `AppConstan
 |---|---|
 | `weeklyStreak.empty.thisWeekTargetZero` | `Set a weekly workout target in Configure Settings to see this week's progress.` |
 | `weeklyStreak.empty.heatmap` | `Log a workout to start your streak history.` |
-| `weeklyStreak.hero.subline.zero` | `Hit your weekly target to start a streak.` (reused from CONSTANTS § Streak Motivational Messages tier 0) |
+| `weeklyStreak.hero.subline.zero` | `Hit your weekly target to start a streak!` (reused from CONSTANTS § Streak Motivational Messages tier 0) |
 
 ### Power Level Breakdown Sheet
 

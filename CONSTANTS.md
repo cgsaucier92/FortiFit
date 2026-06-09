@@ -1141,19 +1141,19 @@ Stored in `AppConstants.TrainingLoad.linkedAdvisoryText` as a dictionary keyed b
 
 | Streak | Message |
 |--------|---------|
-| 0 | "Hit your weekly target to start a streak" |
-| 1 | "One week down. Keep the flame alive" |
-| 2 | "Two weeks strong. Building momentum" |
-| 3 | "Three weeks in. Consistency is power" |
-| 4 | "A full month of hitting your target" |
-| 5 | "Five weeks. You're relentless" |
-| 6 | "Six weeks. This is who you are now" |
-| 7 | "Seven weeks. The flame burns bright" |
-| 8 | "Eight weeks. Entering beast mode" |
-| 9 | "Nine weeks. Nothing stops you" |
-| 10 | "Ten weeks. Double digits. Legendary" |
-| 11 | "Eleven weeks. Almost three months strong" |
-| 12+ | "Unstoppable" |
+| 0 | "Hit your weekly target to start a streak!" |
+| 1 | "One week down. It's all you, brah." |
+| 2 | "Two weeks. Respect." |
+| 3 | "Three weeks. Officially not a resolutioner." |
+| 4 | "Four weeks. Do you even lift? Yes. Yes you do." |
+| 5 | "Five weeks. Solid. Tight. Locked in." |
+| 6 | "Six weeks. Consistency yields results." |
+| 7 | "Seven weeks. Yeah buddy." |
+| 8 | "Eight weeks. Absolute unit behavior." |
+| 9 | "Nine weeks. Flexing on 'em respectfully." |
+| 10 | "Ten weeks. Double digits. Built different." |
+| 11 | "Eleven weeks. Mirin." |
+| 12+ | "Unstoppable. We're all gonna make it, brah." |
 
 ---
 

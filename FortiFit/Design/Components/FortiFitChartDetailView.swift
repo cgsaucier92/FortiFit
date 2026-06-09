@@ -16,6 +16,24 @@ struct FortiFitChartDetailView: View {
     @State private var selectedPRExercise: String = UserDefaults.standard.string(forKey: "trendsSelectedPRExercise") ?? ""
     @State private var selectedStrengthExercise: String = UserDefaults.standard.string(forKey: "trendsSelectedExercise") ?? ""
 
+    // Caches per-chart data so drag-to-scrub doesn't reflow expensive
+    // TrendsChartService calls (each one performs WorkoutService.fetchAll)
+    // on every frame. Reload triggers off `.task(id:)` keyed on chartId +
+    // range + exercise selection.
+    @State private var cache: [String: ChartCache] = [:]
+
+    private struct ChartCache {
+        var points: [ChartDataPoint] = []
+        var hasEnough: Bool = false
+        var delta: ChartDelta? = nil
+        var yDomain: ClosedRange<Double> = 0...1
+        var rollingAverages: [Double] = []
+        var prTimeline: [PRTimelineEvent] = []
+        var prExercises: [String] = []
+        var strengthExercises: [String] = []
+        var breakdownRows: [WorkoutTypeBreakdownRow] = []
+    }
+
     private var settings: UserSettings { UserSettings.shared }
 
     init(charts: [TrendsChart], initialChartIndex: Int) {
@@ -95,6 +113,9 @@ struct FortiFitChartDetailView: View {
                 selectedIndex = nil
             }
         }
+        .task(id: cacheKey(for: chartId)) {
+            loadCache(for: chartId)
+        }
         .accessibilityIdentifier(AccessibilityID.trendsChartDetailCard(chartId))
     }
 
@@ -136,8 +157,7 @@ struct FortiFitChartDetailView: View {
         if chartId == "workoutTypeBreakdown" {
             EmptyView()
         } else {
-            let exerciseName = exerciseNameForChart(chartId)
-            if let delta = TrendsChartService.comparisonDelta(for: chartId, exerciseName: exerciseName, range: range, context: modelContext) {
+            if let delta = cache[chartId]?.delta {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(delta.hero)
                         .font(.system(size: 32, weight: .black))
@@ -207,7 +227,7 @@ struct FortiFitChartDetailView: View {
 
         switch chartId {
         case "strengthTracker":
-            let strengthExercises = TrendsChartService.exercisesWithStrengthData(context: modelContext)
+            let strengthExercises = cache[chartId]?.strengthExercises ?? []
             if !strengthExercises.isEmpty {
                 FortiFitSelect(
                     options: strengthExercises,
@@ -246,14 +266,15 @@ struct FortiFitChartDetailView: View {
 
     @ViewBuilder
     private func lineChartDetail(chartId: String, range: DetailTimeRange, exerciseName: String?, color: Color, gradientAnchor: ChartGradientAnchor, yLabel: String) -> some View {
-        let points = TrendsChartService.dataPoints(for: chartId, exerciseName: exerciseName, range: range, context: modelContext)
+        let entry = cache[chartId] ?? ChartCache()
+        let points = entry.points
 
         // BUG-073 — gate on the same threshold the card uses so a single data point
         // doesn't render here while the card shows "log more…"
-        if !TrendsChartService.hasEnoughData(for: chartId, exerciseName: exerciseName, range: range, context: modelContext) {
+        if !entry.hasEnough {
             emptyChartState(chartId: chartId)
         } else {
-            let yDomain = TrendsChartService.paddedYDomain(for: points.map(\.y))
+            let yDomain = entry.yDomain
             detailPlotArea(gradientAnchor: gradientAnchor) {
                 Chart {
                     ForEach(Array(points.enumerated()), id: \.element.id) { index, point in
@@ -338,12 +359,13 @@ struct FortiFitChartDetailView: View {
 
     @ViewBuilder
     private func barChartDetail(chartId: String, range: DetailTimeRange, color: Color, gradientAnchor: ChartGradientAnchor, yLabel: String, yDomain: ClosedRange<Double>? = nil) -> some View {
-        let points = TrendsChartService.dataPoints(for: chartId, exerciseName: nil, range: range, context: modelContext)
+        let entry = cache[chartId] ?? ChartCache()
+        let points = entry.points
 
         // BUG-073 — match the card's threshold (e.g. trainingFrequency requires
         // ≥ 1 completed week with count > 0; the raw `points` array includes
         // empty weeks and would otherwise let the chart render with all-zero bars).
-        if !TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext) {
+        if !entry.hasEnough {
             emptyChartState(chartId: chartId)
         } else {
             let formatter = DateFormatter()
@@ -383,7 +405,7 @@ struct FortiFitChartDetailView: View {
                         }
                     }
                 }
-                .chartYScale(domain: yDomain ?? TrendsChartService.paddedYDomain(for: points.map(\.y)))
+                .chartYScale(domain: yDomain ?? entry.yDomain)
                 .chartOverlay { proxy in
                     GeometryReader { _ in
                         Rectangle().fill(.clear).contentShape(Rectangle())
@@ -406,22 +428,19 @@ struct FortiFitChartDetailView: View {
 
     @ViewBuilder
     private func trainingLoadDetail(chartId: String, range: DetailTimeRange, gradientAnchor: ChartGradientAnchor) -> some View {
-        let points = TrendsChartService.dataPoints(for: chartId, exerciseName: nil, range: range, context: modelContext)
+        let entry = cache[chartId] ?? ChartCache()
+        let points = entry.points
 
         // BUG-073 — `trainingLoadPoints` returns 30 daily points unconditionally
         // (with zero-score days), so `!points.isEmpty` is always true. Match the
         // card's "3+ days with workouts in last 14 days" gate instead.
-        if !TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext) {
+        if !entry.hasEnough {
             emptyChartState(chartId: chartId)
         } else {
             let formatter = DateFormatter()
             let _ = (formatter.dateFormat = "M/d")
             let labelStride = max(1, Int(ceil(Double(points.count) / 6.0)))
-            let rollingAverages: [Double] = points.indices.map { i in
-                let start = max(0, i - 6)
-                let window = points[start...i]
-                return window.map(\.y).reduce(0, +) / Double(window.count)
-            }
+            let rollingAverages = entry.rollingAverages
             let lastAvgLabel = points.last.map { formatter.string(from: $0.x) }
 
             detailPlotArea(gradientAnchor: gradientAnchor) {
@@ -532,15 +551,15 @@ struct FortiFitChartDetailView: View {
 
     @ViewBuilder
     private func prTimelineDetail(chartId: String, exerciseName: String?, gradientAnchor: ChartGradientAnchor) -> some View {
-        let prExercises = TrendsChartService.exercisesWithPRs(context: modelContext)
-        let name = exerciseName ?? ""
-        let events = TrendsChartService.fullPRTimeline(for: name, context: modelContext)
+        let entry = cache[chartId] ?? ChartCache()
+        let prExercises = entry.prExercises
+        let events = entry.prTimeline
 
         // BUG-073 — funnel through `hasEnoughData` for consistency with other charts
         // (semantically equivalent to `prExercises.isEmpty` since both wrap
         // `exercisesWithPRs(...)`). The inner `events.isEmpty` defensive check below
         // handles the picker-selected-an-edge-case-exercise sub-state.
-        if !TrendsChartService.hasEnoughData(for: chartId, range: .allTime, context: modelContext) {
+        if !entry.hasEnough {
             emptyChartState(chartId: chartId)
         } else {
             FortiFitSelect(
@@ -667,11 +686,12 @@ struct FortiFitChartDetailView: View {
 
     @ViewBuilder
     private func breakdownDetail(chartId: String, range: DetailTimeRange, gradientAnchor: ChartGradientAnchor) -> some View {
-        let rows = TrendsChartService.breakdownPercentages(range: range, context: modelContext)
+        let entry = cache[chartId] ?? ChartCache()
+        let rows = entry.breakdownRows
 
         // BUG-073 — card requires total ≥ 2 workouts in range; the donut would
         // otherwise render with a single 100% slice from one workout.
-        if !TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext) {
+        if !entry.hasEnough {
             emptyChartState(chartId: chartId)
         } else {
             let total = rows.reduce(0) { $0 + $1.count }
@@ -952,6 +972,64 @@ struct FortiFitChartDetailView: View {
                 selectedIndex = closestIndex
             }
         }
+    }
+
+    // MARK: - Cache
+
+    /// Stable key for `.task(id:)` invalidation. Any input that should re-fetch
+    /// goes here so the task re-fires automatically: range toggle changes
+    /// `selectedRanges[chartId]`, picker changes flow through `exerciseNameForChart`.
+    private func cacheKey(for chartId: String) -> String {
+        let range = (selectedRanges[chartId] ?? DetailTimeRange.defaultRange(for: chartId)).rawValue
+        let exercise = exerciseNameForChart(chartId) ?? ""
+        return "\(chartId)|\(range)|\(exercise)"
+    }
+
+    /// Computes everything the renderer needs for one chart in a single pass
+    /// and stores it in `cache[chartId]`. Called from `.task(id:)` on each
+    /// page — so a continuous drag-scrub triggers `selectedIndex` updates
+    /// without retouching any TrendsChartService method.
+    private func loadCache(for chartId: String) {
+        let range = selectedRanges[chartId] ?? DetailTimeRange.defaultRange(for: chartId)
+        let exerciseName = exerciseNameForChart(chartId)
+        var entry = ChartCache()
+
+        switch chartId {
+        case "personalRecords":
+            entry.prExercises = TrendsChartService.exercisesWithPRs(context: modelContext)
+            entry.prTimeline = TrendsChartService.fullPRTimeline(for: exerciseName ?? "", context: modelContext)
+            entry.delta = TrendsChartService.comparisonDelta(for: chartId, exerciseName: exerciseName, range: range, context: modelContext)
+            entry.hasEnough = TrendsChartService.hasEnoughData(for: chartId, range: .allTime, context: modelContext)
+
+        case "workoutTypeBreakdown":
+            entry.breakdownRows = TrendsChartService.breakdownPercentages(range: range, context: modelContext)
+            entry.hasEnough = entry.breakdownRows.reduce(0) { $0 + $1.count } >= 2
+
+        case "trainingLoadTrend":
+            entry.points = TrendsChartService.dataPoints(for: chartId, range: range, context: modelContext)
+            entry.hasEnough = TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext)
+            entry.delta = TrendsChartService.comparisonDelta(for: chartId, range: range, context: modelContext)
+            entry.rollingAverages = entry.points.indices.map { i in
+                let start = max(0, i - 6)
+                let window = entry.points[start...i]
+                return window.map(\.y).reduce(0, +) / Double(window.count)
+            }
+
+        case "strengthTracker":
+            entry.strengthExercises = TrendsChartService.exercisesWithStrengthData(context: modelContext)
+            entry.points = TrendsChartService.dataPoints(for: chartId, exerciseName: exerciseName, range: range, context: modelContext)
+            entry.hasEnough = TrendsChartService.hasEnoughData(for: chartId, exerciseName: exerciseName, range: range, context: modelContext)
+            entry.delta = TrendsChartService.comparisonDelta(for: chartId, exerciseName: exerciseName, range: range, context: modelContext)
+            entry.yDomain = TrendsChartService.paddedYDomain(for: entry.points.map(\.y))
+
+        default:
+            entry.points = TrendsChartService.dataPoints(for: chartId, range: range, context: modelContext)
+            entry.hasEnough = TrendsChartService.hasEnoughData(for: chartId, range: range, context: modelContext)
+            entry.delta = TrendsChartService.comparisonDelta(for: chartId, range: range, context: modelContext)
+            entry.yDomain = TrendsChartService.paddedYDomain(for: entry.points.map(\.y))
+        }
+
+        cache[chartId] = entry
     }
 
     // MARK: - Helpers
