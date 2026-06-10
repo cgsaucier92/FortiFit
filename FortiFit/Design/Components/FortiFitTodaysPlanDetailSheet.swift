@@ -304,26 +304,14 @@ struct FortiFitTodaysPlanDetailSheet: View {
     private func actionRow(for row: ScheduledWorkout) -> some View {
         switch row.status {
         case "planned":
-            Button {
+            FortiFitButton("Complete Workout", style: .outline) {
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
                 completionRPE = nil
                 completionDuration = ""
                 completionTarget = row
-            } label: {
-                Text("Complete Workout")
-                    .font(FortiFitTypography.body)
-                    .kerning(FortiFitTypography.labelKerning)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: FortiFitSpacing.minTouchTarget)
-                    .foregroundStyle(FortiFitColors.background)
-                    .background(
-                        RoundedRectangle(cornerRadius: FortiFitSpacing.cornerRadius)
-                            .fill(FortiFitColors.primaryAccent)
-                    )
             }
-            .buttonStyle(.plain)
             .accessibilityIdentifier(AccessibilityID.todaysPlanDetailSheet_rowCompleteButton(scheduledWorkoutId: row.id))
         default:
             // Completed and Skipped rows have no action row — the status pill in the top-right

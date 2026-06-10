@@ -197,18 +197,22 @@ enum AppConstants {
 
     // MARK: - Stat Card Colors
 
-    static let statCardPurple = Color(hex: "4B2893")
     static let statCardTeal = Color(hex: "289193")
+    static let statCardDistance = Color(hex: "6E8CCD")
     static let statCardCalorie = Color(hex: "FFA600")
+    static let statCardCalorieDark = Color(hex: "CC7A00")
+    static let statCardHeartRateDark = Color(hex: "BA3535")
     static let statCardOrange = Color(hex: "934F28")
 
     static func statCardColor(for metric: WorkoutMetric) -> Color {
         switch metric {
         case .effort: return FortiFitColors.positive
-        case .duration, .exerciseMinutes: return statCardPurple
-        case .distance: return statCardTeal
-        case .avgHR, .maxHR: return FortiFitColors.alert
-        case .activeKcal, .totalKcal: return statCardCalorie
+        case .duration, .exerciseMinutes: return statCardTeal
+        case .distance: return statCardDistance
+        case .avgHR: return statCardHeartRateDark
+        case .maxHR: return FortiFitColors.alert
+        case .activeKcal: return statCardCalorieDark
+        case .totalKcal: return statCardCalorie
         case .elevation: return statCardOrange
         }
     }
@@ -516,17 +520,18 @@ enum AppConstants {
                 ("What workouts count", "Only Strength Training and HIIT workouts. Cardio, yoga, pilates, and other types don't track exercise sets, so they don't contribute to a volume comparison."),
                 ("Bodyweight exercises", "Sets logged without a weight value count as if the weight were 1, since they still represent work performed. This keeps bodyweight volume from disappearing entirely from the comparison."),
                 ("Status thresholds", "- Rising (↑, green): current 30-day average is more than 10% higher than the prior 30 days\n- Steady (—, grey): within 10% in either direction — your volume is holding consistent\n- Deloading (↓, red): current 30-day average is more than 10% lower than the prior 30 days"),
-                ("Empty state", "If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.")
+                ("Minimum Data Threshold", "If you don't have any Strength Training or HIIT workouts logged, the widget shows a prompt to start logging. If you have current workouts but no prior 30-day baseline yet (less than 31 days of history), the status defaults to Steady until you build enough data.")
             ]
         ),
         "linkedRecoveryLoad": ChartInfoCopy(
             title: "About Recovery & Load",
-            intro: "When linked, last night's sleep feeds into your Training Load. Poor sleep slows your recovery, so the score reflects how rested you actually are — not just time since your last workout.",
+            intro: "Training Load is a 0–100 score from your recent workouts that reflects your physical stress. When the recovery and load widgets are linked, sleep adjusts the score to reflect the impact of your rest patterns on your physical stress levels.",
             sections: [
+                ("What feeds your Training Load", "Your score reflects each recent workout's effort, duration, type, and volume (sets × reps for Strength and HIIT). Recent sessions count more — stress decays over about 10 days."),
+                ("Zones", "- Low (1–30, green): well recovered\n- Moderate (31–55, yellow): some accumulated fatigue\n- High (56–80, dark yellow): significant fatigue\n- Peak (81–100, red): high stress, prioritize recovery"),
                 ("How linking changes Training Load", "Without linking, Training Load decays at a fixed rate over ~10 days regardless of how rested you are.\n\nWith linking, a poor night slows that decay, so your score sits higher until you recover. A few rough nights can push the score 10–25% higher than the unlinked version."),
                 ("How sleep slows stress decay", "FitNavi compares last night's sleep to your target. *(Long-press either card → \"Configure Settings\" to change it.)*\n\n- **At or above target** — normal decay.\n- **Below target** — decay slows proportionally, up to ~40%.\n- **No data** — that day falls back to the unlinked rate. The link stays active."),
                 ("About sleep data", "FitNavi reads sleep from Apple Health. Apple Watch, Oura, Whoop, AutoSleep, and others all contribute.\n\nSleep is attributed to your wake-up day, using a 6pm-to-6pm window so late nights and naps land where you'd expect.\n\nTrackers classify sleep into four stages:\n- **Deep** — physical recovery\n- **REM** — cognitive recovery\n- **Core** — lighter sleep, the bulk of the night\n- **Awake** — brief wake-ups\n\nStage accuracy varies by device — treat it as directional, not clinical."),
-                ("How time-since-workout is calculated", "The timer starts from your most recent workout, whether logged manually or imported from Apple Health.\n\nFormat scales with time: `12 min` → `4h 12m` → `1d 4h` → `4 days`. Open the detail sheet for per-type timers."),
                 ("Unlinking these widgets", "Long-press either card → \"Unlink Widgets.\" You can also unlink by reordering them apart or deleting one. To re-link, drag them back into adjacent positions."),
                 ("What to expect when you're starting out", "Your linked score updates once last night's sleep syncs from Apple Health, usually within a few hours of waking. Missed a night? That day falls back to the unlinked rate; the link resumes the next night with data.\n\nThe 14-day chart shows current-calculation history — older days use whatever method was active then, so you may see a small step where you linked.")
             ]
@@ -538,7 +543,6 @@ enum AppConstants {
                 ("How sleep is measured", "FitNavi reads sleep data from Apple Health. Any device that writes sleep to Apple Health contributes — Apple Watch, Oura Ring, Whoop, AutoSleep, and others.\n\nSleep is attributed to your wake-up day. A session ending Tuesday morning belongs to Tuesday's data. FitNavi uses a 6pm-to-6pm window (matching the Apple Health app) so late-evening naps and overnight sessions land on the day you'd expect.\n\nIf you nap during the day, those minutes are added to your total — your hero value is your total sleep across the window."),
                 ("About sleep stages", "Modern sleep trackers classify your sleep into four stages:\n- **Deep** — slow-wave sleep that drives physical recovery\n- **REM** — dream sleep that drives cognitive recovery\n- **Core** — lighter sleep, the bulk of a typical night\n- **Awake** — brief periods of wakefulness during the sleep window\n\nThe deep-sleep percentage you see is the proportion of your total sleep time spent in the deep stage.\n\nA note on accuracy: Apple Watch's sleep stage classification is meaningfully less accurate than clinical polysomnography. Other sources may classify stages with different accuracy. Treat deep sleep percentages as a directional signal, not a diagnostic."),
                 ("About sleep efficiency", "Sleep efficiency is the percentage of your time in bed actually spent asleep. Tossing and turning, brief wake-ups, and trouble falling asleep all lower the number.\n\nEfficiency requires your sleep tracker to record both time-in-bed and time-asleep. Apple Watch records both; some third-party sources record only sleep time. If efficiency isn't shown in your detail sheet, the source didn't provide in-bed data."),
-                ("How time-since-workout is calculated", "The timer counts from the start time of your most recently logged workout, regardless of type. Manual logs and workouts imported from Apple Health both count.\n\nThe format shifts as time passes:\n- Under an hour: `12 min`\n- Hours to a day: `4h 12m`\n- One to three days: `1d 4h`\n- Beyond three days: `4 days`\n\nTap into the detail sheet to see how long it's been since your last workout of each type."),
                 ("Linking with Training Load", "Place Recovery Status directly above or below the Training Load widget on your Home screen to link them. Both card borders turn blue and the cards merge into one continuous block.\n\nWhen linked, last night's sleep is factored into your Training Load score: poor sleep slows your stress decay, so your score better reflects how recovered you actually are — not just how much time has passed.\n\nTo unlink, reorder either widget so they're no longer adjacent, or use the linked pair's long-press menu."),
                 ("What to expect when you're starting out", "The widget needs last night's sleep to fill in. If you forgot your sleep tracking device, the hero will show `NO DATA` for the night — the timer still works.\n\nThe detail sheet's sparkline starts to fill out after about three nights of sleep data; trends become meaningful around two weeks in.")
             ]

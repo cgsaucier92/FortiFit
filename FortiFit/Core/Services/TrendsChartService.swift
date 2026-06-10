@@ -949,7 +949,7 @@ struct TrendsChartService {
             let rpes = workouts.filter { $0.date >= weekStart && $0.date <= endOfWeek && $0.rpe != nil }.compactMap(\.rpe)
             if !rpes.isEmpty {
                 let avg = Double(rpes.reduce(0, +)) / Double(rpes.count)
-                weekData.append(ChartDataPoint(x: weekStart, y: avg, label: String(format: "%.1f RPE", avg)))
+                weekData.append(ChartDataPoint(x: weekStart, y: avg, label: String(format: "%.1f Effort", avg)))
             }
             guard let next = isoCalendar.date(byAdding: .weekOfYear, value: 1, to: weekStart) else { break }
             weekStart = next

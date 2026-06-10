@@ -177,7 +177,7 @@ struct FortiFitRecoveryStatusDetailSheet: View {
         let asleepHM = "\(asleepMinutes / 60)h \(String(format: "%02d", asleepMinutes % 60))m"
         let inBedHM = "\(inBedMinutes / 60)h \(String(format: "%02d", inBedMinutes % 60))m"
         return Text("Sleep efficiency: \(percent)% (\(asleepHM) asleep of \(inBedHM) in bed)")
-            .font(FortiFitTypography.bodySmall)
+            .font(FortiFitTypography.labelSmall)
             .foregroundStyle(FortiFitColors.mutedText)
             .accessibilityIdentifier(AccessibilityID.recoveryStatusDetailSheet_sleepEfficiencyCaption)
     }

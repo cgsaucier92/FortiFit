@@ -298,22 +298,10 @@ struct FortiFitWeeklyStreakDetailSheet: View {
 
     private func milestoneBadge(mark: Int) -> some View {
         let isUnlocked = history.unlockedMilestones.contains(mark)
-        let isNext = history.nextUnlockedMilestone == mark
         return VStack(spacing: 6) {
-            ZStack {
-                if isNext {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(FortiFitColors.primaryAccent.opacity(0.06))
-                        .frame(width: 56, height: 56)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(FortiFitColors.primaryAccent, lineWidth: 1)
-                        )
-                }
-                Image(systemName: isUnlocked ? "trophy.fill" : "trophy")
-                    .font(.system(size: 36))
-                    .foregroundStyle(isUnlocked ? FortiFitColors.primaryAccent : FortiFitColors.mutedText)
-            }
+            Image(systemName: isUnlocked ? "trophy.fill" : "trophy")
+                .font(.system(size: 36))
+                .foregroundStyle(isUnlocked ? FortiFitColors.primaryAccent : FortiFitColors.mutedText)
             Text(mark == 1 ? "1 WK" : "\(mark) WKS")
                 .font(FortiFitTypography.bodySmall)
                 .foregroundStyle(FortiFitColors.primaryAccent)

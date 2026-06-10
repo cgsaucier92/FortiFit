@@ -252,7 +252,7 @@ struct FortiFitChartDetailView: View {
         case "workoutVolume":
             lineChartDetail(chartId: chartId, range: range, exerciseName: nil, color: FortiFitColors.chartPurple, gradientAnchor: gradientAnchor, yLabel: settings.useLbs ? "lbs" : "kg")
         case "rpeTrend":
-            barChartDetail(chartId: chartId, range: range, color: FortiFitColors.chartOrange, gradientAnchor: gradientAnchor, yLabel: "RPE", yDomain: 0...10)
+            barChartDetail(chartId: chartId, range: range, color: FortiFitColors.chartOrange, gradientAnchor: gradientAnchor, yLabel: "Effort", yDomain: 0...10)
         case "workoutTypeBreakdown":
             breakdownDetail(chartId: chartId, range: range, gradientAnchor: gradientAnchor)
         case "sessionDuration":

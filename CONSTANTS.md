@@ -167,18 +167,18 @@ Colors applied to icons and values on every stat card in the Workout Detail Summ
 |---|---|---|---|
 | Effort (Workout Detail Summary, Metric Detail Sheet hero, Share Image Card) | Custom `FortiFitEffortBars` glyph — lit bars use the dynamic band color from § Effort Color Mapping; unlit bars use `FortiFitColors.mutedText × 0.25`. See § Effort Bars Glyph. | Dynamic — maps from `workout.rpe` per § Effort Color Mapping | Per-segment color — each segment endpoint maps via § Effort Color Mapping |
 | Effort (Log Workout dropdown) | Multi-color palette on `chart.bar.fill`: short bar `#10b981`, middle bar `#C4F648`, tall bar `#ef4444` | Dynamic — maps from `workout.rpe` per § Effort Color Mapping | n/a |
-| Duration | `#4B2893` (purple) | `#4B2893` | `#4B2893` |
-| Distance | `#289193` (teal) | `#289193` | `#289193` |
-| Avg HR | `#ef4444` (red) | `#ef4444` | `#ef4444` |
+| Duration | `#289193` (teal) | `#289193` | `#289193` |
+| Distance | `#6E8CCD` (periwinkle) | `#6E8CCD` | `#6E8CCD` |
+| Avg HR | `#BA3535` (darker red) | `#BA3535` | `#BA3535` |
 | Max HR | `#ef4444` (red) | `#ef4444` | `#ef4444` |
-| Active kcal | `#934F28` (orange) | `#934F28` | `#934F28` |
-| Total kcal | `#934F28` (orange) | `#934F28` | `#934F28` |
+| Active kcal | `#CC7A00` (darker orange) | `#CC7A00` | `#CC7A00` |
+| Total kcal | `#FFA600` (orange) | `#FFA600` | `#FFA600` |
 | Elevation Ascended | `#934F28` (orange) | `#934F28` | `#934F28` |
-| Exercise Minutes | `#4B2893` (purple) | `#4B2893` | `#4B2893` |
+| Exercise Minutes | `#289193` (teal) | `#289193` | `#289193` |
 
 **Notes on the table above:**
-- All hex values reference tokens already defined in § Colors (Positive Green, Caution Yellow, Alert Red, Chart Purple, Chart Orange, Chart Teal). No new tokens introduced.
-- Elevation and Exercise Minutes are not in the user's explicit color spec but inherit sensible defaults — Elevation tracks the calorie family (orange) since it represents "work performed against gravity," and Exercise Minutes tracks the Duration family (purple) since it's a time-based metric. Adjust if a different mapping is preferred.
+- Most hex values reference tokens already defined in § Colors (Positive Green, Caution Yellow, Alert Red, Chart Orange, Chart Teal). Distance uses periwinkle `#6E8CCD` (defined inline as `AppConstants.statCardDistance`); Avg HR uses darker red `#BA3535` (defined inline as `AppConstants.statCardHeartRateDark`).
+- Elevation and Exercise Minutes are not in the user's explicit color spec but inherit sensible defaults — Elevation tracks the calorie family (orange) since it represents "work performed against gravity," and Exercise Minutes tracks the Duration family (teal) since it's a time-based metric. Adjust if a different mapping is preferred.
 - The Effort palette-rendered SF Symbol applies only on the Log Workout dropdown: `Image(systemName: "chart.bar.fill").symbolRenderingMode(.palette).foregroundStyle(.green, .yellow, .red)` (using the actual hex tokens). Layer order in `chart.bar.fill` is short → medium → tall, so the foreground style tuple maps to that order naturally; verify visually on first build in case Apple changes the layer order in a future SF Symbols release. On the Workout Detail Summary, the Metric Detail Sheet hero, and the Share Image Card, the SF Symbol is replaced by `FortiFitEffortBars` per § Effort Bars Glyph.
 
 **The current workout's data point on every detail sheet sparkline** is highlighted with Primary Accent Blue `#3b82f6` (filled circle, larger radius) — uniform across all metrics regardless of line color, so users can always locate the current session in the chart.

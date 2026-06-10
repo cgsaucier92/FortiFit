@@ -235,17 +235,6 @@ A note on accuracy: Apple Watch's sleep stage classification is meaningfully les
 
 Efficiency requires your sleep tracker to record both time-in-bed and time-asleep. Apple Watch records both; some third-party sources record only sleep time. If efficiency isn't shown in your detail sheet, the source didn't provide in-bed data.
 
-**How time-since-workout is calculated:** The timer counts from the start time of your most recently logged workout, regardless of type. Manual logs and workouts imported from Apple Health both count.
-
-The format shifts as time passes:
-
-- Under an hour: `12 min`
-- Hours to a day: `4h 12m`
-- One to three days: `1d 4h`
-- Beyond three days: `4 days`
-
-Tap into the detail sheet to see how long it's been since your last workout of each type — Strength Training, HIIT, Cardio, Yoga, Pilates, and Other.
-
 **Linking with Training Load:** Place Recovery Status directly above or below the Training Load widget on your Home screen to link them. Both card borders turn blue and the cards merge into one continuous block.
 
 When linked, last night's sleep is factored into your Training Load score: poor sleep slows your stress decay, so your score better reflects how recovered you actually are — not just how much time has passed.
@@ -260,7 +249,15 @@ The detail sheet's sparkline starts to fill out after about three nights of slee
 
 **Title:** About Recovery & Load
 
-**Intro:** When linked, last night's sleep feeds into your Training Load. Poor sleep slows your recovery, so the score reflects how rested you actually are — not just time since your last workout.
+**Intro:** Training Load is a 0–100 score from your recent workouts that reflects your physical stress. When the recovery and load widgets are linked, sleep adjusts the score to reflect the impact of your rest patterns on your physical stress levels.
+
+**What feeds your Training Load:** Your score reflects each recent workout's effort, duration, type, and volume (sets × reps for Strength and HIIT). Recent sessions count more — stress decays over about 10 days.
+
+**Zones:**
+- Low (1–30, green): well recovered
+- Moderate (31–55, yellow): some accumulated fatigue
+- High (56–80, dark yellow): significant fatigue
+- Peak (81–100, red): high stress, prioritize recovery
 
 **How linking changes Training Load:** Without linking, Training Load decays at a fixed rate over ~10 days regardless of how rested you are.
 
@@ -284,10 +281,6 @@ Trackers classify sleep into four stages:
 - **Awake** — brief wake-ups
 
 Stage accuracy varies by device — treat it as directional, not clinical.
-
-**How time-since-workout is calculated:** The timer starts from your most recent workout, whether logged manually or imported from Apple Health.
-
-Format scales with time: `12 min` → `4h 12m` → `1d 4h` → `4 days`. Open the detail sheet for per-type timers.
 
 **Unlinking these widgets:** Long-press either card → "Unlink Widgets." You can also unlink by reordering them apart or deleting one. To re-link, drag them back into adjacent positions.
 
